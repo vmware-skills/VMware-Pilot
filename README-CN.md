@@ -12,14 +12,14 @@
 >
 > | 技能 | 范围 | 安装 |
 > |------|------|------|
-> | **[vmware-aiops](https://github.com/zw008/VMware-AIops)** | VM 生命周期、部署、Guest Ops、集群 | `uv tool install vmware-aiops` |
-> | **[vmware-monitor](https://github.com/zw008/VMware-Monitor)** | 只读：资源清单、健康检查、告警、事件 | `uv tool install vmware-monitor` |
-> | **[vmware-storage](https://github.com/zw008/VMware-Storage)** | 数据存储、iSCSI、vSAN 管理 | `uv tool install vmware-storage` |
-> | **[vmware-vks](https://github.com/zw008/VMware-VKS)** | Tanzu 命名空间、TKC 集群生命周期 | `uv tool install vmware-vks` |
-> | **[vmware-nsx](https://github.com/zw008/VMware-NSX)** | NSX 网络：Segment、网关、NAT | `uv tool install vmware-nsx-mgmt` |
-> | **[vmware-nsx-security](https://github.com/zw008/VMware-NSX-Security)** | DFW 防火墙规则、安全组 | `uv tool install vmware-nsx-security` |
-> | **[vmware-aria](https://github.com/zw008/VMware-Aria)** | Aria Ops：指标、告警、容量 | `uv tool install vmware-aria` |
-> | **[vmware-avi](https://github.com/zw008/VMware-AVI)** | AVI 负载均衡、Pool 管理、AKO K8s 运维 | `uv tool install vmware-avi` |
+> | **[vmware-aiops](https://github.com/vmware-skills/VMware-AIops)** | VM 生命周期、部署、Guest Ops、集群 | `uv tool install vmware-aiops` |
+> | **[vmware-monitor](https://github.com/vmware-skills/VMware-Monitor)** | 只读：资源清单、健康检查、告警、事件 | `uv tool install vmware-monitor` |
+> | **[vmware-storage](https://github.com/vmware-skills/VMware-Storage)** | 数据存储、iSCSI、vSAN 管理 | `uv tool install vmware-storage` |
+> | **[vmware-vks](https://github.com/vmware-skills/VMware-VKS)** | Tanzu 命名空间、TKC 集群生命周期 | `uv tool install vmware-vks` |
+> | **[vmware-nsx](https://github.com/vmware-skills/VMware-NSX)** | NSX 网络：Segment、网关、NAT | `uv tool install vmware-nsx-mgmt` |
+> | **[vmware-nsx-security](https://github.com/vmware-skills/VMware-NSX-Security)** | DFW 防火墙规则、安全组 | `uv tool install vmware-nsx-security` |
+> | **[vmware-aria](https://github.com/vmware-skills/VMware-Aria)** | Aria Ops：指标、告警、容量 | `uv tool install vmware-aria` |
+> | **[vmware-avi](https://github.com/vmware-skills/VMware-AVI)** | AVI 负载均衡、Pool 管理、AKO K8s 运维 | `uv tool install vmware-avi` |
 
 ## 安装
 

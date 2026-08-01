@@ -194,7 +194,7 @@ vmware-avi doctor
 
 ### Source Code
 
-[github.com/zw008/VMware-Pilot](https://github.com/zw008/VMware-Pilot) — MIT license.
+[github.com/vmware-skills/VMware-Pilot](https://github.com/vmware-skills/VMware-Pilot) — MIT license.
 
 ### Config File Contents
 

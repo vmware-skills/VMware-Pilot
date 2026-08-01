@@ -4,7 +4,7 @@
   "title": "VMware Pilot",
   "description": "Multi-step workflow orchestration for VMware MCP skills with approval gates and rollback.",
   "repository": {
-    "url": "https://github.com/zw008/VMware-Pilot",
+    "url": "https://github.com/vmware-skills/VMware-Pilot",
     "source": "github"
   },
   "version": "1.8.7",

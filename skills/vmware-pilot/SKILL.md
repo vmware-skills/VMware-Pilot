@@ -10,7 +10,7 @@ installer:
   kind: uv
   package: vmware-pilot
 allowed-tools: [Bash]
-metadata: {"openclaw":{"requires":{"bins":["vmware-pilot"]},"optional":{"env":["VMWARE_AUDIT_APPROVED_BY"]},"primaryEnv":"NONE","homepage":"https://github.com/zw008/VMware-Pilot","emoji":"🧭","os":["macos","linux"]}}
+metadata: {"openclaw":{"requires":{"bins":["vmware-pilot"]},"optional":{"env":["VMWARE_AUDIT_APPROVED_BY"]},"primaryEnv":"NONE","homepage":"https://github.com/vmware-skills/VMware-Pilot","emoji":"🧭","os":["macos","linux"]}}
 compatibility: >
   vmware-policy auto-installed as Python dependency (provides @vmware_tool decorator and audit logging). All workflow operations audited to ~/.vmware/audit.db.
   No direct vCenter/NSX credentials: Pilot is an orchestration layer that delegates to companion skills (aiops, monitor, nsx, etc.) which handle their own auth.
@@ -21,7 +21,7 @@ compatibility: >
 
 # VMware Pilot
 
-> **Disclaimer**: This is a community-maintained open-source project and is **not affiliated with, endorsed by, or sponsored by VMware, Inc. or Broadcom Inc.** "VMware" is a trademark of Broadcom. Source code is publicly auditable at [github.com/zw008/VMware-Pilot](https://github.com/zw008/VMware-Pilot) under the MIT license.
+> **Disclaimer**: This is a community-maintained open-source project and is **not affiliated with, endorsed by, or sponsored by VMware, Inc. or Broadcom Inc.** "VMware" is a trademark of Broadcom. Source code is publicly auditable at [github.com/vmware-skills/VMware-Pilot](https://github.com/vmware-skills/VMware-Pilot) under the MIT license.
 
 Multi-step workflow orchestration for VMware MCP skills — design, approve, execute, rollback.
 
