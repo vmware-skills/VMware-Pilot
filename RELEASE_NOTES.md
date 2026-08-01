@@ -1,3 +1,9 @@
+## v1.8.8 — moved to vmware-skills org + MCP Registry namespace io.github.vmware-skills/vmware-pilot
+
+Repo transferred from github.com/zw008 to github.com/vmware-skills (redirects preserve old links).
+MCP Registry server renamed to `io.github.vmware-skills/*`; the old `io.github.zw008/*` entry is deprecated.
+All in-repo links updated. No functional code change on this line beyond the org move.
+
 ## v1.8.7 (2026-07-21) — the skill-level read-only switch is removed; read/write authorization is the vCenter account's job (RBAC)
 
 ### Removed: `VMWARE_READ_ONLY` / `read_only:` — give the agent a read-only service account instead

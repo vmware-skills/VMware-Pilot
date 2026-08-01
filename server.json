@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.zw008/vmware-pilot",
+  "name": "io.github.vmware-skills/vmware-pilot",
   "title": "VMware Pilot",
   "description": "Multi-step workflow orchestration for VMware MCP skills with approval gates and rollback.",
   "repository": {
     "url": "https://github.com/vmware-skills/VMware-Pilot",
     "source": "github"
   },
-  "version": "1.8.7",
+  "version": "1.8.8",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "vmware-pilot",
-      "version": "1.8.7",
+      "version": "1.8.8",
       "transport": {
         "type": "stdio"
       }

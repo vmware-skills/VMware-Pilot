@@ -1,4 +1,4 @@
-<!-- mcp-name: io.github.zw008/vmware-pilot -->
+<!-- mcp-name: io.github.vmware-skills/vmware-pilot -->
 
 # VMware Pilot
 
