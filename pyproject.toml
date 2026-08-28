@@ -17,6 +17,13 @@ dependencies = [
     "typer>=0.12,<1.0",
 ]
 
+
+[project.urls]
+Homepage = "https://github.com/vmware-skills/VMware-Pilot"
+Repository = "https://github.com/vmware-skills/VMware-Pilot"
+Issues = "https://github.com/vmware-skills/VMware-Pilot/issues"
+Changelog = "https://github.com/vmware-skills/VMware-Pilot/blob/main/RELEASE_NOTES.md"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0,<10.0",
