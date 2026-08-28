@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "vmware-pilot": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "vmware-pilot==1.8.8",
+        "vmware-pilot-mcp"
+      ]
+    }
+  }
+}
