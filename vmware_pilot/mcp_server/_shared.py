@@ -15,6 +15,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from vmware_policy import sanitize
 
+from vmware_pilot import __version__
 from vmware_pilot.executor import WorkflowExecutor
 from vmware_pilot.models import WorkflowStore
 
@@ -70,6 +71,11 @@ mcp = FastMCP(
         "approve to continue past gates, rollback to abort."
     ),
 )
+
+# FastMCP takes no version argument and leaves the lowlevel server's at
+# None, which makes `initialize` answer with the MCP SDK's version rather
+# than ours. Set it so a client can tell which release it is talking to.
+mcp._mcp_server.version = __version__
 
 
 def _get_store() -> WorkflowStore:
