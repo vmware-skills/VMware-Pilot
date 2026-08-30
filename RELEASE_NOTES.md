@@ -1,3 +1,56 @@
+## Unreleased — the approval gate stops being an allowlist by omission
+
+Two defects from the 2026-08-30 real-hardware re-test. No version bump yet.
+
+**Importing this package no longer disables another skill's policy rules.**
+`vmware_pilot.mcp_server.server` registered a `vmware_policy` environment
+resolver at import time, and that resolver answered `local` for every target it
+was asked about. `set_environment_resolver` writes to one process-global slot
+shared by every skill in the interpreter, so in an MCP host that loads several of
+these skills — the normal deployment — importing vmware-pilot replaced whatever
+a sibling had installed and every one of that sibling's targets began resolving
+to `local`. A rule scoped to `environments: [production]` then matches nothing
+and denies nothing. The re-test measured a rule going DENY to ALLOW that way.
+
+The registration is gone rather than moved: pilot has no target config and no
+connection, so it has no basis to answer the question for any target, and
+`resolve_environment`'s documented default — unlabeled, matching no
+environment-scoped rule, never refused for lack of a label — is the honest
+answer. Nothing is lost; the gate on the real infrastructure change applies
+downstream, in the target skill's own process.
+
+**`review_workflow` now gates what it cannot classify.** The check for
+"destructive step with no approval gate" tested the tool name against seven
+substrings and treated every other answer as safe. Measured against the family's
+own MCP annotations, 120 tools declare `readOnlyHint: False` and 24 matched a
+substring: 96 write tools produced no finding at all, 17 of them tools their own
+skill marks `destructiveHint: True` — `vm_clean_slate`, `pool_push_image`,
+`machine_reset`, `session_logoff`, `ako_restart`, `vgpu_assign`. Meanwhile
+`SKILL_CATALOG`, in this same package, carried a `risk` label for 69 tools that
+nothing read, including all 13 marked `risk: high`.
+
+Adding the seventeen names would have fixed today's list and lost again on the
+next release, so the shape changed instead. The catalog's risk is now read, and a
+step whose tool pilot cannot place is reported as `ungated_unclassified` and
+needs an approval gate — stated as "cannot classify", not as "destructive",
+because the evidence is an absence rather than a danger. That is what keeps this
+fixed as the surface grows: a tool added to any sibling tomorrow is gated with no
+list edited. `run_workflow` refuses on it like the other blocking findings, and
+`force=True` still overrides, audited.
+
+All 41 self-declared destructive tools are now gated, up from 24. Medium-tier
+writes (create / scale / enable) stay ungated deliberately — the family gates
+destructive work, and four built-in templates create in staging *before* asking
+for approval — but they are classified and counted rather than invisible. The
+summary gained `classified_steps` and `unclassified_steps` so an "approved"
+verdict can no longer mean "nothing here was legible".
+
+Two catalog labels were reconciled with the siblings' own annotations:
+`aiops.vm_power_off` (medium to high) and `vks.get_tkc_kubeconfig`, which returns
+a live Supervisor credential, is marked destructive by vmware-vks, and was being
+read as an inspection because it starts with `get_`.
+
+
 ## v1.8.10 — the schema an agent reads now carries the descriptions
 
 Parameter descriptions reach the JSON schema for the first time. An MCP client

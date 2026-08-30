@@ -16,9 +16,8 @@ Exposes 13 tools for AI agents to manage multi-step VMware workflows:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from vmware_policy import describe_tool_parameters, set_environment_resolver
+from vmware_policy import describe_tool_parameters
 
 from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
 from vmware_pilot.mcp_server._shared import _save_as_yaml, _validate_template_name, mcp
@@ -69,49 +68,60 @@ from vmware_pilot.mcp_server.tools.query import (  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Environment declaration
+# Environment declaration — deliberately absent
 # ---------------------------------------------------------------------------
-
-#: What this skill reports as the environment of everything it touches.
-#:
-#: Policy rules scope by environment, and the baseline treats a target that
-#: declares none as unknown — today that warns on state-changing operations,
-#: and the next major release refuses them. Every other skill answers this from
-#: its own config, where an operator labels each target ``production`` /
-#: ``staging`` / ``lab``.
-#:
-#: vmware-pilot has no such config and no connection of its own — deliberately.
-#: It orchestrates other skills, and its own writes (plan / approve / rollback /
-#: cancel / the authoring tools) all land in the local workflow DB
-#: (``~/.vmware/workflows.db``), never on a VMware estate. The executor does not
-#: call VMware APIs; with no dispatch function configured — which is the case
-#: for this MCP server, see ``vmware_pilot.executor`` — executable steps are
-#: recorded as ``not_executed`` and the run reports ``dispatch_required``.
-#:
-#: So the approval gate on the real infrastructure change is not skipped, it
-#: happens downstream: the calling agent performs each step through the target
-#: skill's own MCP tool, in that skill's process, where that skill's resolver
-#: reports the target's declared environment and the gate applies. Requiring
-#: pilot to declare an environment it has no basis to know would block workflow
-#: authoring permanently while protecting nothing.
-#:
-#: CAVEAT for embedders: this resolver is process-global in vmware_policy, not
-#: per-server. An embedder that constructs ``WorkflowExecutor`` with a real
-#: dispatch callable that invokes sibling skills *in this same process* would
-#: have those skills' writes resolve to ``local`` instead of the target's real
-#: declared environment — silently unscoping exactly the rules this mechanism
-#: exists to enforce. Such an embedder must re-register the skill's own resolver
-#: around the dispatched call. The shipped stdio server never dispatches, so
-#: this cannot arise from normal use.
-LOCAL_ENVIRONMENT = "local"
-
-
-def _environment_for(target: Optional[str]) -> str:
-    """Report the environment for policy scoping. Always ``local`` — see above."""
-    return LOCAL_ENVIRONMENT
-
-
-set_environment_resolver(_environment_for)
+#
+# This module registers no ``vmware_policy`` environment resolver. That is the
+# fix for a real DENY → ALLOW regression, not an oversight, so here is why in
+# full.
+#
+# ``set_environment_resolver`` writes to a single process-global slot shared by
+# every skill in the interpreter. This module used to call it at *import* time
+# with a resolver that answered ``"local"`` for every target it was asked about.
+# In an MCP host that loads several of these skills into one process — the
+# normal deployment — importing vmware-pilot therefore replaced whatever
+# resolver a sibling had installed, and every one of that sibling's targets
+# started resolving to ``"local"``. A rule scoped to
+# ``environments: [production]`` stops matching, so it stops denying. The
+# real-hardware round measured exactly that, and nothing surfaced it: a deny
+# rule that under-matches is silent by construction.
+#
+# Two things were wrong and both had to go.
+#
+# The *timing*: registering a process-global at import means a bare ``import``
+# — the thing a host does merely to enumerate a package — mutates enforcement
+# for code that has nothing to do with this skill.
+#
+# The *answer*: a resolver is asked "what environment is target X in?" and this
+# one replied ``"local"`` for every X. For X = ``prod-vc01`` that is not a
+# conservative default, it is false, and it is precisely the value that makes
+# production-scoped rules stop matching. Moving the same constant into
+# ``main()`` would only narrow who gets lied to.
+#
+# So the registration is gone rather than relocated. vmware-pilot has no target
+# config and no connection of its own — deliberately: it orchestrates other
+# skills, and its own writes (plan / approve / rollback / cancel / the authoring
+# tools) all land in the local workflow DB at ``~/.vmware/workflows.db``, never
+# on a VMware estate. It therefore has no basis to answer the question for any
+# target, and the honest thing is to leave the slot alone and let
+# ``resolve_environment`` apply its documented default: unlabeled (``""``),
+# which matches no environment-scoped rule and is never refused for lack of a
+# label (HLD §6, D-3).
+#
+# Nothing is lost by declining. The approval gate on the real infrastructure
+# change happens downstream anyway: the calling agent performs each step through
+# the target skill's own MCP tool, in that skill's process, where that skill's
+# resolver reports the target's declared environment and the gate applies.
+#
+# Declining is a fix for this skill, not for the hazard. One global slot with
+# last-writer-wins semantics still means any skill that registers honestly can
+# be silently displaced by the next one imported, and ``vmware_policy`` only
+# logs a warning when that happens — a warning is not a control. The repair
+# belongs there, and the shape it should take is: key the resolver by the
+# registering skill so each skill's targets are resolved by its own lookup, and
+# make a second registration for a skill that already has one an error rather
+# than an overwrite. Fixing it here is not possible; every skill would have to
+# agree, and the one that forgets is the one that breaks the others.
 
 __all__ = [
     "mcp",

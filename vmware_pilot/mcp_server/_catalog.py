@@ -10,7 +10,11 @@ SKILL_CATALOG = {
         "description": "VM lifecycle, deployment, clusters, guest operations, alarm management",
         "tools": {
             "vm_power_on": {"risk": "medium", "desc": "Power on a VM"},
-            "vm_power_off": {"risk": "medium", "desc": "Power off a VM (graceful/force)"},
+            # risk high, not medium: vmware-aiops itself publishes this tool with
+            # destructiveHint=True. Pilot's own label used to be the more
+            # optimistic of the two, and since the label is what the approval
+            # gate reads, the disagreement resolved in favour of not gating it.
+            "vm_power_off": {"risk": "high", "desc": "Power off a VM (graceful/force)"},
             "deploy_linked_clone": {"risk": "medium", "desc": "Instant clone from snapshot"},
             "deploy_vm_from_template": {"risk": "medium", "desc": "Clone from vSphere template"},
             "deploy_vm_from_ova": {"risk": "medium", "desc": "Deploy from OVA file"},
@@ -88,6 +92,15 @@ SKILL_CATALOG = {
             "scale_tkc_cluster": {"risk": "medium", "desc": "Scale worker nodes"},
             "upgrade_tkc_cluster": {"risk": "medium", "desc": "Upgrade K8s version"},
             "delete_tkc_cluster": {"risk": "high", "desc": "Delete TKC cluster"},
+            # Listed so the gate stops reading this as an inspection. It opens
+            # with "get_" and returns a live Supervisor credential; vmware-vks
+            # publishes it with destructiveHint=True. It is the one measured case
+            # where the read-only name heuristic was confidently wrong rather
+            # than merely uninformed.
+            "get_tkc_kubeconfig": {
+                "risk": "high",
+                "desc": "Fetch a TKC kubeconfig — returns a live session credential",
+            },
         },
     },
     "storage": {

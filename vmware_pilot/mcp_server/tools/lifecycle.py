@@ -143,7 +143,12 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
         blocking = [
             f
             for f in review_result.get("findings", [])
-            if f.get("kind") in ("ungated_destructive", "destructive_in_parallel_group")
+            # ungated_unclassified is blocking for the same reason the other two
+            # are: pilot is about to dispatch a step it cannot vouch for, and the
+            # only safe reading of "I do not know what this tool does" is that a
+            # human should. force=True still overrides, and is audited.
+            if f.get("kind")
+            in ("ungated_destructive", "ungated_unclassified", "destructive_in_parallel_group")
         ]
         if blocking:
             if not force:
@@ -151,8 +156,9 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
                     "error": (
                         f"Refusing to run workflow '{workflow_id}': review found "
                         f"{len(blocking)} blocking safety finding(s) — destructive "
-                        "steps without a preceding require_approval gate and/or "
-                        "destructive steps inside a parallel group."
+                        "or unclassifiable steps without a preceding "
+                        "require_approval gate, and/or destructive steps inside a "
+                        "parallel group."
                     ),
                     "blocking_findings": blocking,
                     "hint": (

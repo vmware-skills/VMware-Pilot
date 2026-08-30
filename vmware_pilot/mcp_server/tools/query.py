@@ -27,8 +27,21 @@ def review_workflow(workflow_id: str) -> dict:
       - Delete-then-use: a step deletes resource X, a later step references X
       - Missing required params: a step has empty params or placeholder values
       - Cross-skill order issues: surfacing the cross-skill dispatch sequence
-      - Risk profile: count of destructive vs. read-only steps
-      - Approval coverage: are all destructive ops gated behind a require_approval?
+      - Risk profile: count of destructive / write / read-only / unclassified steps
+      - Approval coverage: is every destructive OR unclassifiable step gated
+        behind a preceding require_approval?
+
+    Each step is placed in a tier from the tool's entry in ``get_skill_catalog``
+    first, then from name patterns. A step that matches neither is reported as
+    ``ungated_unclassified`` rather than assumed safe: pilot dispatches nothing
+    itself and cannot inspect a sibling skill's annotations, so "this tool is
+    unknown to me" is the honest finding, and it needs the same gate a known
+    destructive step does. The remedy is in the message — add the tool to
+    SKILL_CATALOG with the risk its own skill declares, or add a gate.
+
+    Medium-risk writes (create / scale / enable) are classified and counted but
+    not gated: the family gates destructive work, and several built-in templates
+    deliberately create in staging *before* asking for approval.
 
     Args:
         workflow_id: The workflow ID returned by ``plan_workflow``.
@@ -36,8 +49,14 @@ def review_workflow(workflow_id: str) -> dict:
     Returns:
         Dict with keys:
           - ``verdict``: ``"approved"`` if no structural issues, otherwise ``"needs_revision"``
-          - ``findings``: list of {severity, kind, message, step_index}
-          - ``summary``: counts (steps, gather/destructive/approval), groups, est_duration_min
+          - ``findings``: list of {severity, kind, message, step_index}. Kinds
+            ``ungated_destructive``, ``ungated_unclassified`` and
+            ``destructive_in_parallel_group`` are what ``run_workflow`` refuses on
+            unless called with ``force=True``.
+          - ``summary``: counts — total/destructive/write/read_only/approval_gates,
+            parallel_groups, est_duration_min, plus ``classified_steps`` and
+            ``unclassified_steps`` so an "approved" verdict can be told apart from
+            a workflow this review could not read.
     """
     try:
         wf = _get_store().load(workflow_id)
