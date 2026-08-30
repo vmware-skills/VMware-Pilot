@@ -1,6 +1,6 @@
-## Unreleased — the approval gate stops being an allowlist by omission
+## v1.8.11 — the approval gate stops being an allowlist by omission
 
-Two defects from the 2026-08-30 real-hardware re-test. No version bump yet.
+Two defects from the 2026-08-30 real-hardware re-test. 
 
 **Importing this package no longer disables another skill's policy rules.**
 `vmware_pilot.mcp_server.server` registered a `vmware_policy` environment
