@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vmware-pilot"
-version = "1.8.9"
+version = "1.8.10"
 description = "VMware workflow orchestration — multi-step state machine with approval gates"
 readme = "README.md"
 license = "MIT"
