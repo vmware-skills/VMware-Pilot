@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from vmware_policy import set_environment_resolver
+from vmware_policy import describe_tool_parameters, set_environment_resolver
 
 from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
 from vmware_pilot.mcp_server._shared import _save_as_yaml, _validate_template_name, mcp
@@ -141,3 +141,10 @@ def main() -> None:
     """Run the MCP server over stdio."""
     logging.basicConfig(level=logging.INFO)
     mcp.run(transport="stdio")
+
+# The docstrings above are the schema. `describe_tool_parameters` copies each
+# `Args:` entry into the JSON schema an agent actually reads, and closes the
+# object. Without it every parameter reaches the model as a bare name and a
+# type, which is how a wrong guess becomes an unfiltered result or a silent
+# zero-row answer instead of an error (real-hardware round, 2026-08-30).
+_DESCRIBED_PARAMS = describe_tool_parameters(mcp._tool_manager._tools)
