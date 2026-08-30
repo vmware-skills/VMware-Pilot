@@ -51,25 +51,26 @@
     "manifest_context_headroom": {
       "detail": {
         "heaviest_tools": {
-          "cancel_workflow": 210,
-          "create_workflow": 251,
-          "plan_workflow": 216,
-          "run_workflow": 248,
-          "update_draft": 240
+          "cancel_workflow": 223,
+          "create_workflow": 270,
+          "review_workflow": 364,
+          "run_workflow": 258,
+          "update_draft": 258
         },
-        "manifest_tokens": 2271,
-        "mean_tokens_per_tool": 174.7,
+        "manifest_tokens": 2519,
+        "mean_tokens_per_tool": 193.8,
         "reference_context": 16384,
         "tool_count": 13
       },
       "maximum": 16384,
-      "pct": 86.1,
+      "pct": 84.6,
       "unit": "tokens",
-      "value": 14113
+      "value": 13865
     },
     "parameter_documentation_coverage": {
       "detail": {
-        "undocumented_by_tool": {}
+        "undocumented_by_tool": {},
+        "value_set_candidates": {}
       },
       "maximum": 23,
       "pct": 100.0,
@@ -79,12 +80,14 @@
     "per_tool_token_discipline": {
       "detail": {
         "ceiling": 350,
-        "over_ceiling": {}
+        "over_ceiling": {
+          "review_workflow": 364
+        }
       },
       "maximum": 13,
-      "pct": 100.0,
+      "pct": 92.3,
       "unit": "tools",
-      "value": 13
+      "value": 12
     },
     "read_write_marker_coverage": {
       "detail": {
