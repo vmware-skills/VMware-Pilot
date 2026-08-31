@@ -202,11 +202,11 @@ class TestListWorkflowsHintIsReachable:
         """The premise of the old hint, falsified directly."""
         from vmware_pilot import custom_loader
 
-        (tmp_path / "broken.yaml").write_text("name: broken\nsteps: [oops\n")
+        (tmp_path / "broken.yaml").write_text("name: broken\nsteps: [oops\n", encoding="utf-8")
         (tmp_path / "good.yaml").write_text(
             "name: good\ndescription: fine\nsteps:\n  - action: a\n    skill: nsx\n"
             "    tool: list_segments\n"
-        )
+        , encoding="utf-8")
         monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path)
 
         result = server.list_workflows()

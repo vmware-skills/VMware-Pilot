@@ -39,7 +39,7 @@ def _has_require_approval(templates_dir: Path, func_name: str) -> bool:
     """Return True if *func_name*, defined anywhere in the templates package,
     contains a ``require_approval`` string literal."""
     for file_path in templates_dir.glob("*.py"):
-        tree = ast.parse(file_path.read_text())
+        tree = ast.parse(file_path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func_name:
                 source = ast.dump(node)

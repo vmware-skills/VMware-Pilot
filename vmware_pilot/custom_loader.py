@@ -82,7 +82,7 @@ def load_custom_templates() -> dict[str, Any]:
 
     for path in sorted(_WORKFLOWS_DIR.glob("*.yaml")):
         try:
-            with open(path) as fh:
+            with open(path, encoding="utf-8") as fh:
                 spec = yaml.safe_load(fh)
             if not spec or "name" not in spec or "steps" not in spec:
                 _log.warning("Skipping invalid workflow: %s (missing name or steps)", path.name)
@@ -174,7 +174,7 @@ def list_custom_workflows() -> list[dict[str, str]]:
 
     for path in sorted(_WORKFLOWS_DIR.glob("*.yaml")):
         try:
-            with open(path) as fh:
+            with open(path, encoding="utf-8") as fh:
                 spec = yaml.safe_load(fh)
             if spec and "name" in spec:
                 result.append(

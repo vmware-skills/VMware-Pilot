@@ -51,7 +51,7 @@ def _sibling_resolver(target: str) -> str | None:
 @pytest.fixture
 def engine(tmp_path):
     path = tmp_path / "rules.yaml"
-    path.write_text(_RULES)
+    path.write_text(_RULES, encoding="utf-8")
     return PolicyEngine(path)
 
 

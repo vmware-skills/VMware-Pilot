@@ -134,7 +134,7 @@ def _save_as_yaml(name: str, description: str, steps: list[dict[str, Any]]) -> N
     }
 
     path = workflows_dir / f"{name}.yaml"
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         yaml.dump(spec, fh, default_flow_style=False, allow_unicode=True)
 
     logger.info("Saved custom workflow template: %s", path)
