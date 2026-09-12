@@ -1,0 +1,20 @@
+{
+  "name": "@zw008/vmware-pilot",
+  "version": "1.10.0",
+  "description": "Multi-step workflow orchestration for VMware MCP skills with approval gates and rollback.",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://github.com/vmware-skills/VMware-Pilot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vmware-skills/VMware-Pilot.git"
+  },
+  "openclaw": {
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2"
+    }
+  }
+}

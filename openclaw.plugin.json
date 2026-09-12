@@ -1,0 +1,24 @@
+{
+  "id": "vmware-pilot",
+  "name": "VMware Pilot",
+  "description": "Multi-step workflow orchestration for VMware MCP skills with approval gates and rollback.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "vmware-pilot": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "vmware-pilot==1.10.0",
+        "vmware-pilot-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
