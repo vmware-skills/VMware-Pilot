@@ -1,3 +1,98 @@
+## v1.9.0 — custom workflows without an approval gate are rejected, not warned
+
+**BREAKING: a custom workflow with an ungated destructive step no longer runs.**
+A custom workflow is one pilot did not ship: a YAML file in `~/.vmware/workflows/`,
+a `create_workflow` step list, or a `design_workflow` draft. If any of its steps is
+destructive (the skill catalog marks it high/critical risk, or its name says
+delete / remove / destroy / shutdown / drop / rollback / force_power_off) or
+unclassifiable (not in the catalog, name matches no pattern), and no
+`require_approval` step comes before it, pilot now refuses it at every door:
+
+- `create_workflow` returns an error and saves nothing — no workflow row, no YAML template;
+- `confirm_draft` refuses and the draft stays a draft (`update_draft` still saves
+  drafts, and lists the steps that need a gate);
+- `plan_workflow` refuses a custom YAML template, naming the file; the YAML loader
+  itself raises `ApprovalGateError`, so code calling it directly is refused too;
+- `run_workflow` refuses such a workflow **even with `force=True`**, including
+  custom workflows saved before this release;
+- `scripts/validate_workflow.py` reports it as an error and exits 1 (it was a
+  warning). The script now runs pilot's own check instead of its own shorter
+  list, so it must run in the Python vmware-pilot is installed in.
+
+Every refusal names each offending step and returns the exact gate step to
+insert and where (`fix.insert_before_step`, `fix.step`). One gate covers every
+step after it. Before, the helper script only warned and `force=True` switched
+`run_workflow`'s refusal off, so the only control on an unreviewed workflow was
+one the caller could opt out of.
+
+**What to do:** add `{action: require_approval, skill: pilot, tool: approve,
+params: {message: ...}}` before the first destructive step of each custom
+workflow. Medium-risk writes (`create_segment`, `vm_power_on`, …) need no gate.
+This refusal does not apply to built-in templates, which keep the audited
+`force=True` override — though two built-ins change in this release for other
+reasons: `patch_deployment` now requires `username`, and `clone_and_test` validates
+`change_spec` at plan time and adds a gate before a guest command (both below).
+Two examples in the docs (SKILL.md, workflow-design.md) had exactly this defect
+and are fixed.
+
+**Rollback was described as automatic. It is not, and never was.** A failed step
+stops the workflow; nothing is undone until `rollback` is called. On the MCP
+server, pilot records the steps the agent performed as `not_executed`, so
+`rollback` there reverses nothing but approval gates — the agent must call each
+step's `rollback_tool` itself. SKILL.md, the references, SECURITY.md, the MCP
+server instructions and the tool descriptions now all say so.
+
+**Docs:** kubeconfig retrieval is described as credential access (gated, written
+to an owner-only file, never printed), not a read-only query; baselines are
+documented as sensitive inventory that pilot does not write itself; the claim
+that a custom template cannot shadow a built-in is corrected (it replaces it,
+with a warning). The English README gains the built-in template table the Chinese
+one had — which listed 14 and left out `investigate_alert`; there are 15. Step
+counts are corrected against the code: `network_segment_setup` 3-6 (not 2-6),
+`compliance_scan` 1-3, `baseline_audit` 1-5, `investigate_alert` 4 or 8 (not 4-9).
+
+**Guest commands and the Supervisor kubeconfig are now gated.** Pilot labelled
+the four aiops guest tools (`vm_guest_exec`, `vm_guest_exec_output`,
+`vm_guest_upload`, `vm_guest_provision`) medium risk, while vmware-aiops publishes
+all four with `destructiveHint: true` — so a custom workflow whose only step was
+`vm_guest_exec /bin/rm -rf /` was saved and dispatched with no gate. They are now
+high risk and need a `require_approval` step before them. `vks
+get_supervisor_kubeconfig` was not in the catalog, and its `get_` prefix made pilot
+read it as an inspection; it returns a live Supervisor bearer token and is now
+gated like `get_tkc_kubeconfig`. Both kubeconfig tools are gated as *credential
+access* — vmware-vks itself publishes them `destructiveHint: false`.
+
+**BREAKING: `patch_deployment` requires `username`.** It defaulted to `root`;
+vmware-aiops removed its own root default for guest operations, and pilot follows.
+Pass the guest account explicitly.
+
+**`clone_and_test` checks `change_spec` when the plan is made.** A spec the aiops
+tool would reject used to fail at dispatch — after the staging clone existed.
+Now, at plan time: a resize (`cpu`, `memory_mb`; `memory_gb` is converted to
+`memory_mb`, which is all `vm_reconfigure` accepts — it used to be passed through
+and rejected) may carry no other keys; a guest command needs `command` and
+`username` (no default) and may carry only `vm_guest_exec` arguments; an empty
+spec is refused. A guest-command run gets an extra approval gate before the
+command runs in staging, so it has 7 steps instead of 6.
+
+**Built-in template names are reserved.** `create_workflow(...,
+save_as_template=True)` and `confirm_draft(..., save_as_template=True)` refuse a
+built-in template's name — the saved YAML would have replaced the built-in for
+every later `plan_workflow` call. A YAML file you write by hand under a built-in
+name still takes precedence, with a warning.
+
+**OpenClaw hid this skill unless `vmware-pilot` was on PATH.** `metadata.openclaw.requires` was
+only `bins: ["vmware-pilot"]` — there was no `requires.config` or `requires.env`, unlike most of the
+family. OpenClaw hides a skill whose required binary is missing, and a plugin install runs the
+server through uvx, which never puts `vmware-pilot` on PATH, so there the skill was "needs setup / not
+visible to the model" (requirement semantics verified on OpenClaw 2026.6.35). `requires` is now
+`anyBins: ["vmware-pilot", "uvx"]`; `optional.env` is unchanged, and the placeholder
+`primaryEnv: "NONE"` is gone.
+
+**Install commands in the skill pin this release.** ClawHub reviews SKILL.md and references/,
+not the package they install, so an unpinned `uv tool install` vouched for code nobody reviewed.
+Every install command for this package in the skill now names this version.
+
 ## v1.8.12 — the test suite runs on a non-UTF-8 machine, and the guardrail tests with it
 
 

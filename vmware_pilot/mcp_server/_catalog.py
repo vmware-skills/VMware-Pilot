@@ -15,14 +15,26 @@ SKILL_CATALOG = {
             # optimistic of the two, and since the label is what the approval
             # gate reads, the disagreement resolved in favour of not gating it.
             "vm_power_off": {"risk": "high", "desc": "Power off a VM (graceful/force)"},
+            # clone_and_test dispatches this for a cpu/memory change_spec. Missing from
+            # the catalog it read as "unclassifiable", and run_workflow refused the
+            # built-in template unless force=True. Label = what vmware-aiops
+            # publishes: risk medium, destructiveHint False.
+            "vm_reconfigure": {"risk": "medium", "desc": "Change a VM's CPU / memory"},
             "deploy_linked_clone": {"risk": "medium", "desc": "Instant clone from snapshot"},
             "deploy_vm_from_template": {"risk": "medium", "desc": "Clone from vSphere template"},
             "deploy_vm_from_ova": {"risk": "medium", "desc": "Deploy from OVA file"},
             "batch_clone_vms": {"risk": "medium", "desc": "Batch clone multiple VMs"},
-            "vm_guest_exec": {"risk": "medium", "desc": "Execute command inside VM"},
-            "vm_guest_exec_output": {"risk": "medium", "desc": "Execute and capture stdout"},
-            "vm_guest_upload": {"risk": "medium", "desc": "Upload file to VM"},
-            "vm_guest_provision": {"risk": "medium", "desc": "Multi-step VM provisioning"},
+            # risk high, as for vm_power_off: vmware-aiops publishes all four guest
+            # tools with destructiveHint=True (its own risk_level is medium). They
+            # run an arbitrary command or write an arbitrary file inside the guest
+            # as the account the caller names — `/bin/rm -rf /` is a well-formed
+            # argument. Labelled medium, a custom workflow whose only step was
+            # that command was saved and dispatched with no approval gate.
+            # vm_guest_download is not here: aiops keeps it destructiveHint=False.
+            "vm_guest_exec": {"risk": "high", "desc": "Execute command inside VM"},
+            "vm_guest_exec_output": {"risk": "high", "desc": "Execute and capture stdout"},
+            "vm_guest_upload": {"risk": "high", "desc": "Upload file to VM"},
+            "vm_guest_provision": {"risk": "high", "desc": "Multi-step VM provisioning"},
             "vm_create_plan": {"risk": "medium", "desc": "Create multi-step execution plan"},
             "vm_apply_plan": {"risk": "medium", "desc": "Execute a created plan"},
             "vm_rollback_plan": {"risk": "medium", "desc": "Rollback a failed plan"},
@@ -92,14 +104,23 @@ SKILL_CATALOG = {
             "scale_tkc_cluster": {"risk": "medium", "desc": "Scale worker nodes"},
             "upgrade_tkc_cluster": {"risk": "medium", "desc": "Upgrade K8s version"},
             "delete_tkc_cluster": {"risk": "high", "desc": "Delete TKC cluster"},
-            # Listed so the gate stops reading this as an inspection. It opens
-            # with "get_" and returns a live Supervisor credential; vmware-vks
-            # publishes it with destructiveHint=True. It is the one measured case
-            # where the read-only name heuristic was confidently wrong rather
-            # than merely uninformed.
+            # Both kubeconfig tools are listed so the gate stops reading them as
+            # inspections: each opens with "get_" and returns a live Supervisor
+            # bearer token. "high" here is pilot's gating decision for
+            # *credential access*, not a copy of vmware-vks's own label — VKS
+            # publishes both with readOnlyHint=False, destructiveHint=False,
+            # risk_level "medium" (they destroy nothing in the cluster). Pilot
+            # gates every step that hands a credential to the calling agent,
+            # and the only tier that gates is the destructive one. Without an
+            # entry, the read-only name heuristic placed them in the read tier:
+            # confidently wrong rather than merely uninformed.
             "get_tkc_kubeconfig": {
                 "risk": "high",
                 "desc": "Fetch a TKC kubeconfig — returns a live session credential",
+            },
+            "get_supervisor_kubeconfig": {
+                "risk": "high",
+                "desc": "Fetch the Supervisor kubeconfig — returns a live bearer token",
             },
         },
     },

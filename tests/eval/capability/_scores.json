@@ -38,34 +38,34 @@
         "dead_end_errors": [],
         "per_dimension_pct": {
           "names_artifact": 100.0,
-          "names_input": 100.0,
+          "names_input": 93.3,
           "states_remedy": 100.0
         },
-        "raise_sites": 7
+        "raise_sites": 15
       },
-      "maximum": 21,
-      "pct": 100.0,
+      "maximum": 45,
+      "pct": 97.8,
       "unit": "points",
-      "value": 21
+      "value": 44
     },
     "manifest_context_headroom": {
       "detail": {
         "heaviest_tools": {
           "cancel_workflow": 223,
-          "create_workflow": 270,
-          "review_workflow": 364,
-          "run_workflow": 258,
-          "update_draft": 258
+          "create_workflow": 319,
+          "review_workflow": 378,
+          "run_workflow": 301,
+          "update_draft": 282
         },
-        "manifest_tokens": 2519,
-        "mean_tokens_per_tool": 193.8,
+        "manifest_tokens": 2769,
+        "mean_tokens_per_tool": 213.0,
         "reference_context": 16384,
         "tool_count": 13
       },
       "maximum": 16384,
-      "pct": 84.6,
+      "pct": 83.1,
       "unit": "tokens",
-      "value": 13865
+      "value": 13615
     },
     "parameter_documentation_coverage": {
       "detail": {
@@ -81,7 +81,7 @@
       "detail": {
         "ceiling": 350,
         "over_ceiling": {
-          "review_workflow": 364
+          "review_workflow": 378
         }
       },
       "maximum": 13,
@@ -108,20 +108,24 @@
           "executor.py:186",
           "executor.py:432",
           "executor.py:444",
-          "_common.py:48"
+          "_aiops_params.py:41",
+          "_aiops_params.py:57",
+          "_aiops_params.py:70",
+          "_aiops_params.py:90",
+          "_aiops_params.py:97"
         ]
       },
-      "maximum": 7,
+      "maximum": 15,
       "pct": 100.0,
       "unit": "messages",
-      "value": 7
+      "value": 15
     },
     "teaching_error_rate": {
       "detail": {},
-      "maximum": 7,
+      "maximum": 15,
       "pct": 100.0,
       "unit": "messages",
-      "value": 7
+      "value": 15
     },
     "tool_description_quality": {
       "detail": {
@@ -155,15 +159,15 @@
     "tool_failure_payload_quality": {
       "detail": {
         "bare_string_error_lines": [],
-        "carries_hint": 10,
-        "dict_shaped": 10,
-        "error_return_sites": 10,
-        "hint_names_artifact": 10
+        "carries_hint": 11,
+        "dict_shaped": 11,
+        "error_return_sites": 11,
+        "hint_names_artifact": 11
       },
-      "maximum": 30,
+      "maximum": 33,
       "pct": 100.0,
       "unit": "checks",
-      "value": 30
+      "value": 33
     }
   }
 }

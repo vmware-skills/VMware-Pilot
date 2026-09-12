@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from typing import Any, Optional
 
 from vmware_policy import vmware_tool
 
+from vmware_pilot.approval_gate import gate_violations, refusal
 from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
 from vmware_pilot.mcp_server._shared import (
     _get_store,
@@ -42,18 +44,23 @@ def create_workflow(
     tool names a step may target.
 
     Each step dict must have: action, skill, tool, params. Optional:
-    rollback_tool, rollback_params. action="require_approval" inserts a human
-    approval gate — run_workflow refuses ungated destructive steps.
+    rollback_tool, rollback_params. action="require_approval" (skill "pilot",
+    tool "approve") inserts a human approval gate. A workflow whose
+    destructive or unclassifiable step has no gate before it is REFUSED —
+    nothing is saved — and the error names the step and the gate to insert.
 
     Args:
         name: Workflow name (used as workflow_type).
         description: Human-readable description.
         steps: List of step dicts, each with action/skill/tool/params.
         save_as_template: If True, save as YAML to ~/.vmware/workflows/ for reuse.
+            Refused when name is a built-in template's name, since the saved
+            template would replace the built-in.
 
     Returns:
         dict with workflow_id and plan summary. Next call review_workflow to
-        check the plan, then run_workflow to execute; rollback undoes it.
+        check the plan, then run_workflow to execute. Nothing is undone
+        automatically on failure; see rollback.
     """
     from datetime import datetime, timezone
 
@@ -67,7 +74,10 @@ def create_workflow(
             if name_error:
                 return {
                     "error": name_error,
-                    "hint": "Choose a simple name like 'network_segment_setup'.",
+                    "hint": (
+                        "Choose a simple name of your own, like 'restart_db_replica' — "
+                        "not a built-in template name (list_workflows shows them)."
+                    ),
                 }
 
         now = datetime.now(tz=timezone.utc).isoformat()
@@ -94,6 +104,15 @@ def create_workflow(
             created_at=now,
             updated_at=now,
         )
+        # Refuse before anything is persisted — no DB row, no YAML template.
+        violations = gate_violations(wf)
+        if violations:
+            return refusal(
+                name,
+                violations,
+                verb="save",
+                retry="call create_workflow again with the corrected steps",
+            )
         _get_store().save(wf)
 
         # Optionally save as YAML template for reuse
@@ -206,7 +225,9 @@ def update_draft(
     create_workflow a new one instead.
 
     Each step dict: {action, skill, tool, params, rollback_tool?, rollback_params?}
-    Use action="require_approval" for approval gates.
+    Use action="require_approval" for approval gates. A draft may be saved
+    without them while it is being designed; the result lists every step
+    that still needs one, and confirm_draft refuses until none are left.
 
     Args:
         workflow_id: The draft workflow ID.
@@ -247,6 +268,19 @@ def update_draft(
 
     _get_store().save(wf)
 
+    violations = gate_violations(wf)
+    message = "Draft updated. Show to user for review. Call confirm_draft() when approved."
+    if violations:
+        first = violations[0]
+        message = (
+            f"Draft updated, but confirm_draft will refuse it: {len(violations)} step(s) "
+            "that could change the estate have no require_approval gate before them "
+            f"(first: step {first.step_index}, {first.skill}.{first.tool}). Add "
+            '{"action": "require_approval", "skill": "pilot", "tool": "approve", '
+            f'"params": {{"message": "..."}}}} before step {first.step_index}, then '
+            "update_draft again."
+        )
+
     return {
         "workflow_id": wf.id,
         "workflow_type": wf.workflow_type,
@@ -261,7 +295,8 @@ def update_draft(
             }
             for s in wf.steps
         ],
-        "message": "Draft updated. Show to user for review. Call confirm_draft() when approved.",
+        "approval_gate_violations": [asdict(v) for v in violations],
+        "message": message,
     }
 
 
@@ -283,11 +318,14 @@ def confirm_draft(
     Use this once the user has approved the draft's steps; call update_draft
     instead if anything still needs changing. After confirmation, the workflow
     can be executed via run_workflow(). Optionally saves as a YAML template
-    for future reuse.
+    for future reuse. Refused — the draft stays a draft and nothing is saved —
+    while any destructive or unclassifiable step lacks a require_approval
+    gate before it.
 
     Args:
         workflow_id: The draft workflow ID to confirm.
         save_as_template: If True, save to ~/.vmware/workflows/ for reuse.
+            Refused when the draft's name is a built-in template's name.
 
     Returns:
         Confirmed workflow summary. Call run_workflow() to execute.
@@ -302,6 +340,15 @@ def confirm_draft(
             return {"error": f"Workflow '{workflow_id}' is not a draft (state: {wf.state.value})"}
         if not wf.steps:
             return {"error": "Cannot confirm a draft with no steps. Call update_draft() first."}
+
+        violations = gate_violations(wf)
+        if violations:
+            return refusal(
+                wf.workflow_type,
+                violations,
+                verb="confirm",
+                retry=f"update_draft('{wf.id}', steps=[...]) and confirm_draft again",
+            )
 
         # Validate the template name BEFORE flipping state to PENDING, so an
         # invalid name cannot leave a confirmed-but-unsaved-template state.

@@ -16,7 +16,7 @@ The contract:
 
 1. **Pilot generates a plan** via `plan_workflow` or `design_workflow`. The plan is a sequence of `(skill, tool, params)` tuples plus approval gates and rollback metadata. State is persisted to SQLite.
 2. **Pilot tracks state** via `run_workflow`, `approve`, `rollback`. Each call returns immediately on the next checkpoint — running, awaiting approval, completed, or failed.
-3. **The calling AI agent dispatches each step**. After `run_workflow` returns a step description, the agent invokes the corresponding MCP tool on the target skill (e.g., `vmware-aiops::vm_clone`), captures the result, and reports back to pilot via the next state transition.
+3. **The calling AI agent dispatches each step**. After `run_workflow` returns a step description, the agent invokes the corresponding MCP tool on the target skill (e.g., `vmware-aiops::vm_clone`) and captures the result. Pilot has no call for reporting a step's result back, so on the MCP server those steps stay `not_executed` in pilot's record — which is why `rollback` there cannot undo them (see Error Handling).
 
 In other words: pilot is the brain, the AI agent is the hands. Pilot never reaches across the wire to call other skills' tools itself — its `dispatch` function defaults to a no-op.
 
@@ -25,7 +25,7 @@ In other words: pilot is the brain, the AI agent is the hands. Pilot never reach
 - **Context isolation**: each step runs in the agent's main loop, not inside pilot. Pilot's context stays small (~100 lines/turn).
 - **No persistent agents**: there is no long-running pilot process that holds state in memory. State is always on disk.
 - **Approval gates as state, not blocking calls**: when a workflow hits `require_approval`, pilot persists the state and returns. Resumption is a new MCP call (`approve`), not an unblocking signal to a paused thread.
-- **Rollback is an explicit operation**: it doesn't happen automatically on agent crash or context loss. The user (or agent) must call `rollback` deliberately.
+- **Rollback is an explicit operation**: it never happens automatically — not on a failed step, not on agent crash or context loss. The user (or agent) must call `rollback` deliberately, and on the MCP server the agent performs the undo calls itself.
 
 ### What this means for agents using pilot
 
@@ -34,7 +34,7 @@ In other words: pilot is the brain, the AI agent is the hands. Pilot never reach
 | Start a multi-step task | Call `plan_workflow`; read returned plan; show to user |
 | Execute the plan | Call `run_workflow`; for each pending step in the response, invoke the named skill+tool yourself; report progress to the user |
 | Hit an approval gate | Tell the user; wait for explicit approval; call `approve` |
-| Encounter a failure | Surface the error; ask the user whether to `rollback` |
+| Encounter a failure | Surface the error; ask the user whether to undo; if yes, call each performed step's `rollback_tool` yourself, last first (pilot's `rollback` cannot see steps you performed) |
 | Need to know workflow state mid-execution | Call `get_workflow_status` (idempotent, safe) |
 
 ### What this means for skill authors
@@ -131,7 +131,8 @@ Phase 1 - Capture (run once, save as baseline):
     nsx.list_segments               -> Network segments
     storage.list_all_datastores     -> Storage state
     monitor.get_alarms              -> Alarm state
-    [Save to ~/.vmware/baselines/]
+    [Agent saves results to ~/.vmware/baselines/ — pilot does not;
+     sensitive inventory, keep it owner-only (0700 dir / 0600 file)]
 
 Phase 2 - Audit (run periodically):
     monitor.list_virtual_machines   -> Current VM state
@@ -139,7 +140,7 @@ Phase 2 - Audit (run periodically):
     nsx.list_segments               -> Current network state
     storage.list_all_datastores     -> Current storage state
     aria.list_anomalies             -> Any new anomalies
-    [Compare against saved baseline -> drift report]
+    [Agent compares against the saved baseline -> drift report]
 
 Phase 3 - Remediate (if drift detected):
     monitor.get_alarms              -> Pre-check
@@ -195,7 +196,7 @@ For each VM:
     aiops.vm_power_off          -> Stop VM (graceful)
     aiops.vm_power_on           -> Start VM
     monitor.get_alarms          -> Verify health after restart
-    [If alarms -> stop rolling, offer rollback]
+    [If alarms -> stop rolling; undo only if the user asks]
 ```
 
 **Built-in templates**: `rolling_restart`, `patch_deployment`
@@ -204,7 +205,9 @@ For each VM:
 be done simultaneously (database clusters, load-balanced web servers, etc.).
 
 **Key benefit**: If one VM fails the health check after restart, the workflow
-stops before touching remaining VMs. Rollback powers the failed VM back on.
+stops before touching remaining VMs. Nothing is undone automatically; the
+step's `rollback_tool` (`vm_power_on`) is there for the agent to call if the
+user wants the VM back on.
 
 ---
 
@@ -217,7 +220,8 @@ vks.create_namespace            -> Create Supervisor Namespace with storage poli
     [APPROVAL GATE]             -> Human reviews namespace config
 vks.create_tkc_cluster          -> Deploy TKC cluster
 vks.get_tkc_cluster             -> Verify cluster is ready
-vks.get_tkc_kubeconfig          -> Retrieve kubeconfig for access
+    [APPROVAL GATE]             -> get_tkc_kubeconfig returns a live credential
+vks.get_tkc_kubeconfig          -> Write it to a file (0600); never print the token
 ```
 
 **Built-in template**: `vks_cluster_deploy`
@@ -264,7 +268,7 @@ storage.list_all_datastores     -> Verify new datastores visible
 | Check VM details | monitor | -- | Read-only query |
 | List network segments | nsx | -- | Read-only query |
 | Check capacity | aria | -- | Read-only query |
-| Get kubeconfig | vks | -- | Read-only query |
+| Get kubeconfig | vks | -- | Credential retrieval, not a read-only query: returns a live Supervisor session token. Run it only when the user asks, write it to an owner-only file (`output_path` on the MCP tool, `-o <path>` on the CLI), and never echo the token into chat or logs |
 | Clone, test, approve, apply | -- | pilot | Multi-step with approval gate |
 | Set up network + firewall + VMs | -- | pilot | Cross-skill orchestration |
 | Incident diagnosis + remediation | -- | pilot | Needs approval before action |
@@ -312,9 +316,19 @@ When a workflow step fails:
 1. The step is marked `failed` with the error message
 2. All remaining steps are marked `skipped`
 3. The workflow state becomes `FAILED`
-4. Pilot offers rollback for steps that have `rollback_tool` defined
-5. Rollback executes in reverse order (last completed step first)
-6. Steps without rollback are skipped during rollback
+4. **Nothing is undone automatically.** Undo happens only when someone decides to
+   roll back, and it is best-effort:
+   - **MCP server (the normal case — no dispatcher):** the steps the agent
+     performed are still `not_executed` in pilot's record, so `rollback()`
+     reverses nothing but approval gates and just marks the workflow `failed`.
+     The agent undoes the work itself: for each step it performed, last first,
+     call that step's `rollback_tool` with its `rollback_params`, after the user
+     agrees.
+   - **Embedders that pass a dispatcher to `WorkflowExecutor`:** `rollback()`
+     dispatches `rollback_tool` for each step pilot recorded as `success`, in
+     reverse order. The failed step itself is not rolled back (it is `failed`,
+     not `success`).
+5. Steps without a `rollback_tool` are skipped; they cannot be undone this way
 
-If rollback itself fails on one step, Pilot continues rolling back the remaining
-steps (best-effort rollback) and reports which rollback steps succeeded or failed.
+If an undo call fails, the remaining ones still run; the result reports each one
+and sets `blocked_reason: rollback_failed`.

@@ -52,9 +52,26 @@ class TestRunWorkflowGating:
         assert wf.steps[0].status == "pending"
         assert wf.state == WorkflowState.PENDING
 
-    def test_ungated_destructive_with_force_runs_and_audits(self, store):
+    def test_ungated_destructive_with_force_is_still_refused_for_custom(self, store):
+        """This test used to assert the opposite — that force=True ran it.
+
+        ``workflow_type="test"`` is not a built-in, so this is a custom
+        workflow, and a custom workflow's missing approval gate is not
+        overridable: the fix is one inserted require_approval step.
+        """
         wf = _save(store, [_step(0, "delete_segment")], "wf-g2")
         result = server.run_workflow("wf-g2", force=True)
+        assert "error" in result
+        assert result["blocking_findings"][0]["kind"] == "ungated_destructive"
+        assert wf.steps[0].status == "pending"
+        assert not any(e["action"] == "forced_run" for e in wf.audit_log)
+
+    def test_ungated_destructive_with_force_runs_and_audits_for_builtin(self, store):
+        """The audited escape hatch survives for built-in templates."""
+        wf = _save(store, [_step(0, "delete_segment")], "wf-g2b")
+        wf.workflow_type = "clone_and_test"
+        store.save(wf)
+        result = server.run_workflow("wf-g2b", force=True)
         assert "error" not in result
         # Server has no dispatcher → honest dispatch_required, not completed
         assert result["outcome"] == "dispatch_required"

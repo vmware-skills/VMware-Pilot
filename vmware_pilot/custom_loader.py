@@ -15,6 +15,12 @@ Example YAML (``~/.vmware/workflows/restart_db_cluster.yaml``)::
         params:
           target: "{{target}}"
 
+      - action: require_approval
+        skill: pilot
+        tool: approve
+        params:
+          message: "Cluster healthy. Stop replica {{replica_vm}}?"
+
       - action: stop_replica
         skill: aiops
         tool: vm_power_off
@@ -40,6 +46,11 @@ Example YAML (``~/.vmware/workflows/restart_db_cluster.yaml``)::
         rollback_params:
           vm_name: "{{primary_vm}}"
 
+Every step that could change the estate (``vm_power_off`` above) must have a
+``require_approval`` step somewhere before it. A file that breaks that rule
+still lists, but building it — ``plan_workflow`` — is refused with the offending
+step named; see ``vmware_pilot.approval_gate``.
+
 Usage:
     plan_workflow("restart_db_cluster", {
         "target": "vcenter1",
@@ -56,6 +67,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from vmware_pilot.approval_gate import enforce
 from vmware_pilot.models import Workflow, WorkflowState, WorkflowStep, new_workflow_id
 
 _log = logging.getLogger("vmware-pilot.custom")
@@ -122,7 +134,7 @@ def _make_loader(spec: dict[str, Any], source: Path) -> Any:
                 )
             )
 
-        return Workflow(
+        wf = Workflow(
             id=new_workflow_id(),
             workflow_type=spec["name"],
             state=WorkflowState.PENDING,
@@ -135,10 +147,27 @@ def _make_loader(spec: dict[str, Any], source: Path) -> Any:
             created_at=now,
             updated_at=now,
         )
+        # Refuse here, not only in plan_workflow, so an embedder calling the
+        # loader directly cannot get an ungated custom workflow either.
+        enforce(
+            wf,
+            verb="plan",
+            source=_display_path(source),
+            retry=f"call plan_workflow('{spec['name']}', ...) again",
+        )
+        return wf
 
     loader.__doc__ = description or f"Custom workflow from {source.name}"
     loader.__name__ = spec["name"]
     return loader
+
+
+def _display_path(path: Path) -> str:
+    """``path`` with the home directory shown as ``~`` — the file to edit."""
+    try:
+        return "~/" + path.resolve().relative_to(Path.home().resolve()).as_posix()
+    except (ValueError, OSError):
+        return str(path)
 
 
 def _substitute(obj: Any, params: dict[str, Any]) -> Any:

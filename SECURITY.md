@@ -27,23 +27,26 @@ Do **not** open a public GitHub issue for security vulnerabilities.
 
 ### Approval Gates
 
-Workflows that include destructive steps (delete, migrate, reconfigure) pause for **human review** before proceeding:
+A workflow pauses at each `require_approval` step until `approve()` is called with a named approver; one gate covers every step after it. There is no approval timeout — a paused workflow waits until it is approved or cancelled.
 
-1. **Pre-execution review** — the workflow presents a summary of pending destructive actions and waits for explicit approval
-2. **Step-level confirmation** — each destructive step requires individual approval; read-only steps execute automatically
-3. **Timeout** — unapproved steps time out after a configurable period (default 300 seconds), and the workflow enters a paused state
+1. **Review before every run** — `run_workflow` reviews the plan and refuses one whose destructive step (skill-catalog risk high/critical, or a destructive name) or unclassifiable step has no gate before it
+2. **Custom workflows are rejected, not warned** — for a custom YAML, `create_workflow`, or AI-designed workflow, that same finding makes `plan_workflow`, `create_workflow` and `confirm_draft` refuse to save it and `run_workflow` refuse it even with `force=True`; only built-in templates keep the audited `force=True` override
+3. **Credentials and guest commands count as destructive** — `vks get_tkc_kubeconfig` and `get_supervisor_kubeconfig` return a live Supervisor credential, and the aiops guest tools (`vm_guest_exec`, `vm_guest_exec_output`, `vm_guest_upload`, `vm_guest_provision`) run arbitrary commands or write files inside a VM as the account the caller names; all are gated like a delete
+4. **The gate is in pilot's workflow, not in the target skill** — on the MCP server pilot executes nothing itself; the calling agent performs each step through the companion skill, which applies its own policy rules
 
-### Rollback on Failure
+### Rollback (explicit, best-effort — never automatic)
 
-- If a workflow step fails after earlier steps have completed, the orchestrator automatically attempts to reverse completed steps in LIFO order
-- Rollback actions are logged with the same audit trail as forward operations
-- Steps that cannot be rolled back (e.g., notifications already sent) are marked as `rollback_skipped` in the workflow state
+- A failed step stops the workflow (`failed`); remaining steps are marked `skipped` and nothing is undone automatically
+- `rollback()` must be called deliberately. It reverses, last first, only the steps pilot recorded as `success`, dispatching each step's `rollback_tool` — which only happens when an embedder supplied a dispatcher. On the MCP server (no dispatcher) the steps the agent performed are recorded `not_executed`, so `rollback()` reverses nothing but approval gates; the agent must call each performed step's `rollback_tool` itself
+- Steps without a `rollback_tool` are reported `skipped`; a failed undo does not stop the rest and sets `blocked_reason: rollback_failed`
+- Rollback results are kept on the workflow record and each `rollback` call is audited to `~/.vmware/audit.db`
 
 ### State Persistence
 
-- Workflow state is persisted in a local SQLite database (WAL mode)
-- State includes: step history, approval status, rollback records, and error context
-- No sensitive data (credentials, API responses) is stored in the workflow state
+- Workflow state is persisted in a local SQLite database, `~/.vmware/workflows.db` (WAL mode); pilot sets `~/.vmware` to 0700 and the database file to 0600 (best-effort)
+- State includes: step params, step results, approval status, rollback records, and error context — step results are whatever a companion skill returned, so treat the file as sensitive operational data
+- Params whose key names a secret (`password`, `token`, `api_key`, …) are masked to `***` before they are written; values under other key names are stored as given
+- Baseline files under `~/.vmware/baselines/` are not written by pilot; if the agent saves one there it is an inventory of VMs, hosts, network segments, datastores and alarms and should be kept owner-only
 
 ### SSL/TLS Verification
 
@@ -53,14 +56,14 @@ Workflows that include destructive steps (delete, migrate, reconfigure) pause fo
 ### Transitive Dependencies
 
 - `vmware-policy` is the only transitive dependency auto-installed; it provides the `@vmware_tool` decorator and audit logging
-- All other dependencies are standard Python packages (Click, Rich, python-dotenv)
+- All other dependencies are standard Python packages (`mcp`, `pyyaml`, `typer`)
 - No post-install scripts or background services are started during installation
 
 ### Prompt Injection Protection
 
-- All text passed between workflow steps is processed through `_sanitize()`
-- Sanitization truncates to 500 characters and strips C0/C1 control characters
-- Workflow step names and descriptions are validated against allowed character patterns
+- Error text returned to the agent goes through vmware-policy `sanitize()` (C0/C1 control characters stripped, 500-character cap); exceptions pilot did not author are reduced to their class name
+- Step results passed from one step to the next (`__from_step_N__` references) are not sanitized by pilot — the companion skill that produced them is responsible for its own output
+- Workflow names used as YAML template filenames are rejected if they contain path separators, a leading dot, or null bytes
 
 ## Static Analysis
 

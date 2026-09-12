@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """List all available VMware tools grouped by skill for workflow design.
 
-Quick reference for designing workflows — shows every skill and its tools
-with risk levels and brief descriptions.
+Quick reference for designing workflows — shows a curated set of tools per
+skill with risk levels and brief descriptions. The approval-gate check does not
+read this table; it reads pilot's skill catalog (get_skill_catalog), so where
+the two differ the catalog decides whether a step needs a require_approval gate.
 
 Usage:
     python3 list_available_tools.py          # All skills
@@ -21,15 +23,15 @@ SKILLS: dict[str, dict[str, Any]] = {
         "description": "VM lifecycle and operations (power, clone, deploy, reconfigure, guest ops)",
         "tools": {
             "vm_power_on":               {"risk": "medium", "desc": "Power on a VM"},
-            "vm_power_off":              {"risk": "medium", "desc": "Power off a VM (graceful or force)"},
+            "vm_power_off":              {"risk": "high",   "desc": "Power off a VM (graceful or force)"},
             "deploy_linked_clone":       {"risk": "medium", "desc": "Clone a VM from snapshot"},
             "vm_create_plan":            {"risk": "low",    "desc": "Create a batch operation plan (dry-run)"},
             "vm_apply_plan":             {"risk": "high",   "desc": "Execute a batch operation plan"},
             "vm_rollback_plan":          {"risk": "high",   "desc": "Rollback a batch operation plan"},
-            "vm_guest_exec":             {"risk": "medium", "desc": "Run command inside guest OS"},
-            "vm_guest_exec_output":      {"risk": "medium", "desc": "Run command inside guest OS and capture output"},
-            "vm_guest_upload":           {"risk": "medium", "desc": "Upload file to guest OS"},
-            "vm_guest_provision":        {"risk": "medium", "desc": "Bootstrap/provision a new VM"},
+            "vm_guest_exec":             {"risk": "high",   "desc": "Run command inside guest OS"},
+            "vm_guest_exec_output":      {"risk": "high",   "desc": "Run command inside guest OS and capture output"},
+            "vm_guest_upload":           {"risk": "high",   "desc": "Upload file to guest OS"},
+            "vm_guest_provision":        {"risk": "high",   "desc": "Bootstrap/provision a new VM"},
             "batch_clone_vms":           {"risk": "high",   "desc": "Clone multiple VMs at once"},
             "vm_clean_slate":            {"risk": "high",   "desc": "Revert VM to snapshot (destructive)"},
             "acknowledge_vcenter_alarm": {"risk": "low",    "desc": "Acknowledge a vCenter alarm"},
@@ -94,7 +96,8 @@ SKILLS: dict[str, dict[str, Any]] = {
             "create_tkc_cluster": {"risk": "medium", "desc": "Deploy TKC cluster"},
             "scale_tkc_cluster":  {"risk": "medium", "desc": "Scale TKC worker nodes"},
             "delete_tkc_cluster": {"risk": "high",   "desc": "Delete TKC cluster"},
-            "get_tkc_kubeconfig": {"risk": "low",    "desc": "Retrieve kubeconfig for TKC cluster"},
+            "get_tkc_kubeconfig": {"risk": "high",   "desc": "Live credential - gate it"},
+            "get_supervisor_kubeconfig": {"risk": "high", "desc": "Live credential - gate it"},
         },
     },
     "storage": {

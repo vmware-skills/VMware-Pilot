@@ -51,8 +51,9 @@ def review_workflow(workflow_id: str) -> dict:
           - ``verdict``: ``"approved"`` if no structural issues, otherwise ``"needs_revision"``
           - ``findings``: list of {severity, kind, message, step_index}. Kinds
             ``ungated_destructive``, ``ungated_unclassified`` and
-            ``destructive_in_parallel_group`` are what ``run_workflow`` refuses on
-            unless called with ``force=True``.
+            ``destructive_in_parallel_group`` are what ``run_workflow`` refuses on;
+            ``force=True`` overrides that only for a built-in template, never
+            for a custom workflow's missing approval gate.
           - ``summary``: counts — total/destructive/write/read_only/approval_gates,
             parallel_groups, est_duration_min, plus ``classified_steps`` and
             ``unclassified_steps`` so an "approved" verdict can be told apart from

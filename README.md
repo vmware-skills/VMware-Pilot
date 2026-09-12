@@ -69,12 +69,37 @@ pip install --no-index --find-links dist vmware-pilot
 | `update_draft` | Edit draft workflow steps |
 | `confirm_draft` | Finalize draft → ready to execute |
 | `plan_workflow` | Generate execution plan from template, returns workflow_id |
-| `create_workflow` | Create custom workflow from step list |
+| `create_workflow` | Create custom workflow from step list (refused if a destructive step has no approval gate before it) |
 | `run_workflow` | Execute workflow, pauses at approval gates |
 | `get_workflow_status` | Query state + diff report + audit log |
 | `approve` | Human approval, continue execution |
-| `rollback` | Abort and rollback at any stage |
+| `rollback` | Explicit, best-effort undo of steps pilot recorded as succeeded — never automatic |
 | `cancel_workflow` | Cancel a workflow — move it to the terminal CANCELLED state |
+
+## Built-in Templates (15)
+
+`n` is the number of VMs (or drift items); ranges depend on which optional parameters are set.
+`clone_and_test` has 7 steps when `change_spec` is a guest command (an extra gate before it runs
+in staging). `investigate_alert`'s approvals are synthesis checkpoints; its steps are all reads.
+See `skills/vmware-pilot/references/templates.md` for parameters and steps.
+
+| Template | Steps | Approval | Skills Used |
+|----------|:-----:|:--------:|-------------|
+| `clone_and_test` | 6-7 | Yes | aiops, monitor |
+| `incident_response` | 4 | Yes | monitor, aiops |
+| `investigate_alert` | 4 (8 with `deep_dive`) | Yes | monitor, aria |
+| `plan_and_approve` | 3 | Yes | aiops |
+| `compliance_scan` | 1-3 | No | monitor, aria |
+| `network_segment_setup` | 3-6 | Yes | nsx, nsx-security |
+| `vks_cluster_deploy` | 4 | Yes | vks |
+| `rolling_restart` | 2+3n | Yes | aiops, monitor |
+| `capacity_expansion` | 5 | Yes | aria, aiops, monitor |
+| `disaster_recovery` | 5 | Yes | aiops, monitor, nsx |
+| `patch_deployment` | 1+3n | Yes | aiops, monitor |
+| `storage_expansion` | 6 | Yes | storage |
+| `baseline_capture` | 1-5 | No | monitor, nsx, storage |
+| `baseline_audit` | 1-5 | No | monitor, nsx, storage, aria |
+| `baseline_remediate` | 3+n | Yes | varies |
 
 ## MCP Configuration
 

@@ -162,11 +162,12 @@ class TestCatalogRiskIsRead:
         assert _blocking_kinds(_ungated("monitor", "vm_info")) == set()
 
     def test_every_high_risk_catalog_entry_is_gated(self):
-        """All 15 of them, not the handful whose names contain 'delete'.
+        """Every one of them, not the handful whose names contain 'delete'.
 
         Thirteen carried the label before this change and none of them was read;
-        two more were added when the catalog was reconciled against the siblings'
-        own annotations (``aiops.vm_power_off``, ``vks.get_tkc_kubeconfig``).
+        more were added when the catalog was reconciled against the siblings'
+        own annotations (``aiops.vm_power_off``, the four guest tools, and both
+        VKS kubeconfig tools).
         """
         from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
 
@@ -177,6 +178,46 @@ class TestCatalogRiskIsRead:
             if meta["risk"] == "high" and not _blocking_kinds(_ungated(skill, tool))
         ]
         assert missed == []
+
+
+@pytest.mark.unit
+class TestLabelsAgreeWithWhatTheSiblingsPublish:
+    """Catalog entries whose label had drifted from the owning skill's own claim.
+
+    Re-read from the sibling sources on 2026-09-11, not from the 2026-08-30
+    snapshot in ``_family_write_surface`` (which predates both changes):
+
+    * ``VMware-AIops/vmware_aiops/mcp_server/tools/guest.py`` publishes
+      ``vm_guest_exec``, ``vm_guest_exec_output``, ``vm_guest_upload`` and
+      ``vm_guest_provision`` with ``destructiveHint: True``. Pilot labelled all
+      four ``medium``, so a custom workflow whose only step was
+      ``vm_guest_exec /bin/rm -rf /`` was saved and dispatched with no gate.
+    * ``VMware-VKS/vmware_vks/mcp_server/server.py`` publishes
+      ``get_supervisor_kubeconfig`` with ``readOnlyHint: False`` — it returns a
+      live Supervisor bearer token. It was absent from the catalog, so the
+      ``get`` read-hint placed it in the read tier: confidently wrong.
+    """
+
+    @pytest.mark.parametrize(
+        "tool", ["vm_guest_exec", "vm_guest_exec_output", "vm_guest_upload", "vm_guest_provision"]
+    )
+    def test_guest_tools_are_gated(self, tool):
+        assert "ungated_destructive" in _blocking_kinds(_ungated("aiops", tool))
+
+    def test_guest_download_stays_ungated(self):
+        """Control: AIops keeps ``vm_guest_download`` at destructiveHint False."""
+        from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
+
+        assert SKILL_CATALOG["aiops"]["tools"].get("vm_guest_download", {}).get("risk") != "high"
+
+    @pytest.mark.parametrize("tool", ["get_supervisor_kubeconfig", "get_tkc_kubeconfig"])
+    def test_both_kubeconfig_tools_are_gated_as_credential_access(self, tool):
+        from vmware_pilot.review import classify_step
+
+        tier, why = classify_step("vks", tool)
+        assert tier == "destructive", why
+        assert "catalog" in why, "decided by the catalog, not by a name substring"
+        assert "ungated_destructive" in _blocking_kinds(_ungated("vks", tool))
 
 
 @pytest.mark.unit
@@ -240,10 +281,12 @@ class TestMeasuredFamilySurface:
     def test_no_write_tool_is_positively_classified_as_read_only(self):
         """The worse failure: not 'unknown', but confidently wrong.
 
-        ``get_tkc_kubeconfig`` hands back a live Supervisor credential and its own
-        skill marks it destructive, yet it opens with ``get_`` — the read-only
-        name heuristic claimed it. A tool pilot mislabels safe is invisible; a
-        tool pilot cannot label is at least loud.
+        ``get_tkc_kubeconfig`` hands back a live Supervisor credential, yet it
+        opens with ``get_`` — the read-only name heuristic claimed it. A tool
+        pilot mislabels safe is invisible; a tool pilot cannot label is at least
+        loud. (``get_supervisor_kubeconfig`` is the same shape; it became a
+        write after this snapshot was taken and is pinned in
+        ``TestLabelsAgreeWithWhatTheSiblingsPublish``.)
         """
         from vmware_pilot.review import classify_step
 
@@ -359,12 +402,29 @@ class TestRunWorkflowEnforcesTheSameSet:
         assert kinds == ["ungated_unclassified"]
         assert "require_approval" in result["hint"]
 
-    def test_force_still_overrides_it(self, store):
-        """Fail-closed with an audited escape hatch, not a dead end."""
+    def test_force_does_not_override_it_on_a_custom_workflow(self, store):
+        """``workflow_type="test"`` is custom. This used to assert force ran it.
+
+        A custom workflow's missing gate is fixed by inserting one step, and
+        that step is the human consent force would stand in for — so force no
+        longer stands in for it.
+        """
         import vmware_pilot.mcp_server.server as server
 
         result = server.run_workflow(self._persist(store, "quiesce_appliance"), force=True)
+        assert [f["kind"] for f in result["blocking_findings"]] == ["ungated_unclassified"]
+
+    def test_force_still_overrides_it_on_a_builtin(self, store):
+        """Fail-closed with an audited escape hatch, not a dead end — for built-ins."""
+        import vmware_pilot.mcp_server.server as server
+
+        wf_id = self._persist(store, "quiesce_appliance")
+        wf = store.load(wf_id)
+        wf.workflow_type = "clone_and_test"
+        store.save(wf)
+        result = server.run_workflow(wf_id, force=True)
         assert "blocking_findings" not in result
+        assert "error" not in result
 
     def test_a_classified_read_step_still_runs_without_force(self, store):
         """Control: the runner did not simply start refusing everything."""

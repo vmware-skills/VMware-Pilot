@@ -42,7 +42,9 @@ Pilot creates workflow:
   Step 4: monitor.get_alarms              -> verify health after change
 
 User reviews steps, approves at gate, Pilot completes execution.
-On failure at Step 3, Pilot offers automatic rollback.
+On failure at Step 3 the workflow stops as `failed`; nothing is undone until
+someone calls `rollback` (explicit, best-effort — see Error Handling in
+integration-patterns.md).
 ```
 
 ---
@@ -80,25 +82,31 @@ safe for destructive operations.
 
 ## Available Skills and Key Tools
 
+The **Risk** column is pilot's skill catalog (`get_skill_catalog`), which is what
+the approval-gate check reads: a `high` step, a step whose name says
+delete/remove/destroy/shutdown/drop/rollback/force_power_off, or a step whose
+tool is not in the catalog must have a `require_approval` step before it in a
+custom workflow, or pilot refuses the workflow. `medium` writes need no gate.
+
 ### aiops (VM Lifecycle and Operations)
 
 | Tool | Risk | Use For |
 |------|------|---------|
 | `vm_power_on` | medium | Start a VM |
-| `vm_power_off` | medium | Stop a VM (graceful or force) |
+| `vm_power_off` | high | Stop a VM (graceful or force) |
 | `deploy_linked_clone` | medium | Clone a VM from snapshot |
-| `vm_create_plan` | low | Create a batch operation plan |
-| `vm_apply_plan` | high | Execute a planned batch |
-| `vm_rollback_plan` | high | Undo a batch operation |
-| `vm_guest_exec` | medium | Run command inside guest OS |
-| `vm_guest_exec_output` | medium | Run command and capture output |
-| `vm_guest_upload` | medium | Upload file to guest OS |
-| `vm_guest_provision` | medium | Bootstrap a new VM |
-| `batch_clone_vms` | high | Clone multiple VMs at once |
+| `vm_create_plan` | medium | Create a batch operation plan |
+| `vm_apply_plan` | medium | Execute a planned batch |
+| `vm_rollback_plan` | medium | Undo a batch operation |
+| `vm_guest_exec` | high | Run command inside guest OS — as the account you name; gate it |
+| `vm_guest_exec_output` | high | Run command and capture output |
+| `vm_guest_upload` | high | Upload file to guest OS |
+| `vm_guest_provision` | high | Bootstrap a new VM |
+| `batch_clone_vms` | medium | Clone multiple VMs at once |
 | `vm_clean_slate` | high | Revert VM to snapshot |
-| `acknowledge_vcenter_alarm` | low | Acknowledge an alarm |
-| `reset_vcenter_alarm` | low | Reset an alarm |
-| `cluster_create` | high | Create a new cluster |
+| `acknowledge_vcenter_alarm` | medium | Acknowledge an alarm |
+| `reset_vcenter_alarm` | medium | Reset an alarm |
+| `cluster_create` | medium | Create a new cluster |
 | `deploy_vm_from_ova` | medium | Deploy from OVA |
 | `deploy_vm_from_template` | medium | Deploy from template |
 
@@ -134,20 +142,20 @@ safe for destructive operations.
 | `create_dfw_rule` | medium | Add firewall rule |
 | `delete_dfw_rule` | high | Remove firewall rule |
 | `create_group` | medium | Create security group |
-| `run_traceflow` | low | Trace packet path |
+| `run_traceflow` | medium | Trace packet path |
 
 ### aria (Metrics, Alerts, Capacity)
 
 | Tool | Risk | Use For |
 |------|------|---------|
 | `list_alerts` | low | List active alerts |
-| `acknowledge_alert` | low | Acknowledge an alert |
+| `acknowledge_alert` | medium | Acknowledge an alert |
 | `get_capacity_overview` | low | Overall capacity summary |
 | `get_remaining_capacity` | low | Time/resource remaining |
 | `get_time_remaining` | low | Days until capacity exhaustion |
 | `list_anomalies` | low | Detected anomalies |
 | `list_rightsizing_recommendations` | low | VM rightsizing suggestions |
-| `generate_report` | low | Generate capacity report |
+| `generate_report` | not in catalog | Generate capacity report (unclassified, so it needs a gate before it) |
 
 ### vks (Tanzu Kubernetes)
 
@@ -158,7 +166,8 @@ safe for destructive operations.
 | `create_tkc_cluster` | medium | Deploy TKC cluster |
 | `scale_tkc_cluster` | medium | Scale worker nodes |
 | `delete_tkc_cluster` | high | Delete TKC cluster |
-| `get_tkc_kubeconfig` | low | Get kubeconfig |
+| `get_tkc_kubeconfig` | high | Returns a live Supervisor credential — gate it, write it to a file, never print it |
+| `get_supervisor_kubeconfig` | high | Same: a live Supervisor bearer token — gate it, write it to a file, never print it |
 
 ### storage (Datastores, iSCSI, vSAN)
 
@@ -167,7 +176,7 @@ safe for destructive operations.
 | `list_all_datastores` | low | List datastores |
 | `storage_iscsi_enable` | medium | Enable iSCSI adapter |
 | `storage_iscsi_add_target` | medium | Add iSCSI target |
-| `storage_rescan` | low | Rescan storage adapters |
+| `storage_rescan` | medium | Rescan storage adapters |
 | `vsan_health` | low | vSAN health check |
 | `vsan_capacity` | low | vSAN capacity info |
 
@@ -190,6 +199,12 @@ steps:
     tool: get_alarms
     params:
       target: "{{target}}"
+
+  - action: require_approval       # required: vm_power_off below is high risk
+    skill: pilot
+    tool: approve
+    params:
+      message: "Cluster healthy. Stop replica {{replica_vm}}?"
 
   - action: stop_replica
     skill: aiops
@@ -304,7 +319,7 @@ DRAFT -> PENDING -> RUNNING -> AWAITING_APPROVAL -> RUNNING -> COMPLETED
 | `committing` | Applying tested changes to production |
 | `rolling_back` | Undoing completed steps in reverse |
 | `completed` | All steps finished successfully |
-| `failed` | A step failed (may offer rollback) |
+| `failed` | A step failed; nothing is undone until someone calls `rollback` |
 | `blocked_by_policy` | Blocked by a policy check |
 
 ---
@@ -345,14 +360,17 @@ DRAFT -> PENDING -> RUNNING -> AWAITING_APPROVAL -> RUNNING -> COMPLETED
 
 ## Validation
 
-Before executing a workflow, validate it with the included script:
+Before executing a workflow, validate it with the included script. It runs
+pilot's own approval-gate check, so run it with the Python vmware-pilot is
+installed in:
 
 ```bash
-python3 scripts/validate_workflow.py ~/.vmware/workflows/my_workflow.yaml
+"$(uv tool dir)/vmware-pilot/bin/python" scripts/validate_workflow.py ~/.vmware/workflows/my_workflow.yaml
 ```
 
 This checks:
-- All referenced skills exist
-- Tool names are recognized
-- Approval gates are placed before destructive steps
-- Step structure is valid
+- Step structure is valid (action / skill / tool present, params a mapping)
+- **Approval gates (error)**: every destructive or unclassifiable step has a
+  `require_approval` step before it — the same check `plan_workflow`,
+  `create_workflow`, `confirm_draft` and `run_workflow` enforce
+- Skills and tools not in the catalog (warning — the catalog is a curated subset)

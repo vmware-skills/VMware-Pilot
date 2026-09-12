@@ -3,6 +3,7 @@ disaster recovery, and rolling patch deployment."""
 
 from __future__ import annotations
 
+from vmware_pilot.templates._aiops_params import plan_change, require_guest_username
 from vmware_pilot.templates._common import (
     Any,
     Workflow,
@@ -12,6 +13,24 @@ from vmware_pilot.templates._common import (
     new_workflow_id,
     timezone,
 )
+
+
+def _guest_gate(change_params: dict[str, Any], staging_name: str) -> dict[str, Any]:
+    """The approval step ahead of a guest command in the staging clone."""
+    command = " ".join(
+        part for part in (change_params["command"], change_params.get("arguments", "")) if part
+    )
+    return {
+        "action": "require_approval",
+        "skill": "pilot",
+        "tool": "approve",
+        "params": {
+            "message": (
+                f"About to run '{command}' as guest user '{change_params['username']}' "
+                f"inside staging VM '{staging_name}'. Proceed?"
+            )
+        },
+    }
 
 
 def clone_and_test(
@@ -24,77 +43,79 @@ def clone_and_test(
 
     Steps:
       1. Clone target VM → staging
-      2. Apply change_spec to staging
-      3. Monitor staging for N minutes
-      4. Await human approval
-      5. Apply change_spec to production (original VM)
-      6. Delete staging VM
+      2. (guest change only) Await approval to run the command in staging
+      3. Apply change_spec to staging
+      4. Monitor staging for N minutes
+      5. Await human approval
+      6. Apply change_spec to production (original VM)
+      7. Power off staging VM
 
     Args:
         target_vm: Production VM name to clone.
-        change_spec: Changes to apply (e.g. {"memory_gb": 32, "cpu": 4}).
+        change_spec: What to apply. Either a resize — ``cpu`` and/or
+            ``memory_mb`` (``memory_gb`` is converted to ``memory_mb``) — applied
+            with aiops ``vm_reconfigure``; or one guest command — ``command``,
+            ``username`` (required, no default account), ``password``, optional
+            ``arguments`` / ``working_directory`` — applied with aiops
+            ``vm_guest_exec``. Anything the chosen tool would reject is refused
+            here, before the staging clone exists.
         monitor_minutes: How long to monitor staging (default 5).
         target: vCenter target name.
     """
+    tool, change_params = plan_change(change_spec)
     staging_name = f"{target_vm}-staging"
     now = datetime.now(tz=timezone.utc).isoformat()
 
-    steps = [
-        WorkflowStep(
-            index=0,
-            action="clone",
-            skill="aiops",
-            tool="deploy_linked_clone",
-            params={
+    specs: list[dict[str, Any]] = [
+        {
+            "action": "clone",
+            "skill": "aiops",
+            "tool": "deploy_linked_clone",
+            "params": {
                 "source_vm_name": target_vm,
                 "snapshot_name": "current",
                 "new_name": staging_name,
                 "power_on": True,
                 "target": target,
             },
-            rollback_tool="vm_power_off",
-            rollback_params={"vm_name": staging_name, "force": True, "target": target},
-        ),
-        WorkflowStep(
-            index=1,
-            action="apply_changes",
-            skill="aiops",
-            tool="vm_reconfigure"
-            if "cpu" in change_spec or "memory_mb" in change_spec or "memory_gb" in change_spec
-            else "vm_guest_exec",
-            params={"vm_name": staging_name, **change_spec, "target": target},
-        ),
-        WorkflowStep(
-            index=2,
-            action="monitor",
-            skill="monitor",
-            tool="get_alarms",
-            params={"target": target},
-        ),
-        WorkflowStep(
-            index=3,
-            action="require_approval",
-            skill="pilot",
-            tool="approve",
-            params={"message": f"Staging VM '{staging_name}' tested. Apply to production?"},
-        ),
-        WorkflowStep(
-            index=4,
-            action="apply_to_production",
-            skill="aiops",
-            tool="vm_reconfigure"
-            if "cpu" in change_spec or "memory_mb" in change_spec or "memory_gb" in change_spec
-            else "vm_guest_exec",
-            params={"vm_name": target_vm, **change_spec, "target": target},
-        ),
-        WorkflowStep(
-            index=5,
-            action="cleanup",
-            skill="aiops",
-            tool="vm_power_off",
-            params={"vm_name": staging_name, "force": True, "target": target},
-        ),
+            "rollback_tool": "vm_power_off",
+            "rollback_params": {"vm_name": staging_name, "force": True, "target": target},
+        },
+        # vm_guest_exec is destructive (aiops publishes destructiveHint=True), and
+        # the approval at the end comes after it has already run in staging.
+        *([_guest_gate(change_params, staging_name)] if tool == "vm_guest_exec" else []),
+        {
+            "action": "apply_changes",
+            "skill": "aiops",
+            "tool": tool,
+            "params": {"vm_name": staging_name, **change_params, "target": target},
+        },
+        {
+            "action": "monitor",
+            "skill": "monitor",
+            "tool": "get_alarms",
+            "params": {"target": target},
+        },
+        {
+            "action": "require_approval",
+            "skill": "pilot",
+            "tool": "approve",
+            "params": {"message": f"Staging VM '{staging_name}' tested. Apply to production?"},
+        },
+        {
+            "action": "apply_to_production",
+            "skill": "aiops",
+            "tool": tool,
+            "params": {"vm_name": target_vm, **change_params, "target": target},
+        },
+        {
+            "action": "cleanup",
+            "skill": "aiops",
+            "tool": "vm_power_off",
+            "params": {"vm_name": staging_name, "force": True, "target": target},
+        },
     ]
+    steps = [WorkflowStep(index=i, **spec) for i, spec in enumerate(specs)]
 
     return Workflow(
         id=new_workflow_id(),
@@ -435,7 +456,7 @@ def patch_deployment(
     patch_local_path: str,
     patch_guest_path: str,
     install_command: str,
-    username: str = "root",
+    username: str,
     password: str = "",  # nosec B107 — empty default; caller supplies the value
     target: str = "",
 ) -> Workflow:
@@ -446,7 +467,12 @@ def patch_deployment(
       2. Execute install command
       3. Verify health
     Approval gate before starting.
+
+    ``username`` is the guest OS account the upload and install run as. It is
+    required and has no default: vmware-aiops removed its root default on
+    2026-09-11, so a call can never act as root without choosing root.
     """
+    require_guest_username(username, "patch_deployment")
     now = datetime.now(tz=timezone.utc).isoformat()
     steps: list[WorkflowStep] = []
     idx = 0

@@ -48,9 +48,119 @@ class TestCloneAndTest:
         ]
 
     def test_has_approval_gate(self):
-        wf = clone_and_test(target_vm="app01", change_spec={})
+        wf = clone_and_test(target_vm="app01", change_spec={"cpu": 4})
         approval_steps = [s for s in wf.steps if s.action == "require_approval"]
         assert len(approval_steps) == 1
+
+    def test_an_empty_change_spec_is_refused_at_plan_time(self):
+        """It used to build a vm_guest_exec step with no command at all."""
+        with pytest.raises(ValueError, match="change_spec"):
+            clone_and_test(target_vm="app01", change_spec={})
+
+
+#: A guest change_spec as vmware-aiops vm_guest_exec takes it, minus vm_name/target.
+_GUEST_SPEC = {"command": "/usr/bin/apt-get", "arguments": "-y upgrade",
+               "username": "ops", "password": "pw"}
+
+
+@pytest.mark.unit
+class TestCloneAndTestMapsOntoTheRealAiopsTools:
+    """Step params must be ones the aiops tool accepts, checked when planning.
+
+    A mistake here used to surface at dispatch — after the staging clone had
+    already been created — as a schema rejection from aiops.
+    """
+
+    #: vmware-aiops vm_reconfigure(vm_name, cpu, memory_mb, target) — no memory_gb.
+    RECONFIGURE_PARAMS = {"vm_name", "cpu", "memory_mb", "target"}
+    #: vmware-aiops vm_guest_exec(vm_name, command, username, arguments,
+    #: password, working_directory, target).
+    GUEST_EXEC_PARAMS = {"vm_name", "command", "username", "arguments", "password",
+                         "working_directory", "target"}
+
+    def _apply_steps(self, wf):
+        return [s for s in wf.steps if s.action in ("apply_changes", "apply_to_production")]
+
+    def test_memory_gb_is_sent_as_memory_mb(self):
+        wf = clone_and_test(target_vm="db01", change_spec={"memory_gb": 32, "cpu": 4})
+        for step in self._apply_steps(wf):
+            assert step.tool == "vm_reconfigure"
+            assert set(step.params) <= self.RECONFIGURE_PARAMS, step.params
+            assert step.params["memory_mb"] == 32768
+            assert step.params["cpu"] == 4
+
+    def test_memory_gb_and_memory_mb_together_is_refused(self):
+        with pytest.raises(ValueError, match="memory_gb"):
+            clone_and_test(target_vm="db01", change_spec={"memory_gb": 32, "memory_mb": 1024})
+
+    def test_a_fractional_megabyte_is_refused(self):
+        with pytest.raises(ValueError, match="memory_mb"):
+            clone_and_test(target_vm="db01", change_spec={"memory_gb": 0.0001})
+
+    def test_a_reconfigure_spec_with_a_foreign_key_is_refused(self):
+        with pytest.raises(ValueError, match="command"):
+            clone_and_test(target_vm="db01", change_spec={"cpu": 4, "command": "/bin/true"})
+
+    def test_the_callers_change_spec_is_not_mutated(self):
+        spec = {"memory_gb": 8}
+        clone_and_test(target_vm="db01", change_spec=spec)
+        assert spec == {"memory_gb": 8}
+
+    def test_a_guest_spec_builds_guest_steps_with_the_given_account(self):
+        wf = clone_and_test(target_vm="db01", change_spec=_GUEST_SPEC)
+        for step in self._apply_steps(wf):
+            assert step.tool == "vm_guest_exec"
+            assert set(step.params) <= self.GUEST_EXEC_PARAMS, step.params
+            assert step.params["username"] == "ops"
+
+    def test_a_guest_spec_without_a_username_is_refused(self):
+        """vmware-aiops has no root default any more; neither may pilot."""
+        spec = {k: v for k, v in _GUEST_SPEC.items() if k != "username"}
+        with pytest.raises(ValueError, match="username") as err:
+            clone_and_test(target_vm="db01", change_spec=spec)
+        assert "root" in str(err.value), "say that there is no default account"
+
+    def test_a_guest_spec_with_a_blank_username_is_refused(self):
+        with pytest.raises(ValueError, match="username"):
+            clone_and_test(target_vm="db01", change_spec={**_GUEST_SPEC, "username": " "})
+
+    def test_a_guest_spec_without_a_command_is_refused(self):
+        spec = {k: v for k, v in _GUEST_SPEC.items() if k != "command"}
+        with pytest.raises(ValueError, match="command"):
+            clone_and_test(target_vm="db01", change_spec=spec)
+
+    def test_a_guest_spec_with_an_unknown_key_is_refused(self):
+        with pytest.raises(ValueError, match="script"):
+            clone_and_test(target_vm="db01", change_spec={**_GUEST_SPEC, "script": "x"})
+
+    def test_the_staging_guest_command_is_behind_an_approval_gate(self):
+        """vm_guest_exec is destructive; the staging run needs its own gate."""
+        wf = clone_and_test(target_vm="db01", change_spec=_GUEST_SPEC)
+        first_guest = next(s.index for s in wf.steps if s.tool == "vm_guest_exec")
+        assert any(
+            s.action == "require_approval" and s.index < first_guest for s in wf.steps
+        )
+
+    def test_the_reconfigure_path_keeps_its_six_steps(self):
+        """Control: only the guest path grew a gate."""
+        wf = clone_and_test(target_vm="db01", change_spec={"cpu": 4})
+        assert len(wf.steps) == 6
+
+    def test_plan_workflow_returns_the_teaching_error(self, tmp_path, monkeypatch):
+        """Refused at plan time: nothing is persisted, so no clone ever exists."""
+        import vmware_pilot.mcp_server.server as server
+        from vmware_pilot.executor import WorkflowExecutor
+        from vmware_pilot.models import WorkflowStore
+
+        store = WorkflowStore(tmp_path / "wf.db")
+        monkeypatch.setattr(server, "_store", store)
+        monkeypatch.setattr(server, "_executor", WorkflowExecutor(store))
+        spec = {k: v for k, v in _GUEST_SPEC.items() if k != "username"}
+        result = server.plan_workflow(
+            "clone_and_test", {"target_vm": "db01", "change_spec": spec}
+        )
+        assert "username" in result["error"]
+        assert store.list_all() == []
 
 
 @pytest.mark.unit
@@ -253,14 +363,49 @@ class TestPatchDeployment:
             patch_local_path="/tmp/patch.sh",
             patch_guest_path="/tmp/patch.sh",
             install_command="bash /tmp/patch.sh",
+            username="ops",
         )
         assert wf.workflow_type == "patch_deployment"
         # approve + 2*(upload+install+verify) = 7
         assert len(wf.steps) == 7
 
     def test_scales_with_vm_count(self):
-        wf = patch_deployment(["a", "b", "c"], "/p", "/p", "bash /p")
+        wf = patch_deployment(["a", "b", "c"], "/p", "/p", "bash /p", "ops")
         assert len(wf.steps) == 10  # approve + 3*3
+
+    def test_username_has_no_default(self):
+        """vmware-aiops made the guest account required on 2026-09-11 (no root)."""
+        import inspect
+
+        param = inspect.signature(patch_deployment).parameters["username"]
+        assert param.default is inspect.Parameter.empty
+
+    def test_a_blank_username_is_refused_at_plan_time(self):
+        with pytest.raises(ValueError, match="username"):
+            patch_deployment(["a"], "/p", "/p", "bash /p", username="")
+
+    def test_plan_workflow_names_the_missing_username(self, tmp_path, monkeypatch):
+        """Omitting it is the likely mistake (it used to default), so the MCP
+        answer must name it — not ``TypeError: operation failed.``"""
+        import vmware_pilot.mcp_server.server as server
+        from vmware_pilot.executor import WorkflowExecutor
+        from vmware_pilot.models import WorkflowStore
+
+        store = WorkflowStore(tmp_path / "wf.db")
+        monkeypatch.setattr(server, "_store", store)
+        monkeypatch.setattr(server, "_executor", WorkflowExecutor(store))
+        result = server.plan_workflow("patch_deployment", {
+            "vm_names": ["a"], "patch_local_path": "/p", "patch_guest_path": "/p",
+            "install_command": "bash /p",
+        })
+        assert "username" in result["error"]
+        assert store.list_all() == []
+
+    def test_every_guest_step_carries_the_given_account(self):
+        wf = patch_deployment(["a", "b"], "/p", "/p", "bash /p", username="ops")
+        guest = [s for s in wf.steps if s.tool.startswith("vm_guest_")]
+        assert len(guest) == 4
+        assert {s.params["username"] for s in guest} == {"ops"}
 
 
 @pytest.mark.unit

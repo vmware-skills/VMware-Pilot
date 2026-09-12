@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any
 
 from vmware_policy import vmware_tool
 
+from vmware_pilot.approval_gate import (
+    GATE_FINDING_KINDS,
+    ApprovalGateError,
+    gate_violations,
+    is_custom_workflow,
+    refusal,
+)
 from vmware_pilot.mcp_server._shared import _get_executor, _get_store, _safe_error, mcp
 from vmware_pilot.models import WorkflowState
 from vmware_pilot.review import review as _review_workflow_impl
@@ -31,7 +39,9 @@ def plan_workflow(
     """[WRITE] Create an execution plan for a multi-step workflow.
 
     Use this when the goal matches one of the built-in types below; use
-    create_workflow instead when none of them fit.
+    create_workflow instead when none of them fit. A custom YAML template whose
+    destructive or unclassifiable step has no require_approval gate before it
+    is refused, naming the step and the file to fix.
 
     Available workflow types:
       - clone_and_test: Clone VM → apply changes → monitor → approve → commit
@@ -43,7 +53,11 @@ def plan_workflow(
         workflow_type: One of the available workflow types.
         params: Workflow-specific parameters.
             clone_and_test: target_vm (str), change_spec (dict), monitor_minutes (int),
-                target (str).
+                target (str). change_spec is a resize ({"cpu": 4} and/or
+                {"memory_mb": 32768}; memory_gb is converted) or one guest command
+                ({"command": "/usr/bin/apt-get", "arguments": "...", "username":
+                "<guest account>", "password": "..."}) — username is required,
+                there is no root default.
             incident_response: alert_entity (str), alert_name (str), target (str).
             plan_and_approve: operations (list[dict]), target (str), description (str).
             compliance_scan: target (str), check_alarms (bool), check_capacity (bool).
@@ -60,7 +74,20 @@ def plan_workflow(
                 f"Available: {list(templates.keys())}"
             }
 
-        wf = template_fn(**params)
+        # Check the params against the template's own signature first: a missing
+        # or misspelt param is otherwise a TypeError, which _safe_error reduces
+        # to its class name. The text here names only our own parameters.
+        signature = inspect.signature(template_fn)
+        try:
+            signature.bind(**params)
+        except TypeError as e:
+            return {
+                "error": f"plan_workflow('{workflow_type}'): {e}.",
+                "hint": f"{workflow_type} takes {signature}. Supply the missing or "
+                "misspelt params and call plan_workflow again.",
+            }
+
+        wf = template_fn(**params)  # custom YAML loaders raise ApprovalGateError
         _get_store().save(wf)
 
         return {
@@ -74,6 +101,10 @@ def plan_workflow(
             "params": wf.params,
             "message": f"Plan created. Call run_workflow('{wf.id}') to execute.",
         }
+    except ApprovalGateError as e:
+        # Returned whole: the refusal names the file and the step to insert,
+        # and _safe_error would cut the remedy off at 500 characters.
+        return e.payload
     except Exception as e:
         return {
             "error": _safe_error(e, "plan_workflow"),
@@ -103,18 +134,21 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
     real dispatcher (embedders supplying one to WorkflowExecutor).
 
     Safety: the workflow is structurally reviewed before each run. Runs
-    are REFUSED if review finds ungated destructive steps or destructive
-    steps inside a parallel group, unless force=True (forced runs are
-    written to the workflow audit log).
+    are REFUSED if review finds ungated destructive or unclassifiable steps,
+    or destructive steps inside a parallel group. For a built-in template,
+    force=True overrides that (forced runs are written to the workflow audit
+    log). For a custom workflow (create_workflow, design_workflow, or a YAML
+    template) an ungated step is refused even with force=True: add a
+    require_approval step before it instead.
 
     When an approval gate is reached, the workflow pauses with state
     'awaiting_approval'. Call approve() to continue.
 
     Args:
         workflow_id: The workflow ID from plan_workflow.
-        force: Bypass blocking review findings (ungated_destructive,
-            destructive_in_parallel_group). Use only with explicit human
-            consent; the bypass is audited.
+        force: Bypass blocking review findings on a built-in template. Use
+            only with explicit human consent; the bypass is audited. Has no
+            effect on a custom workflow's missing approval gate.
 
     Returns:
         Current workflow state with 'outcome' (completed | awaiting_approval
@@ -140,6 +174,39 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
     try:
         # ── Approval-gate enforcement (not just advisory) ─────────────
         review_result = _review_workflow_impl(wf)
+
+        # ── Custom workflows: a missing gate is not overridable ──────
+        # A built-in was reviewed by whoever wrote it; a custom workflow was
+        # not, and the fix for its missing gate is one inserted step — which
+        # is itself the human consent force=True would stand in for.
+        gate_findings = [
+            f for f in review_result.get("findings", []) if f.get("kind") in GATE_FINDING_KINDS
+        ]
+        if is_custom_workflow(wf) and gate_findings:
+            payload = refusal(
+                wf.workflow_type,
+                gate_violations(wf),
+                verb="run",
+                retry=(
+                    "cancel_workflow this one and create_workflow the corrected steps "
+                    "(a confirmed workflow's steps are frozen)"
+                ),
+                extra=(
+                    "force=True does not override this for a custom workflow: the "
+                    "approval gate is the human consent force would stand in for."
+                ),
+            )
+            # Same shape as the built-in refusal below, so a caller reads one.
+            return {
+                **payload,
+                "blocking_findings": gate_findings,
+                "hint": (
+                    "Add a require_approval step (skill 'pilot', tool 'approve') before "
+                    f"step {payload['fix']['insert_before_step']}; force=True cannot "
+                    "stand in for it on a custom workflow."
+                ),
+            }
+
         blocking = [
             f
             for f in review_result.get("findings", [])
@@ -247,17 +314,24 @@ def approve(workflow_id: str, approver: str = "") -> dict:
 def rollback(workflow_id: str) -> dict:
     """[WRITE] Abort a workflow and rollback completed steps in reverse order.
 
-    Use this to undo steps that already ran; use cancel_workflow instead to
-    stop a workflow that has not started yet or whose approval was rejected.
-    Works in any state except 'completed'. Irreversible steps are skipped.
-    The workflow state is set to 'failed' after rollback.
+    Nothing rolls back automatically: a failed step leaves the workflow
+    'failed' and stops. This tool is the explicit, best-effort undo, and it
+    only reverses steps pilot itself recorded as 'success' — which, on this
+    server (no dispatcher), are approval gates only. Steps YOU performed from
+    pending_dispatch are still 'not_executed' here, so to undo them call each
+    one's rollback_tool with its rollback_params yourself, last step first.
+    Embedders that pass a dispatcher to WorkflowExecutor get those calls made
+    for them. Steps without a rollback_tool are skipped; a failed undo does not
+    stop the rest. Works in any state except draft, completed, rolling_back or
+    cancelled. The workflow state is set to 'failed' afterwards.
 
     Args:
         workflow_id: The workflow ID to rollback.
 
     Returns:
-        Rollback results for each step. Check get_workflow_status afterwards
-        to see which steps were actually reversed and which were skipped.
+        Rollback results for each step pilot recorded as succeeded. Check
+        get_workflow_status afterwards to see which steps were actually
+        reversed and which were skipped.
     """
     try:
         wf = _get_store().load(workflow_id)

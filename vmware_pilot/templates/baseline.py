@@ -24,8 +24,11 @@ def baseline_capture(
 ) -> Workflow:
     """Capture current infrastructure state as a baseline snapshot.
 
-    Collects configuration from all relevant skills and stores as JSON
-    in ~/.vmware/baselines/. Use baseline_audit to compare later.
+    Collects configuration from the relevant skills. Pilot does not write the
+    baseline file: ``params["baseline_path"]`` (~/.vmware/baselines/{name}.json)
+    is where the calling agent should save the collected step results. That
+    data is an inventory of VMs, hosts, network segments, datastores and
+    alarms — sensitive; save it owner-only. Use baseline_audit to compare later.
 
     Steps:
       1. Collect VM inventory (monitor)
@@ -33,7 +36,6 @@ def baseline_capture(
       3. Collect network segments (nsx)
       4. Collect storage/datastores (storage)
       5. Collect active alarms (monitor)
-      6. Save baseline to ~/.vmware/baselines/{name}.json
 
     Args:
         target: vCenter target name.
@@ -139,15 +141,16 @@ def baseline_audit(
 ) -> Workflow:
     """Audit current state against a saved baseline — detect configuration drift.
 
-    Collects current state using the same tools as baseline_capture,
-    then compares with the saved baseline. Differences are reported as drift items.
+    Collects current state using the same tools as baseline_capture. The
+    comparison with the saved baseline file is the calling agent's job — pilot
+    does not read the file, and the workflow's ``diff_report`` stays empty.
 
     Steps:
       1. Collect current VM inventory
       2. Collect current host inventory
       3. Collect current network state
       4. Collect current storage state
-      5. Compare against saved baseline (results in diff_report)
+      5. Check Aria anomalies for context
 
     Args:
         baseline_name: Name of the baseline to compare against (default: "latest").

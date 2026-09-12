@@ -180,3 +180,30 @@ class TestDeadStateRemoval:
         loaded = fresh.load("wf-rt")
         assert loaded is not None
         assert loaded.state is WorkflowState.AWAITING_APPROVAL
+
+
+@pytest.mark.unit
+class TestStateFilePermissions:
+    """The docs promise owner-only state; this is what makes that a fact.
+
+    ``workflows.db`` holds step params and whatever companion skills returned —
+    inventory, addresses, error text — so it is sensitive operational data.
+    """
+
+    def test_db_is_owner_only_and_its_directory_is_0700(self, tmp_path):
+        import os
+        import stat
+
+        from vmware_policy.fsperms import POSIX_PERMISSIONS, assert_owner_only
+
+        state_dir = tmp_path / "dotvmware"
+        state_dir.mkdir(mode=0o755)
+        store = WorkflowStore(state_dir / "workflows.db")
+        store.save(Workflow(
+            id="wf-perm", workflow_type="test", state=WorkflowState.PENDING,
+            steps=[], params={}, created_at="", updated_at="",
+        ))
+
+        assert_owner_only(state_dir / "workflows.db")
+        if POSIX_PERMISSIONS:
+            assert stat.S_IMODE(os.stat(state_dir).st_mode) == 0o700

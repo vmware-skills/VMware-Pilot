@@ -11,16 +11,16 @@
 ### Via uv (Recommended)
 
 ```bash
-uv tool install vmware-pilot
+uv tool install vmware-pilot==1.9.0
 ```
 
 ### Via pip
 
 ```bash
-uv tool install vmware-pilot
+uv tool install vmware-pilot==1.9.0
 
 # China mainland mirror
-pip install vmware-pilot -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install vmware-pilot==1.9.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ### Verify Installation
@@ -84,7 +84,7 @@ The `uvx` form still works and needs no prior install:
   "mcpServers": {
     "vmware-pilot": {
       "command": "uvx",
-      "args": ["--from", "vmware-pilot", "vmware-pilot-mcp"]
+      "args": ["--from", "vmware-pilot==1.9.0", "vmware-pilot-mcp"]
     }
   }
 }
@@ -100,7 +100,7 @@ invalid peer certificate: UnknownIssuer
 
 `uv` ships its own certificate bundle and ignores the system trust store, which is what breaks.
 Either set `UV_NATIVE_TLS=true` so it honours your corporate CA, or install the tool once
-(`uv tool install vmware-pilot`) and launch `vmware-pilot mcp`, which touches the network
+(`uv tool install vmware-pilot==1.9.0`) and launch `vmware-pilot mcp`, which touches the network
 zero times.
 
 ---
@@ -144,8 +144,9 @@ their own `config.yaml` — an optional label an environment-scoped `deny` rule
 in `~/.vmware/rules.yaml` can match on (for example, to freeze writes on
 `production`). A target with no label is simply not matched by such a rule.
 
-vmware-pilot has no targets and needs no such declaration: it reports a
-constant `local`. That is accurate rather than an exemption — pilot's own
+vmware-pilot has no targets and needs no such declaration: it registers no
+environment resolver, so its own calls are unlabeled and match no
+environment-scoped rule. That is accurate rather than an exemption — pilot's own
 writes land in `~/.vmware/workflows.db`, and its executor never calls VMware
 APIs. When a workflow reaches an executable step, the MCP server records it as
 `not_executed` and returns `dispatch_required`; the calling agent then performs
@@ -252,7 +253,7 @@ The workflow database uses WAL mode for concurrent access. If you see lock error
 Validate your template:
 
 ```bash
-python3 scripts/validate_workflow.py ~/.vmware/workflows/my_workflow.yaml
+"$(uv tool dir)/vmware-pilot/bin/python" scripts/validate_workflow.py ~/.vmware/workflows/my_workflow.yaml
 ```
 
-Common issues: incorrect indentation, missing required fields (action, skill, tool, params), invalid YAML syntax.
+Common issues: incorrect indentation, missing required fields (action, skill, tool, params), invalid YAML syntax, and a destructive step with no `require_approval` step before it (pilot refuses the file until one is added).

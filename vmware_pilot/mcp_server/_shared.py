@@ -65,10 +65,11 @@ mcp = FastMCP(
     "vmware-pilot",
     instructions=(
         "VMware workflow orchestration. Plan and execute multi-step operations "
-        "(clone-test-approve-commit, incident response) with state persistence, "
-        "approval gates, and automatic rollback. "
+        "(clone-test-approve-commit, incident response) with state persistence "
+        "and approval gates. Nothing rolls back automatically: a failed step stops "
+        "the workflow, and rollback is an explicit, best-effort call. "
         "Use plan_workflow to create a plan, run_workflow to execute, "
-        "approve to continue past gates, rollback to abort."
+        "approve to continue past gates, rollback to undo."
     ),
 )
 
@@ -96,12 +97,24 @@ def _validate_template_name(name: str) -> str | None:
     """Return an error message if ``name`` is unsafe as a template filename.
 
     ``name`` is user-supplied and becomes a filename — reject traversal so a
-    template cannot be written outside the workflows dir.
+    template cannot be written outside the workflows dir. Built-in template
+    names are reserved too: ``get_all_templates`` lets a custom template of the
+    same name take precedence, so saving one would replace the vetted built-in
+    for every later ``plan_workflow`` call.
     """
+    from vmware_pilot.templates import BUILTIN_TEMPLATES
+
     if not name or "/" in name or "\\" in name or name.startswith(".") or "\x00" in name:
         return (
             f"Invalid workflow name {name!r}: must be non-empty with no path "
             "separators, leading dots, or null bytes"
+        )
+    if name in BUILTIN_TEMPLATES:
+        return (
+            f"Invalid workflow name {name!r}: it is a built-in template, and a custom "
+            "template saved under that name would replace the built-in for every "
+            f"later plan_workflow('{name}') call. Choose a name of your own, e.g. "
+            f"'{name}_custom' or one that says what this workflow does."
         )
     return None
 

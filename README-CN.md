@@ -40,22 +40,27 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `update_draft` | 编辑草稿工作流的步骤 |
 | `confirm_draft` | 确认草稿 → 可执行状态 |
 | `plan_workflow` | 从模板创建执行计划，返回 workflow_id |
-| `create_workflow` | 从步骤列表直接创建自定义工作流 |
+| `create_workflow` | 从步骤列表直接创建自定义工作流（若破坏性步骤之前没有审批门控则拒绝） |
 | `run_workflow` | 执行工作流，在审批门控处暂停 |
 | `get_workflow_status` | 查询状态 + 差异报告 + 审计日志 |
 | `approve` | 人工审批，继续执行 |
-| `rollback` | 中止并按逆序回滚已完成的步骤 |
+| `rollback` | 显式、尽力而为地逆序撤销 pilot 记录为成功的步骤——从不自动执行 |
 | `cancel_workflow` | 取消工作流，置为终态 CANCELLED |
 
-## 内置模板（14 个）
+## 内置模板（15 个）
+
+`n` 为虚拟机（或漂移项）数量；区间取决于设置了哪些可选参数。`change_spec` 为 guest 命令时
+`clone_and_test` 有 7 步（在 staging 中执行命令前多一道审批）。`investigate_alert` 的审批是综合
+判断检查点，其步骤全部为只读。参数与步骤详见 `skills/vmware-pilot/references/templates.md`。
 
 | 模板 | 步骤数 | 审批 | 使用的技能 |
 |------|:------:|:----:|-----------|
-| `clone_and_test` | 6 | 是 | aiops, monitor |
+| `clone_and_test` | 6-7 | 是 | aiops, monitor |
 | `incident_response` | 4 | 是 | monitor, aiops |
+| `investigate_alert` | 4（`deep_dive` 时 8） | 是 | monitor, aria |
 | `plan_and_approve` | 3 | 是 | aiops |
-| `compliance_scan` | 3 | 否 | monitor, aria |
-| `network_segment_setup` | 2-6 | 是 | nsx, nsx-security |
+| `compliance_scan` | 1-3 | 否 | monitor, aria |
+| `network_segment_setup` | 3-6 | 是 | nsx, nsx-security |
 | `vks_cluster_deploy` | 4 | 是 | vks |
 | `rolling_restart` | 2+3n | 是 | aiops, monitor |
 | `capacity_expansion` | 5 | 是 | aria, aiops, monitor |
@@ -63,7 +68,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `patch_deployment` | 1+3n | 是 | aiops, monitor |
 | `storage_expansion` | 6 | 是 | storage |
 | `baseline_capture` | 1-5 | 否 | monitor, nsx, storage |
-| `baseline_audit` | 2-5 | 否 | monitor, nsx, storage, aria |
+| `baseline_audit` | 1-5 | 否 | monitor, nsx, storage, aria |
 | `baseline_remediate` | 3+n | 是 | 按需 |
 
 ## MCP 配置

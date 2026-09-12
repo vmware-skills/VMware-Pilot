@@ -1,6 +1,6 @@
 # Built-in Templates Reference
 
-vmware-pilot ships with 14 built-in workflow templates. Each template is a Python function
+vmware-pilot ships with 15 built-in workflow templates. Each template is a Python function
 that generates a `Workflow` with pre-configured steps, approval gates, and rollback mappings.
 
 ---
@@ -9,31 +9,55 @@ that generates a `Workflow` with pre-configured steps, approval gates, and rollb
 
 **Purpose**: Clone a VM, apply changes in staging, monitor, then await approval before applying to production. The safest way to test changes.
 
-**Steps** (6):
+**Steps** (6 for a resize, 7 for a guest command):
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
 | 0 | Clone VM to staging | aiops | `deploy_linked_clone` | `vm_power_off` (staging) |
+| (1) | **APPROVAL GATE** — guest command only: run it in staging? | pilot | `approve` | -- |
 | 1 | Apply changes to staging | aiops | `vm_reconfigure` or `vm_guest_exec` | -- |
 | 2 | Monitor staging health | monitor | `get_alarms` | -- |
 | 3 | **APPROVAL GATE** | pilot | `approve` | -- |
 | 4 | Apply changes to production | aiops | `vm_reconfigure` or `vm_guest_exec` | -- |
-| 5 | Cleanup staging VM | aiops | `vm_power_off` | -- |
+| 5 | Power off staging VM | aiops | `vm_power_off` | -- |
+
+With a guest command the extra gate comes first, so the later steps shift by
+one. `vm_guest_exec` is destructive (vmware-aiops publishes it with
+`destructiveHint: true`), and the end-of-test gate would come after it had
+already run in staging.
 
 **Parameters**:
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `target_vm` | str | Yes | Production VM name to clone |
-| `change_spec` | dict | Yes | Changes to apply (e.g. `{memory_mb: 32768, cpu: 4}`) |
+| `change_spec` | dict | Yes | What to apply — see below |
 | `monitor_minutes` | int | No | How long to monitor staging (default: 5) |
 | `target` | str | No | vCenter target name |
+
+`change_spec` is one of two shapes, and anything the aiops tool would reject is
+refused when the plan is made — before the staging clone exists:
+
+- **Resize** → aiops `vm_reconfigure`: `cpu` and/or `memory_mb`. `memory_gb` is
+  accepted and converted to `memory_mb` (it must come out a whole number of MB;
+  do not pass both). No other keys.
+- **Guest command** → aiops `vm_guest_exec`: `command` (full path of the
+  program), `username` (**required** — the guest account to run as; there is no
+  default, and pilot never assumes root), `password`, and optionally
+  `arguments`, `working_directory`. No other keys.
 
 **Example**:
 ```
 plan_workflow("clone_and_test", {
     target_vm: "db01",
     change_spec: {memory_mb: 32768},
+    target: "vcenter-prod"
+})
+
+plan_workflow("clone_and_test", {
+    target_vm: "web01",
+    change_spec: {command: "/usr/bin/apt-get", arguments: "-y upgrade",
+                  username: "ops", password: "..."},
     target: "vcenter-prod"
 })
 ```
@@ -344,7 +368,7 @@ plan_workflow("disaster_recovery", {
 | `patch_local_path` | str | Yes | Local path to patch file |
 | `patch_guest_path` | str | Yes | Destination path inside guest OS |
 | `install_command` | str | Yes | Command to run after upload (e.g. "rpm -Uvh /tmp/patch.rpm") |
-| `username` | str | No | Guest OS username (default: "root") |
+| `username` | str | Yes | Guest OS account the upload and install run as. No default — vmware-aiops removed its root default, and pilot will not assume one |
 | `password` | str | No | Guest OS password |
 | `target` | str | No | vCenter target name |
 
@@ -355,7 +379,7 @@ plan_workflow("patch_deployment", {
     patch_local_path: "/tmp/security-patch-2026q1.rpm",
     patch_guest_path: "/tmp/security-patch-2026q1.rpm",
     install_command: "rpm -Uvh /tmp/security-patch-2026q1.rpm",
-    username: "root",
+    username: "patchadmin",
     password: "...",
     target: "vcenter-prod"
 })
@@ -427,7 +451,13 @@ All steps are read-only. No approval gate.
 | `include_alarms` | bool | No | Capture alarms (default: True) |
 | `baseline_name` | str | No | Name for baseline (default: auto-generated timestamp) |
 
-Baselines are saved to `~/.vmware/baselines/{name}.json`.
+**Pilot does not write the baseline file.** The plan carries a suggested
+`baseline_path` (`~/.vmware/baselines/{name}.json`); the calling agent saves the
+collected step results there if you want to keep them. **That file is sensitive**:
+it is an inventory of your VMs, ESXi hosts, NSX segments, datastores and active
+alarms — the map an attacker would want. Keep it owner-only (`chmod 700
+~/.vmware/baselines`, `chmod 600` each file), do not paste it into chat, tickets
+or shared drives, and delete baselines you no longer need.
 
 **Example**:
 ```
@@ -442,6 +472,8 @@ plan_workflow("baseline_capture", {
 ## 13. baseline_audit
 
 **Purpose**: Compare current infrastructure state against a saved baseline to detect configuration drift.
+Pilot collects the current state; the calling agent does the comparison against
+the file it saved (pilot does not read it, and `diff_report` stays empty).
 
 **Steps** (up to 5):
 
@@ -539,11 +571,11 @@ plan_workflow("baseline_remediate", {
 
 | Template | Steps | Approval | Skills Used | Risk Level |
 |----------|-------|----------|-------------|------------|
-| `clone_and_test` | 6 | Yes | aiops, monitor | Medium |
+| `clone_and_test` | 6-7 | Yes | aiops, monitor | Medium |
 | `incident_response` | 4 | Yes | monitor, aiops | Medium |
 | `plan_and_approve` | 3 | Yes | aiops | High |
-| `compliance_scan` | 3 | No | monitor, aria | Low |
-| `network_segment_setup` | 2-6 | Yes | nsx, nsx-security | Medium |
+| `compliance_scan` | 1-3 | No | monitor, aria | Low |
+| `network_segment_setup` | 3-6 | Yes | nsx, nsx-security | Medium |
 | `vks_cluster_deploy` | 4 | Yes | vks | Medium |
 | `rolling_restart` | 2+3n | Yes | aiops, monitor | Medium |
 | `capacity_expansion` | 5 | Yes | aria, aiops, monitor | Medium |
@@ -551,5 +583,6 @@ plan_workflow("baseline_remediate", {
 | `patch_deployment` | 1+3n | Yes | aiops, monitor | Medium |
 | `storage_expansion` | 6 | Yes | storage | Medium |
 | `baseline_capture` | 1-5 | No | monitor, nsx, storage | Low |
-| `baseline_audit` | 2-5 | No | monitor, nsx, storage, aria | Low |
+| `baseline_audit` | 1-5 | No | monitor, nsx, storage, aria | Low |
 | `baseline_remediate` | 3+n | Yes | varies | High |
+| `investigate_alert` | 4 (8 with `deep_dive`) | Yes (synthesis checkpoints) | monitor, aria | Low |

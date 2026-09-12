@@ -10,10 +10,10 @@
 | 4 | `update_draft` | medium | Design | Edit draft workflow steps, name, or description |
 | 5 | `confirm_draft` | medium | Design | Finalize draft → state changes to PENDING |
 | 6 | `plan_workflow` | medium | Execute | Create workflow from built-in/custom template |
-| 7 | `create_workflow` | medium | Execute | Create custom workflow from step list |
+| 7 | `create_workflow` | medium | Execute | Create custom workflow from step list (refused if a destructive step has no approval gate before it) |
 | 8 | `run_workflow` | medium | Execute | Execute workflow, pauses at approval gates |
 | 9 | `approve` | high | Control | Human approval to continue past approval gate |
-| 10 | `rollback` | high | Control | Reverse completed steps in reverse order |
+| 10 | `rollback` | high | Control | Explicit, best-effort undo of steps pilot recorded as succeeded, in reverse order — never automatic |
 | 11 | `get_workflow_status` | low | Control | Query workflow state, audit log, diff report |
 | 12 | `review_workflow` | low | Discovery | Sanity-check a planned workflow before anyone runs it |
 | 13 | `cancel_workflow` | medium | Control | Cancel a workflow — moves it to the terminal CANCELLED state |
@@ -24,11 +24,11 @@
 
 | # | Template | Steps | Approval | Skills Used | Risk |
 |---|----------|-------|----------|-------------|------|
-| 1 | `clone_and_test` | 6 | Yes | aiops, monitor | Medium |
+| 1 | `clone_and_test` | 6-7 | Yes | aiops, monitor | Medium |
 | 2 | `incident_response` | 4 | Yes | monitor, aiops | Medium |
 | 3 | `plan_and_approve` | 3 | Yes | aiops | High |
-| 4 | `compliance_scan` | 3 | No | monitor, aria | Low |
-| 5 | `network_segment_setup` | 2-6 | Yes | nsx, nsx-security | Medium |
+| 4 | `compliance_scan` | 1-3 | No | monitor, aria | Low |
+| 5 | `network_segment_setup` | 3-6 | Yes | nsx, nsx-security | Medium |
 | 6 | `vks_cluster_deploy` | 4 | Yes | vks | Medium |
 | 7 | `rolling_restart` | 2+3n | Yes | aiops, monitor | Medium |
 | 8 | `capacity_expansion` | 5 | Yes | aria, aiops, monitor | Medium |
@@ -36,9 +36,9 @@
 | 10 | `patch_deployment` | 1+3n | Yes | aiops, monitor | Medium |
 | 11 | `storage_expansion` | 6 | Yes | storage | Medium |
 | 12 | `baseline_capture` | 1-5 | No | monitor, nsx, storage | Low |
-| 13 | `baseline_audit` | 2-5 | No | monitor, nsx, storage, aria | Low |
+| 13 | `baseline_audit` | 1-5 | No | monitor, nsx, storage, aria | Low |
 | 14 | `baseline_remediate` | 3+n | Yes | varies | High |
-| 15 | `investigate_alert` | 4-9 | Checkpoint | monitor, aria | Low |
+| 15 | `investigate_alert` | 4 (8 with `deep_dive`) | Checkpoint | monitor, aria | Low |
 
 ---
 
@@ -99,10 +99,10 @@ DRAFT -> PENDING -> RUNNING -> AWAITING_APPROVAL -> RUNNING -> COMPLETED
 ## Key Features
 
 ### Approval Gates
-Pause execution for human review before destructive operations. Workflows can have multiple approval gates. Each gate requires an explicit `approve()` call to continue.
+Pause execution for human review before destructive operations. Workflows can have multiple approval gates. Each gate requires an explicit `approve()` call to continue. In a custom workflow (YAML, `create_workflow`, or AI-designed) every destructive or unclassifiable step must have a gate before it: otherwise pilot refuses to save, confirm, plan or run it, and `force=True` does not override that.
 
-### Automatic Rollback
-When a step fails, pilot offers to reverse all completed steps that have `rollback_tool` defined. Rollback executes in reverse order (last completed step first). Best-effort: if one rollback fails, remaining rollbacks still execute.
+### Rollback (explicit, never automatic)
+A failed step stops the workflow; nothing is reversed until someone calls `rollback`. It undoes, last first, only steps pilot recorded as `success` — on the MCP server (no dispatcher) that is none of the steps the agent performed, so the agent calls each step's `rollback_tool` itself. Best-effort: if one undo fails, the rest still run. Steps without a `rollback_tool` cannot be undone.
 
 ### State Persistence
 All workflow state is stored in SQLite at `~/.vmware/workflows.db` (WAL mode). Workflows survive MCP server restarts and can be resumed.
