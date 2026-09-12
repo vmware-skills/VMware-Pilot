@@ -34,6 +34,46 @@ _log = logging.getLogger("vmware-pilot.executor")
 # Type for the dispatch function: (skill, tool, params) → result
 DispatchFn = Callable[[str, str, dict[str, Any]], Any]
 
+# A dispatch that raises is only ONE of the two ways a step fails. Every skill
+# in this family reports failure by *returning* {"error": ...} (that is what
+# @vmware_tool / _safe_error produce), and an MCP client hands back a result
+# object carrying isError=True. Treating "it returned" as "it worked" makes a
+# workflow whose every step failed report `completed` — and because rollback
+# refuses a completed workflow, the false success also removes the way back.
+# Same shape as the Policy v1.8.4 fix (a returned error envelope audited as ok);
+# found again here on a real run against a live vCenter, 2026-09-12.
+
+
+class _StepReturnedFailure(Exception):
+    """A step whose dispatch returned a failure instead of raising one."""
+
+    def __init__(self, message: str, payload: Any) -> None:
+        super().__init__(message)
+        self.message = message
+        self.payload = payload if isinstance(payload, dict) else {"error": message}
+
+
+def _returned_failure(result: Any) -> str | None:
+    """Return the failure message if this dispatch result reports failure.
+
+    Only a TOP-LEVEL, non-empty ``error`` counts: ``{"error": None}`` is an
+    explicit "no error", and an ``error`` nested inside a row (an alarm's
+    ``error_count``, say) is data, not a failed call.
+    """
+    if getattr(result, "isError", False):
+        # Unwrap the content block if there is one: the skill's own teaching
+        # message is the useful part, not the repr of the transport object.
+        content = getattr(result, "content", None)
+        if isinstance(content, list) and content and getattr(content[0], "text", None):
+            return str(content[0].text)
+        return str(content or "the tool reported isError")
+    if isinstance(result, dict):
+        err = result.get("error")
+        if err not in (None, "", [], {}):
+            return str(err)
+    return None
+
+
 _NO_DISPATCH_REASON = (
     "No dispatch function is configured — vmware-pilot cannot invoke other "
     "skills' MCP tools itself. The step was recorded but NOT executed. "
@@ -194,10 +234,26 @@ class WorkflowExecutor:
                         "cancel_workflow to retire the stale one."
                     )
                 result = self._dispatch(step.skill, step.tool, resolved_params)
+                returned_failure = _returned_failure(result)
+                if returned_failure is not None:
+                    raise _StepReturnedFailure(returned_failure, result)
                 step.status = "success"
                 step.result = result
                 step.completed_at = _now()
                 wf.log("step_completed", f"Step {step.index}: {step.tool} → success")
+            except _StepReturnedFailure as failed:
+                # The skill reported failure by RETURNING it. Keep its own
+                # payload: the teaching message is what the operator needs.
+                step.status = "failed"
+                step.result = failed.payload
+                step.completed_at = _now()
+                wf.state = WorkflowState.FAILED
+                wf.log("step_failed", f"Step {step.index}: {step.tool} → {failed.message}")
+                for remaining in wf.steps:
+                    if remaining.status == "pending":
+                        remaining.status = "skipped"
+                self._store.save(wf)
+                return self._finish(wf, "failed")
             except Exception as exc:
                 step.status = "failed"
                 step.result = {"error": str(exc)}
@@ -328,6 +384,12 @@ class WorkflowExecutor:
                     step.rollback_params, wf.steps, current_index=step.index + 1
                 )
                 result = self._dispatch(step.skill, step.rollback_tool, resolved_rb)
+                # A rollback that *returns* a failure is not a rollback. Saying
+                # "rolled back" when the estate never changed back is the worst
+                # place in this file to be optimistic.
+                returned_failure = _returned_failure(result)
+                if returned_failure is not None:
+                    raise _StepReturnedFailure(returned_failure, result)
                 step.status = "rolled_back"
                 rollback_results.append(
                     {

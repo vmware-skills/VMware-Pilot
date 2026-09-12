@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "vmware-pilot",
   "displayName": "VMware Pilot",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Multi-step workflow orchestration for VMware MCP skills with approval gates and rollback.",
   "author": {
     "name": "Wei Zhou",

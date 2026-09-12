@@ -573,3 +573,140 @@ class TestApproverRequired:
             assert "error" in result
             assert "approver is required" in result["error"]
         assert wf.steps[0].status == "pending"
+
+
+# ── Returned-failure envelopes ────────────────────────────────────────
+# Every skill in this family signals failure by RETURNING {"error": ...},
+# not by raising: that is what @vmware_tool / _safe_error produce. An
+# executor that only treats exceptions as failure therefore reports
+# "completed" for a workflow whose every step failed — the shape fixed in
+# Policy v1.8.4 (a returned error envelope audited as ok), found again here
+# on a real run against home-vcenter on 2026-09-12.
+
+
+def _envelope_error_dispatch(skill: str, tool: str, params: dict[str, Any]) -> dict:
+    if tool == "failing_tool":
+        return {
+            "error": "VM 'zz-nonexistent' not found on target 'home-vcenter'.",
+            "hint": "Run vm_list to see available VMs.",
+        }
+    return {"ok": True}
+
+
+class _TextBlock:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _CallToolResult:
+    """Duck-typed stand-in for mcp's CallToolResult(isError=True)."""
+
+    def __init__(self, is_error: bool) -> None:
+        self.isError = is_error
+        self.content = [_TextBlock("Error: VM 'zz-nonexistent' not found. Run vm_list to see available VMs.")]
+
+
+def _is_error_object_dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
+    return _CallToolResult(is_error=(tool == "failing_tool"))
+
+
+@pytest.mark.unit
+class TestReturnedFailureIsNotSuccess:
+    def _wf(self, wid: str) -> Workflow:
+        return Workflow(
+            id=wid, workflow_type="test", state=WorkflowState.PENDING,
+            steps=[
+                WorkflowStep(index=0, action="ok", skill="monitor", tool="get_alarms", params={}),
+                WorkflowStep(index=1, action="fail", skill="aiops", tool="failing_tool", params={}),
+                WorkflowStep(index=2, action="skip", skill="aiops", tool="vm_power_off", params={}),
+            ],
+            params={}, created_at="", updated_at="",
+        )
+
+    def test_error_envelope_fails_the_step(self, tmp_path):
+        store = _make_store(tmp_path)
+        wf = self._wf("wf-env-1")
+        store.save(wf)
+        result = WorkflowExecutor(store, dispatch=_envelope_error_dispatch).run_until_checkpoint(wf)
+
+        assert result["state"] == "failed", "a returned error envelope must not read as success"
+        assert result["steps"][1]["status"] == "failed"
+        assert result["steps"][2]["status"] == "skipped"
+
+    def test_error_envelope_keeps_the_skill_message(self, tmp_path):
+        store = _make_store(tmp_path)
+        wf = self._wf("wf-env-2")
+        store.save(wf)
+        WorkflowExecutor(store, dispatch=_envelope_error_dispatch).run_until_checkpoint(wf)
+
+        # The skill's own teaching message is what an operator needs; do not
+        # replace it with a generic "step failed".
+        assert "not found" in str(wf.steps[1].result)
+
+    def test_failed_workflow_can_be_rolled_back(self, tmp_path):
+        # The point of failing honestly: rollback refuses a *completed*
+        # workflow, so a false "completed" also removes the way back.
+        store = _make_store(tmp_path)
+        wf = self._wf("wf-env-3")
+        store.save(wf)
+        ex = WorkflowExecutor(store, dispatch=_envelope_error_dispatch)
+        ex.run_until_checkpoint(wf)
+
+        rb = ex.rollback(wf)
+        assert "error" not in rb, f"rollback should be available after a real failure: {rb}"
+
+    def test_is_error_object_fails_the_step(self, tmp_path):
+        store = _make_store(tmp_path)
+        wf = self._wf("wf-env-4")
+        store.save(wf)
+        result = WorkflowExecutor(store, dispatch=_is_error_object_dispatch).run_until_checkpoint(wf)
+
+        assert result["state"] == "failed", "an isError result object must not read as success"
+        # The operator must get the skill's message, not a repr of the transport object.
+        assert "Run vm_list" in str(wf.steps[1].result)
+        assert "TextContent" not in str(wf.steps[1].result)
+
+    def test_ordinary_results_are_still_success(self, tmp_path):
+        # Negative control: nothing here may turn a good result into a failure.
+        def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
+            return {
+                "failing_tool": {"error": None, "items": []},   # explicit no-error
+                "get_alarms": {"items": [{"error_count": 3}]},  # 'error' only nested
+            }.get(tool, {"ok": True})
+
+        store = _make_store(tmp_path)
+        wf = self._wf("wf-env-5")
+        store.save(wf)
+        result = WorkflowExecutor(store, dispatch=dispatch).run_until_checkpoint(wf)
+
+        assert result["state"] == "completed"
+        assert [s["status"] for s in result["steps"]] == ["success", "success", "success"]
+
+    def test_rollback_step_that_returns_an_error_is_not_a_successful_rollback(self, tmp_path):
+        # Worse than the forward path: "we rolled it back" when we did not.
+        store = _make_store(tmp_path)
+        wf = Workflow(
+            id="wf-env-6", workflow_type="test", state=WorkflowState.PENDING,
+            steps=[
+                WorkflowStep(index=0, action="write", skill="aiops", tool="vm_power_on",
+                             params={}, rollback_tool="vm_power_off", rollback_params={}),
+                WorkflowStep(index=1, action="fail", skill="aiops", tool="failing_tool", params={}),
+            ],
+            params={}, created_at="", updated_at="",
+        )
+        store.save(wf)
+
+        def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
+            if tool == "failing_tool":
+                return {"error": "boom"}
+            if tool == "vm_power_off":                      # the rollback itself fails
+                return {"error": "VM 'x' not found on target 'home-vcenter'."}
+            return {"ok": True}
+
+        ex = WorkflowExecutor(store, dispatch=dispatch)
+        ex.run_until_checkpoint(wf)
+        rb = ex.rollback(wf)
+
+        statuses = [r["status"] for r in rb["rollback_results"]]
+        assert "failed" in statuses, f"a rollback that returned an error must not read as success: {rb['rollback_results']}"
+        assert wf.blocked_reason == "rollback_failed"

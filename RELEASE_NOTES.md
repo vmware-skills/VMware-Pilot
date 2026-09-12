@@ -1,3 +1,46 @@
+## v1.10.0 — a step that returns a failure is a failed step
+
+**Behaviour change: workflows that used to report `completed` now report `failed`.**
+That is the point. The executor decided success by whether the dispatch call
+*raised*: any value it returned counted as a success. But every skill in this
+family reports failure by **returning** `{"error": ...}` — that is what
+`@vmware_tool` and `_safe_error` produce — and an MCP client hands back a result
+object carrying `isError=True`. So the obvious wiring (dispatch → call the sibling
+skill's MCP tool → return what it gave you) recorded a step that failed as
+`success`, ran on to the next one, and finished the workflow `completed`.
+
+Two consequences, both worse than the wrong label:
+
+- The operator was told the estate had changed when nothing had.
+- `rollback` refuses a `completed` workflow by design, so the false success also
+  removed the way back.
+
+Found on a live vCenter 8.0.3 on 2026-09-12: a `rolling_restart` aimed at a VM
+that does not exist reported every step `success` and the workflow `completed`,
+while the log carried `VMNotFoundError` twice. Same shape as the vmware-policy
+v1.8.4 fix, where a returned error envelope was audited as `ok`.
+
+**What changed**
+
+- A dispatch result that carries a top-level, non-empty `error`, or an object with
+  `isError` set, now fails the step: state `failed`, later steps `skipped`, and
+  `rollback` available. The skill's own message is kept as the step result rather
+  than being replaced with a generic one — for an `isError` object the text block
+  is unwrapped, so the operator reads `VM 'x' not found. Run list_virtual_machines`
+  and not a repr of the transport object.
+- The **rollback path** had the same blindness and was worse: a rollback step whose
+  dispatch returned an error was recorded as a successful rollback — claiming the
+  estate was put back when it was not. It now fails, and sets `blocked_reason`.
+- Deliberately not treated as failure: `{"error": None}` (an explicit "no error")
+  and an `error` nested inside a row, such as an alarm's `error_count`. Both are
+  covered by a negative-control test.
+
+Verified after the fix on the same estate: the failing step is recorded `failed`
+with the skill's own message, the following steps `skipped`, and rollback then
+really ran — it re-issued the declared inverse against vCenter.
+
+Note for embedders: `DispatchFn` may still raise; nothing about that changed.
+
 ## v1.9.0 — custom workflows without an approval gate are rejected, not warned
 
 **BREAKING: a custom workflow with an ungated destructive step no longer runs.**

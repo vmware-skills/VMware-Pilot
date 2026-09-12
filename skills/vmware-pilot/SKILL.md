@@ -42,7 +42,7 @@ Multi-step workflow orchestration for VMware MCP skills — design, approve, exe
 ## Quick Install
 
 ```bash
-uv tool install vmware-pilot==1.9.0
+uv tool install vmware-pilot==1.10.0
 vmware-pilot mcp          # start the MCP server (stdio)
 ```
 
@@ -299,7 +299,7 @@ No vCenter credentials needed — pilot orchestrates other skills that handle co
 }
 ```
 
-> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==1.9.0", "vmware-pilot-mcp"]}` also
+> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==1.10.0", "vmware-pilot-mcp"]}` also
 > works, but `uvx` re-resolves the package against PyPI on every start and fails behind a
 > TLS-inspecting corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed
 > entry point above touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.
