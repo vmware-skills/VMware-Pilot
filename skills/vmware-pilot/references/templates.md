@@ -141,8 +141,10 @@ plan_workflow("plan_and_approve", {
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
 | 0 | Check active alarms | monitor | `get_alarms` | -- |
-| 1 | Check capacity remaining | aria | `get_capacity_overview` | -- |
+| 1 | Check capacity | aria / monitor | `get_capacity_overview` (with `cluster_id`) / `cluster_health_summary` (without) | -- |
 | 2 | Check anomalies | aria | `list_anomalies` | -- |
+
+Aria's `get_capacity_overview` requires a cluster id. Without one, the capacity step reads vmware-monitor's per-cluster CPU/memory rollup instead.
 
 **Parameters**:
 
@@ -151,6 +153,7 @@ plan_workflow("plan_and_approve", {
 | `target` | str | No | vCenter/Aria target name |
 | `check_alarms` | bool | No | Include alarm check (default: True) |
 | `check_capacity` | bool | No | Include capacity check (default: True) |
+| `cluster_id` | str | No | Aria resource id of a cluster, for Aria's capacity overview |
 
 **Example**:
 ```
@@ -562,6 +565,48 @@ plan_workflow("baseline_remediate", {
         }
     ],
     target: "vcenter-prod"
+})
+```
+
+---
+
+## 15. investigate_alert
+
+**Purpose**: Causal-chain root-cause investigation of an alert. Gathers evidence in parallel, then stops at a checkpoint where the agent applies the four criteria (falsifiability, sufficiency, necessity, mechanism) from `investigation-protocol.md`. All gathering steps are reads; the approvals are synthesis checkpoints, not permission for a change.
+
+**Steps** (4, or 8 with `deep_dive`):
+
+| # | Action | Skill | Tool | Parallel group |
+|---|--------|-------|------|----------------|
+| 0 | Gather active alarms | monitor | `get_alarms` | round1-gather |
+| 1 | Gather events, last 2 h | monitor | `get_events` (`hours: 2`) | round1-gather |
+| 2 | Gather active Aria alerts | aria | `list_alerts` (`active_only: true`) | round1-gather |
+| 3 | **CHECKPOINT** — four criteria | pilot | `approve` | -- |
+| 4 | Gather anomalies | aria | `list_anomalies` | round2-gather |
+| 5 | Gather per-cluster capacity | monitor | `cluster_health_summary` | round2-gather |
+| 6 | Gather Aria alerts incl. cancelled | aria | `list_alerts` (`active_only: false`) | round2-gather |
+| 7 | **CHECKPOINT** — four criteria again | pilot | `approve` | -- |
+
+Steps 4–7 exist only with `deep_dive: true`. None of these tools filters by object, so keep the rows that concern `alert_entity` — alarms and alerts carry the object's name. The checkpoint message says so.
+
+**Parameters**:
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `alert_entity` | str | Yes | Object the alert is on (VM, host, cluster) |
+| `alert_name` | str | No | Alert label shown in the checkpoint messages |
+| `deep_dive` | bool | No | Add the second gathering round and checkpoint (default: False) |
+| `target` | str | No | vCenter target for the monitor steps; also the Aria target unless `aria_target` is set |
+| `aria_target` | str | No | Aria target for the aria steps, when it is named differently from the vCenter one |
+
+**Example**:
+```
+plan_workflow("investigate_alert", {
+    alert_entity: "192.168.60.15",
+    alert_name: "Host connection and power state",
+    target: "home-vcenter",
+    aria_target: "home-aria",
+    deep_dive: true
 })
 ```
 

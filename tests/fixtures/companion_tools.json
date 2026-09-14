@@ -1,0 +1,2544 @@
+{
+ "aiops": {
+  "acknowledge_vcenter_alarm": {
+   "properties": [
+    "alarm_name",
+    "entity_name",
+    "target"
+   ],
+   "required": [
+    "alarm_name",
+    "entity_name"
+   ]
+  },
+  "add_host_vmk": {
+   "properties": [
+    "confirm",
+    "host_name",
+    "ip",
+    "mtu",
+    "netmask",
+    "portgroup",
+    "target"
+   ],
+   "required": [
+    "host_name",
+    "ip",
+    "netmask",
+    "portgroup"
+   ]
+  },
+  "attach_iso_to_vm": {
+   "properties": [
+    "iso_ds_path",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "iso_ds_path",
+    "vm_name"
+   ]
+  },
+  "batch_clone_vms": {
+   "properties": [
+    "cpu",
+    "memory_mb",
+    "power_on",
+    "snapshot_name",
+    "source_vm_name",
+    "target",
+    "vm_names"
+   ],
+   "required": [
+    "source_vm_name",
+    "vm_names"
+   ]
+  },
+  "batch_deploy_from_spec": {
+   "properties": [
+    "spec_path",
+    "target"
+   ],
+   "required": [
+    "spec_path"
+   ]
+  },
+  "batch_linked_clone_vms": {
+   "properties": [
+    "baseline_snapshot",
+    "cpu",
+    "memory_mb",
+    "power_on",
+    "snapshot_name",
+    "source_vm_name",
+    "target",
+    "vm_names"
+   ],
+   "required": [
+    "snapshot_name",
+    "source_vm_name",
+    "vm_names"
+   ]
+  },
+  "browse_datastore": {
+   "properties": [
+    "datastore_name",
+    "path",
+    "pattern",
+    "target"
+   ],
+   "required": [
+    "datastore_name"
+   ]
+  },
+  "cluster_add_host": {
+   "properties": [
+    "cluster_name",
+    "host_name",
+    "target"
+   ],
+   "required": [
+    "cluster_name",
+    "host_name"
+   ]
+  },
+  "cluster_configure": {
+   "properties": [
+    "drs",
+    "drs_behavior",
+    "ha",
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "cluster_create": {
+   "properties": [
+    "datacenter",
+    "drs",
+    "drs_behavior",
+    "ha",
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "cluster_delete": {
+   "properties": [
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "cluster_health_summary": {
+   "properties": [
+    "cluster_filter",
+    "include_vms",
+    "target",
+    "top_n"
+   ],
+   "required": []
+  },
+  "cluster_info": {
+   "properties": [
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "cluster_remove_host": {
+   "properties": [
+    "cluster_name",
+    "host_name",
+    "target"
+   ],
+   "required": [
+    "cluster_name",
+    "host_name"
+   ]
+  },
+  "convert_vm_to_template": {
+   "properties": [
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "create_drs_rule": {
+   "properties": [
+    "cluster",
+    "confirm",
+    "enabled",
+    "rule_name",
+    "rule_type",
+    "target",
+    "vm_names"
+   ],
+   "required": [
+    "cluster",
+    "rule_name",
+    "rule_type",
+    "vm_names"
+   ]
+  },
+  "create_dvs_portgroup": {
+   "properties": [
+    "binding",
+    "confirm",
+    "dvs_name",
+    "name",
+    "num_ports",
+    "target",
+    "vlan_id"
+   ],
+   "required": [
+    "dvs_name",
+    "name",
+    "vlan_id"
+   ]
+  },
+  "cross_vcenter_attention": {
+   "properties": [
+    "cluster_filter",
+    "top_n"
+   ],
+   "required": []
+  },
+  "datastore_investigation_bundle": {
+   "properties": [
+    "datastore_name",
+    "hours",
+    "target"
+   ],
+   "required": [
+    "datastore_name"
+   ]
+  },
+  "delete_drs_rule": {
+   "properties": [
+    "cluster",
+    "confirm",
+    "rule_name",
+    "target"
+   ],
+   "required": [
+    "cluster",
+    "rule_name"
+   ]
+  },
+  "deploy_linked_clone": {
+   "properties": [
+    "baseline_snapshot",
+    "cpu",
+    "memory_mb",
+    "new_name",
+    "power_on",
+    "snapshot_name",
+    "source_vm_name",
+    "target"
+   ],
+   "required": [
+    "new_name",
+    "snapshot_name",
+    "source_vm_name"
+   ]
+  },
+  "deploy_vm_from_ova": {
+   "properties": [
+    "datastore_name",
+    "folder_path",
+    "network_name",
+    "ova_path",
+    "power_on",
+    "snapshot_name",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "datastore_name",
+    "ova_path",
+    "vm_name"
+   ]
+  },
+  "deploy_vm_from_template": {
+   "properties": [
+    "cpu",
+    "datastore_name",
+    "memory_mb",
+    "new_name",
+    "power_on",
+    "snapshot_name",
+    "target",
+    "template_name"
+   ],
+   "required": [
+    "new_name",
+    "template_name"
+   ]
+  },
+  "host_investigation_bundle": {
+   "properties": [
+    "host_name",
+    "hours",
+    "target"
+   ],
+   "required": [
+    "host_name"
+   ]
+  },
+  "list_drs_rules": {
+   "properties": [
+    "cluster",
+    "target"
+   ],
+   "required": [
+    "cluster"
+   ]
+  },
+  "list_dvs_portgroups": {
+   "properties": [
+    "dvs_name",
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_host_vmks": {
+   "properties": [
+    "host_name",
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_vcenter_alarms": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "remove_host_vmk": {
+   "properties": [
+    "confirm",
+    "force_unprotected",
+    "host_name",
+    "target",
+    "vmk"
+   ],
+   "required": [
+    "host_name",
+    "vmk"
+   ]
+  },
+  "reset_vcenter_alarm": {
+   "properties": [
+    "alarm_name",
+    "entity_name",
+    "target"
+   ],
+   "required": [
+    "alarm_name",
+    "entity_name"
+   ]
+  },
+  "scan_datastore_images": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "set_drs_rule_enabled": {
+   "properties": [
+    "cluster",
+    "confirm",
+    "enabled",
+    "rule_name",
+    "target"
+   ],
+   "required": [
+    "cluster",
+    "enabled",
+    "rule_name"
+   ]
+  },
+  "set_vmk_service": {
+   "properties": [
+    "confirm",
+    "enabled",
+    "host_name",
+    "service",
+    "target",
+    "vmk"
+   ],
+   "required": [
+    "enabled",
+    "host_name",
+    "service",
+    "vmk"
+   ]
+  },
+  "vm_apply_plan": {
+   "properties": [
+    "plan_id",
+    "target"
+   ],
+   "required": [
+    "plan_id"
+   ]
+  },
+  "vm_cancel_ttl": {
+   "properties": [
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_clean_slate": {
+   "properties": [
+    "snapshot_name",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_clone": {
+   "properties": [
+    "new_name",
+    "power_on",
+    "target",
+    "to_datastore",
+    "to_host",
+    "vm_name"
+   ],
+   "required": [
+    "new_name",
+    "vm_name"
+   ]
+  },
+  "vm_create": {
+   "properties": [
+    "cpu",
+    "datastore_name",
+    "disk_gb",
+    "folder_path",
+    "memory_mb",
+    "network_name",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_create_plan": {
+   "properties": [
+    "operations",
+    "target"
+   ],
+   "required": [
+    "operations"
+   ]
+  },
+  "vm_create_snapshot": {
+   "properties": [
+    "description",
+    "memory",
+    "quiesce",
+    "snapshot_name",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "snapshot_name",
+    "vm_name"
+   ]
+  },
+  "vm_delete": {
+   "properties": [
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_delete_snapshot": {
+   "properties": [
+    "remove_children",
+    "snapshot_name",
+    "target",
+    "vm_name",
+    "wait"
+   ],
+   "required": [
+    "snapshot_name",
+    "vm_name"
+   ]
+  },
+  "vm_guest_download": {
+   "properties": [
+    "guest_path",
+    "local_path",
+    "overwrite",
+    "password",
+    "target",
+    "username",
+    "vm_name"
+   ],
+   "required": [
+    "guest_path",
+    "local_path",
+    "username",
+    "vm_name"
+   ]
+  },
+  "vm_guest_exec": {
+   "properties": [
+    "arguments",
+    "command",
+    "password",
+    "target",
+    "username",
+    "vm_name",
+    "working_directory"
+   ],
+   "required": [
+    "command",
+    "username",
+    "vm_name"
+   ]
+  },
+  "vm_guest_exec_output": {
+   "properties": [
+    "command",
+    "password",
+    "target",
+    "timeout",
+    "username",
+    "vm_name"
+   ],
+   "required": [
+    "command",
+    "username",
+    "vm_name"
+   ]
+  },
+  "vm_guest_provision": {
+   "properties": [
+    "password",
+    "steps",
+    "target",
+    "timeout",
+    "username",
+    "vm_name"
+   ],
+   "required": [
+    "password",
+    "steps",
+    "username",
+    "vm_name"
+   ]
+  },
+  "vm_guest_upload": {
+   "properties": [
+    "guest_path",
+    "local_path",
+    "password",
+    "target",
+    "username",
+    "vm_name"
+   ],
+   "required": [
+    "guest_path",
+    "local_path",
+    "username",
+    "vm_name"
+   ]
+  },
+  "vm_investigation_bundle": {
+   "properties": [
+    "hours",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_list_plans": {
+   "properties": [],
+   "required": []
+  },
+  "vm_list_snapshots": {
+   "properties": [
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_list_ttl": {
+   "properties": [],
+   "required": []
+  },
+  "vm_migrate": {
+   "properties": [
+    "target",
+    "to_datastore",
+    "to_host",
+    "vm_name"
+   ],
+   "required": [
+    "to_host",
+    "vm_name"
+   ]
+  },
+  "vm_power_off": {
+   "properties": [
+    "force",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_power_on": {
+   "properties": [
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_reconfigure": {
+   "properties": [
+    "cpu",
+    "memory_mb",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_revert_snapshot": {
+   "properties": [
+    "snapshot_name",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "snapshot_name",
+    "vm_name"
+   ]
+  },
+  "vm_rollback_plan": {
+   "properties": [
+    "plan_id",
+    "target"
+   ],
+   "required": [
+    "plan_id"
+   ]
+  },
+  "vm_set_ttl": {
+   "properties": [
+    "minutes",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "minutes",
+    "vm_name"
+   ]
+  },
+  "vm_task_status": {
+   "properties": [
+    "target",
+    "task_id"
+   ],
+   "required": [
+    "task_id"
+   ]
+  },
+  "vmk_ping": {
+   "properties": [
+    "count",
+    "dest_ip",
+    "df",
+    "host_name",
+    "netstack",
+    "size",
+    "source_vmk",
+    "target"
+   ],
+   "required": [
+    "dest_ip",
+    "host_name",
+    "source_vmk"
+   ]
+  }
+ },
+ "aria": {
+  "acknowledge_alert": {
+   "properties": [
+    "alert_id",
+    "confirmed",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "add_alert_note": {
+   "properties": [
+    "alert_id",
+    "note",
+    "target"
+   ],
+   "required": [
+    "alert_id",
+    "note"
+   ]
+  },
+  "cancel_alert": {
+   "properties": [
+    "alert_id",
+    "confirmed",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "create_alert_definition": {
+   "properties": [
+    "adapter_kind",
+    "criticality",
+    "description",
+    "name",
+    "resource_kind",
+    "symptom_definition_ids",
+    "target"
+   ],
+   "required": [
+    "description",
+    "name",
+    "resource_kind",
+    "symptom_definition_ids"
+   ]
+  },
+  "delete_alert_definition": {
+   "properties": [
+    "confirmed",
+    "definition_id",
+    "target"
+   ],
+   "required": [
+    "definition_id"
+   ]
+  },
+  "delete_report": {
+   "properties": [
+    "confirmed",
+    "report_id",
+    "target"
+   ],
+   "required": [
+    "report_id"
+   ]
+  },
+  "end_resource_maintenance": {
+   "properties": [
+    "confirmed",
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "findings_list": {
+   "properties": [
+    "categories",
+    "finding_types",
+    "limit",
+    "severities",
+    "target"
+   ],
+   "required": []
+  },
+  "fleet_certificate_list": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "fleet_domain_list": {
+   "properties": [
+    "integration_id",
+    "limit",
+    "target"
+   ],
+   "required": [
+    "integration_id"
+   ]
+  },
+  "fleet_password_account_list": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "generate_report": {
+   "properties": [
+    "definition_id",
+    "resource_ids",
+    "target"
+   ],
+   "required": [
+    "definition_id"
+   ]
+  },
+  "get_alert": {
+   "properties": [
+    "alert_id",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "get_alert_recommendations": {
+   "properties": [
+    "alert_id",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "get_aria_health": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "get_aria_node_resources": {
+   "properties": [
+    "target",
+    "window_hours"
+   ],
+   "required": []
+  },
+  "get_capacity_overview": {
+   "properties": [
+    "cluster_id",
+    "target"
+   ],
+   "required": [
+    "cluster_id"
+   ]
+  },
+  "get_remaining_capacity": {
+   "properties": [
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_report": {
+   "properties": [
+    "report_id",
+    "target"
+   ],
+   "required": [
+    "report_id"
+   ]
+  },
+  "get_resource": {
+   "properties": [
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_resource_health": {
+   "properties": [
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_resource_metrics": {
+   "properties": [
+    "hours",
+    "metric_keys",
+    "resource_id",
+    "rollup_type",
+    "target"
+   ],
+   "required": [
+    "metric_keys",
+    "resource_id"
+   ]
+  },
+  "get_resource_properties": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_resource_relationships": {
+   "properties": [
+    "limit",
+    "offset",
+    "relationship_type",
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_resource_riskbadge": {
+   "properties": [
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_time_remaining": {
+   "properties": [
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  },
+  "get_top_consumers": {
+   "properties": [
+    "metric_key",
+    "resource_kind",
+    "target",
+    "top_n"
+   ],
+   "required": []
+  },
+  "investigate_alert": {
+   "properties": [
+    "alert_id",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "list_adapters": {
+   "properties": [
+    "adapter_kind",
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_alert_definitions": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_alert_notes": {
+   "properties": [
+    "alert_id",
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "list_alerts": {
+   "properties": [
+    "active_only",
+    "criticality",
+    "limit",
+    "offset",
+    "resource_id",
+    "target"
+   ],
+   "required": []
+  },
+  "list_anomalies": {
+   "properties": [
+    "limit",
+    "resource_id",
+    "target"
+   ],
+   "required": []
+  },
+  "list_collector_groups": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "list_maintenance_schedules": {
+   "properties": [
+    "limit",
+    "offset",
+    "resource_id",
+    "target"
+   ],
+   "required": []
+  },
+  "list_metric_keys": {
+   "properties": [
+    "adapter_kind",
+    "key_filter",
+    "limit",
+    "offset",
+    "resource_id",
+    "resource_kind",
+    "target"
+   ],
+   "required": []
+  },
+  "list_report_definitions": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_reports": {
+   "properties": [
+    "definition_id",
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "list_resources": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "resource_kind",
+    "target"
+   ],
+   "required": []
+  },
+  "list_rightsizing_recommendations": {
+   "properties": [
+    "limit",
+    "resource_id",
+    "target"
+   ],
+   "required": []
+  },
+  "list_symptom_definitions": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "resource_kind",
+    "target"
+   ],
+   "required": []
+  },
+  "promql_query": {
+   "properties": [
+    "limit",
+    "query",
+    "source_id",
+    "target",
+    "time"
+   ],
+   "required": [
+    "query"
+   ]
+  },
+  "set_alert_definition_state": {
+   "properties": [
+    "definition_id",
+    "enabled",
+    "target"
+   ],
+   "required": [
+    "definition_id",
+    "enabled"
+   ]
+  },
+  "start_resource_maintenance": {
+   "properties": [
+    "confirmed",
+    "duration_minutes",
+    "end_time_ms",
+    "resource_id",
+    "target"
+   ],
+   "required": [
+    "resource_id"
+   ]
+  }
+ },
+ "avi": {
+  "ako_amko_status": {
+   "properties": [],
+   "required": []
+  },
+  "ako_clusters": {
+   "properties": [],
+   "required": []
+  },
+  "ako_config_diff": {
+   "properties": [
+    "chart_version"
+   ],
+   "required": []
+  },
+  "ako_config_show": {
+   "properties": [],
+   "required": []
+  },
+  "ako_config_upgrade": {
+   "properties": [
+    "chart_version",
+    "confirmed",
+    "dry_run"
+   ],
+   "required": []
+  },
+  "ako_ingress_check": {
+   "properties": [
+    "context",
+    "namespace"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "ako_ingress_diagnose": {
+   "properties": [
+    "context",
+    "name",
+    "namespace"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "ako_ingress_map": {
+   "properties": [
+    "context"
+   ],
+   "required": []
+  },
+  "ako_logs": {
+   "properties": [
+    "context",
+    "since",
+    "tail"
+   ],
+   "required": []
+  },
+  "ako_restart": {
+   "properties": [
+    "confirmed",
+    "context"
+   ],
+   "required": []
+  },
+  "ako_status": {
+   "properties": [
+    "context"
+   ],
+   "required": []
+  },
+  "ako_sync_diff": {
+   "properties": [
+    "context"
+   ],
+   "required": []
+  },
+  "ako_sync_force": {
+   "properties": [
+    "confirmed",
+    "context"
+   ],
+   "required": []
+  },
+  "ako_sync_status": {
+   "properties": [
+    "context"
+   ],
+   "required": []
+  },
+  "ako_version": {
+   "properties": [
+    "context"
+   ],
+   "required": []
+  },
+  "pool_list": {
+   "properties": [
+    "vs_filter"
+   ],
+   "required": []
+  },
+  "pool_member_disable": {
+   "properties": [
+    "confirmed",
+    "pool",
+    "server"
+   ],
+   "required": [
+    "pool",
+    "server"
+   ]
+  },
+  "pool_member_enable": {
+   "properties": [
+    "pool",
+    "server"
+   ],
+   "required": [
+    "pool",
+    "server"
+   ]
+  },
+  "pool_members": {
+   "properties": [
+    "pool"
+   ],
+   "required": [
+    "pool"
+   ]
+  },
+  "se_health": {
+   "properties": [],
+   "required": []
+  },
+  "se_list": {
+   "properties": [],
+   "required": []
+  },
+  "ssl_expiry_check": {
+   "properties": [
+    "days"
+   ],
+   "required": []
+  },
+  "ssl_list": {
+   "properties": [],
+   "required": []
+  },
+  "vs_analytics": {
+   "properties": [
+    "vs_name"
+   ],
+   "required": [
+    "vs_name"
+   ]
+  },
+  "vs_error_logs": {
+   "properties": [
+    "since",
+    "vs_name"
+   ],
+   "required": [
+    "vs_name"
+   ]
+  },
+  "vs_list": {
+   "properties": [
+    "controller"
+   ],
+   "required": []
+  },
+  "vs_status": {
+   "properties": [
+    "name"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "vs_toggle": {
+   "properties": [
+    "confirmed",
+    "enable",
+    "name"
+   ],
+   "required": [
+    "enable",
+    "name"
+   ]
+  }
+ },
+ "monitor": {
+  "active_sessions": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "active_tasks": {
+   "properties": [
+    "include_recent",
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "certificate_status": {
+   "properties": [
+    "limit",
+    "target",
+    "warn_days"
+   ],
+   "required": []
+  },
+  "cluster_health_summary": {
+   "properties": [
+    "cluster_filter",
+    "include_vms",
+    "target",
+    "top_n"
+   ],
+   "required": []
+  },
+  "cluster_last_apply_result": {
+   "properties": [
+    "cluster",
+    "target"
+   ],
+   "required": [
+    "cluster"
+   ]
+  },
+  "cluster_patch_compliance": {
+   "properties": [
+    "cluster",
+    "target"
+   ],
+   "required": [
+    "cluster"
+   ]
+  },
+  "cross_vcenter_attention": {
+   "properties": [
+    "cluster_filter",
+    "top_n"
+   ],
+   "required": []
+  },
+  "datastore_capacity": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "datastore_investigation_bundle": {
+   "properties": [
+    "datastore_name",
+    "hours",
+    "target"
+   ],
+   "required": [
+    "datastore_name"
+   ]
+  },
+  "get_alarms": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "get_events": {
+   "properties": [
+    "hours",
+    "severity",
+    "target"
+   ],
+   "required": []
+  },
+  "get_host_sensors": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "get_host_services": {
+   "properties": [
+    "host_name",
+    "target"
+   ],
+   "required": []
+  },
+  "host_investigation_bundle": {
+   "properties": [
+    "host_name",
+    "hours",
+    "target"
+   ],
+   "required": [
+    "host_name"
+   ]
+  },
+  "host_log_scan": {
+   "properties": [
+    "host_name",
+    "lines",
+    "target"
+   ],
+   "required": []
+  },
+  "host_memory_tiering": {
+   "properties": [
+    "host_name",
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "host_performance": {
+   "properties": [
+    "host_name",
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "license_status": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "list_all_clusters": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "list_all_datastores": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "list_all_networks": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "list_esxi_hosts": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "list_virtual_machines": {
+   "properties": [
+    "fields",
+    "folder_filter",
+    "limit",
+    "name_filter",
+    "power_state",
+    "sort_by",
+    "target"
+   ],
+   "required": []
+  },
+  "ntp_status": {
+   "properties": [
+    "host_name",
+    "target"
+   ],
+   "required": []
+  },
+  "resource_pool_usage": {
+   "properties": [
+    "limit",
+    "target"
+   ],
+   "required": []
+  },
+  "snapshot_aging": {
+   "properties": [
+    "age_threshold_days",
+    "limit",
+    "only_old",
+    "target"
+   ],
+   "required": []
+  },
+  "vcenter_deployment_size": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "vm_backup_snapshot_history": {
+   "properties": [
+    "days",
+    "include_cycles",
+    "limit",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_info": {
+   "properties": [
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_investigation_bundle": {
+   "properties": [
+    "hours",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_list_snapshots": {
+   "properties": [
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "vm_name"
+   ]
+  },
+  "vm_performance": {
+   "properties": [
+    "limit",
+    "target",
+    "vm_name"
+   ],
+   "required": []
+  }
+ },
+ "nsx": {
+  "configure_tier0_bgp": {
+   "properties": [
+    "ecmp",
+    "enabled",
+    "inter_sr_ibgp",
+    "local_as_num",
+    "locale_service_id",
+    "target",
+    "tier0_id"
+   ],
+   "required": [
+    "local_as_num",
+    "tier0_id"
+   ]
+  },
+  "create_ip_pool": {
+   "properties": [
+    "cidr",
+    "display_name",
+    "end_ip",
+    "gateway_ip",
+    "pool_id",
+    "start_ip",
+    "target"
+   ],
+   "required": [
+    "cidr",
+    "display_name",
+    "end_ip",
+    "pool_id",
+    "start_ip"
+   ]
+  },
+  "create_nat_rule": {
+   "properties": [
+    "action",
+    "destination_network",
+    "rule_id",
+    "source_network",
+    "target",
+    "tier1_id",
+    "translated_network"
+   ],
+   "required": [
+    "rule_id",
+    "tier1_id"
+   ]
+  },
+  "create_segment": {
+   "properties": [
+    "display_name",
+    "segment_id",
+    "subnet",
+    "target",
+    "transport_zone_path",
+    "vlan_ids"
+   ],
+   "required": [
+    "display_name",
+    "segment_id",
+    "transport_zone_path"
+   ]
+  },
+  "create_static_route": {
+   "properties": [
+    "gateway_type",
+    "network",
+    "next_hop",
+    "route_id",
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "network",
+    "next_hop",
+    "route_id",
+    "tier1_id"
+   ]
+  },
+  "create_tier1_gateway": {
+   "properties": [
+    "display_name",
+    "edge_cluster_path",
+    "route_advertisement",
+    "target",
+    "tier0_path",
+    "tier1_id"
+   ],
+   "required": [
+    "display_name",
+    "tier1_id"
+   ]
+  },
+  "delete_ip_pool": {
+   "properties": [
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "pool_id"
+   ]
+  },
+  "delete_nat_rule": {
+   "properties": [
+    "rule_id",
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "rule_id",
+    "tier1_id"
+   ]
+  },
+  "delete_segment": {
+   "properties": [
+    "segment_id",
+    "target"
+   ],
+   "required": [
+    "segment_id"
+   ]
+  },
+  "delete_static_route": {
+   "properties": [
+    "gateway_type",
+    "route_id",
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "route_id",
+    "tier1_id"
+   ]
+  },
+  "delete_tier1_gateway": {
+   "properties": [
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "tier1_id"
+   ]
+  },
+  "get_bgp_neighbors": {
+   "properties": [
+    "target",
+    "tier0_id"
+   ],
+   "required": [
+    "tier0_id"
+   ]
+  },
+  "get_edge_cluster_status": {
+   "properties": [
+    "cluster_id",
+    "target"
+   ],
+   "required": [
+    "cluster_id"
+   ]
+  },
+  "get_ip_pool_usage": {
+   "properties": [
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "pool_id"
+   ]
+  },
+  "get_logical_port_status": {
+   "properties": [
+    "segment_id",
+    "target"
+   ],
+   "required": [
+    "segment_id"
+   ]
+  },
+  "get_nsx_manager_status": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "get_segment": {
+   "properties": [
+    "segment_id",
+    "target"
+   ],
+   "required": [
+    "segment_id"
+   ]
+  },
+  "get_segment_port_for_vm": {
+   "properties": [
+    "target",
+    "vm_display_name"
+   ],
+   "required": [
+    "vm_display_name"
+   ]
+  },
+  "get_tier0_gateway": {
+   "properties": [
+    "target",
+    "tier0_id"
+   ],
+   "required": [
+    "tier0_id"
+   ]
+  },
+  "get_tier1_gateway": {
+   "properties": [
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "tier1_id"
+   ]
+  },
+  "get_transport_node_status": {
+   "properties": [
+    "node_id",
+    "target"
+   ],
+   "required": [
+    "node_id"
+   ]
+  },
+  "list_edge_clusters": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_ip_pools": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_nat_rules": {
+   "properties": [
+    "limit",
+    "offset",
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "tier1_id"
+   ]
+  },
+  "list_nsx_alarms": {
+   "properties": [
+    "limit",
+    "offset",
+    "severity",
+    "target"
+   ],
+   "required": []
+  },
+  "list_segments": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_static_routes": {
+   "properties": [
+    "gateway_type",
+    "limit",
+    "offset",
+    "target",
+    "tier1_id"
+   ],
+   "required": [
+    "tier1_id"
+   ]
+  },
+  "list_tier0_gateways": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_tier1_gateways": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_transport_nodes": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_transport_zones": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "update_segment": {
+   "properties": [
+    "display_name",
+    "segment_id",
+    "subnet",
+    "target"
+   ],
+   "required": [
+    "segment_id"
+   ]
+  },
+  "update_tier1_gateway": {
+   "properties": [
+    "display_name",
+    "route_advertisement",
+    "target",
+    "tier0_path",
+    "tier1_id"
+   ],
+   "required": [
+    "tier1_id"
+   ]
+  }
+ },
+ "nsx-security": {
+  "apply_vm_tag": {
+   "properties": [
+    "tag_scope",
+    "tag_value",
+    "target",
+    "vm_id"
+   ],
+   "required": [
+    "tag_scope",
+    "tag_value",
+    "vm_id"
+   ]
+  },
+  "create_dfw_policy": {
+   "properties": [
+    "category",
+    "description",
+    "display_name",
+    "policy_id",
+    "sequence_number",
+    "stateful",
+    "target"
+   ],
+   "required": [
+    "display_name",
+    "policy_id"
+   ]
+  },
+  "create_dfw_rule": {
+   "properties": [
+    "action",
+    "description",
+    "destinations",
+    "direction",
+    "disabled",
+    "display_name",
+    "ip_protocol",
+    "logged",
+    "policy_id",
+    "rule_id",
+    "scope",
+    "sequence_number",
+    "services",
+    "sources",
+    "target"
+   ],
+   "required": [
+    "display_name",
+    "policy_id",
+    "rule_id"
+   ]
+  },
+  "create_group": {
+   "properties": [
+    "description",
+    "display_name",
+    "group_id",
+    "ip_addresses",
+    "segment_paths",
+    "tag_scope",
+    "tag_value",
+    "target"
+   ],
+   "required": [
+    "display_name",
+    "group_id"
+   ]
+  },
+  "delete_dfw_policy": {
+   "properties": [
+    "policy_id",
+    "target"
+   ],
+   "required": [
+    "policy_id"
+   ]
+  },
+  "delete_dfw_rule": {
+   "properties": [
+    "policy_id",
+    "rule_id",
+    "target"
+   ],
+   "required": [
+    "policy_id",
+    "rule_id"
+   ]
+  },
+  "delete_group": {
+   "properties": [
+    "group_id",
+    "target"
+   ],
+   "required": [
+    "group_id"
+   ]
+  },
+  "get_dfw_policy": {
+   "properties": [
+    "policy_id",
+    "target"
+   ],
+   "required": [
+    "policy_id"
+   ]
+  },
+  "get_dfw_rule_stats": {
+   "properties": [
+    "policy_id",
+    "rule_id",
+    "target"
+   ],
+   "required": [
+    "policy_id",
+    "rule_id"
+   ]
+  },
+  "get_group": {
+   "properties": [
+    "group_id",
+    "target"
+   ],
+   "required": [
+    "group_id"
+   ]
+  },
+  "get_idps_status": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "get_traceflow_result": {
+   "properties": [
+    "target",
+    "traceflow_id"
+   ],
+   "required": [
+    "traceflow_id"
+   ]
+  },
+  "list_dfw_exclusions": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_dfw_policies": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_dfw_rules": {
+   "properties": [
+    "limit",
+    "offset",
+    "policy_id",
+    "target"
+   ],
+   "required": [
+    "policy_id"
+   ]
+  },
+  "list_groups": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_idps_profiles": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "list_vm_tags": {
+   "properties": [
+    "target",
+    "vm_display_name"
+   ],
+   "required": [
+    "vm_display_name"
+   ]
+  },
+  "remove_vm_tag": {
+   "properties": [
+    "tag_scope",
+    "tag_value",
+    "target",
+    "vm_id"
+   ],
+   "required": [
+    "tag_scope",
+    "tag_value",
+    "vm_id"
+   ]
+  },
+  "run_traceflow": {
+   "properties": [
+    "dst_ip",
+    "dst_port",
+    "protocol",
+    "src_ip",
+    "src_lport_id",
+    "src_port",
+    "target",
+    "timeout_seconds",
+    "ttl"
+   ],
+   "required": [
+    "dst_ip",
+    "src_ip",
+    "src_lport_id"
+   ]
+  },
+  "update_dfw_policy": {
+   "properties": [
+    "description",
+    "display_name",
+    "policy_id",
+    "sequence_number",
+    "stateful",
+    "target"
+   ],
+   "required": [
+    "policy_id"
+   ]
+  },
+  "update_dfw_rule": {
+   "properties": [
+    "action",
+    "description",
+    "destinations",
+    "disabled",
+    "display_name",
+    "logged",
+    "policy_id",
+    "rule_id",
+    "sequence_number",
+    "services",
+    "sources",
+    "target"
+   ],
+   "required": [
+    "policy_id",
+    "rule_id"
+   ]
+  }
+ },
+ "storage": {
+  "browse_datastore": {
+   "properties": [
+    "ds_name",
+    "path",
+    "pattern",
+    "target"
+   ],
+   "required": [
+    "ds_name"
+   ]
+  },
+  "list_all_datastores": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "list_cached_images": {
+   "properties": [
+    "datastore",
+    "image_type"
+   ],
+   "required": []
+  },
+  "scan_datastore_images": {
+   "properties": [
+    "ds_name",
+    "path",
+    "target"
+   ],
+   "required": [
+    "ds_name"
+   ]
+  },
+  "storage_iscsi_add_target": {
+   "properties": [
+    "address",
+    "dry_run",
+    "host_name",
+    "port",
+    "target"
+   ],
+   "required": [
+    "address",
+    "host_name"
+   ]
+  },
+  "storage_iscsi_enable": {
+   "properties": [
+    "dry_run",
+    "host_name",
+    "target"
+   ],
+   "required": [
+    "host_name"
+   ]
+  },
+  "storage_iscsi_remove_target": {
+   "properties": [
+    "address",
+    "dry_run",
+    "host_name",
+    "port",
+    "target"
+   ],
+   "required": [
+    "address",
+    "host_name"
+   ]
+  },
+  "storage_iscsi_status": {
+   "properties": [
+    "host_name",
+    "target"
+   ],
+   "required": [
+    "host_name"
+   ]
+  },
+  "storage_rescan": {
+   "properties": [
+    "dry_run",
+    "host_name",
+    "target"
+   ],
+   "required": [
+    "host_name"
+   ]
+  },
+  "vsan_capacity": {
+   "properties": [
+    "cluster_name",
+    "target"
+   ],
+   "required": [
+    "cluster_name"
+   ]
+  },
+  "vsan_efficiency": {
+   "properties": [
+    "cluster_name",
+    "target"
+   ],
+   "required": [
+    "cluster_name"
+   ]
+  },
+  "vsan_health": {
+   "properties": [
+    "cluster_name",
+    "target"
+   ],
+   "required": [
+    "cluster_name"
+   ]
+  }
+ },
+ "vks": {
+  "check_vks_compatibility": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "create_namespace": {
+   "properties": [
+    "cluster_id",
+    "cpu_limit",
+    "description",
+    "dry_run",
+    "memory_limit_mib",
+    "name",
+    "storage_policy",
+    "target"
+   ],
+   "required": [
+    "cluster_id",
+    "name",
+    "storage_policy"
+   ]
+  },
+  "create_tkc_cluster": {
+   "properties": [
+    "control_plane_count",
+    "dry_run",
+    "k8s_version",
+    "name",
+    "namespace",
+    "storage_class",
+    "target",
+    "vm_class",
+    "worker_count"
+   ],
+   "required": [
+    "k8s_version",
+    "name",
+    "namespace",
+    "vm_class"
+   ]
+  },
+  "delete_namespace": {
+   "properties": [
+    "confirmed",
+    "dry_run",
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "delete_tkc_cluster": {
+   "properties": [
+    "confirmed",
+    "dry_run",
+    "force",
+    "name",
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "name",
+    "namespace"
+   ]
+  },
+  "get_harbor_info": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "get_namespace": {
+   "properties": [
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "get_supervisor_kubeconfig": {
+   "properties": [
+    "namespace",
+    "output_path",
+    "target"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "get_supervisor_status": {
+   "properties": [
+    "cluster_id",
+    "target"
+   ],
+   "required": [
+    "cluster_id"
+   ]
+  },
+  "get_tkc_available_versions": {
+   "properties": [
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "get_tkc_cluster": {
+   "properties": [
+    "name",
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "name",
+    "namespace"
+   ]
+  },
+  "get_tkc_kubeconfig": {
+   "properties": [
+    "name",
+    "namespace",
+    "output_path",
+    "target"
+   ],
+   "required": [
+    "name",
+    "namespace"
+   ]
+  },
+  "list_namespace_storage_usage": {
+   "properties": [
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "list_namespaces": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "list_supervisor_storage_policies": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "list_tkc_clusters": {
+   "properties": [
+    "namespace",
+    "target"
+   ],
+   "required": []
+  },
+  "list_vm_classes": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "list_vm_groups": {
+   "properties": [
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "list_vm_network_interfaces": {
+   "properties": [
+    "namespace",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "namespace",
+    "vm_name"
+   ]
+  },
+  "list_vm_snapshots": {
+   "properties": [
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "scale_tkc_cluster": {
+   "properties": [
+    "name",
+    "namespace",
+    "pool_name",
+    "target",
+    "worker_count"
+   ],
+   "required": [
+    "name",
+    "namespace",
+    "worker_count"
+   ]
+  },
+  "update_namespace": {
+   "properties": [
+    "cpu_limit",
+    "memory_limit_mib",
+    "name",
+    "storage_policy",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "upgrade_tkc_cluster": {
+   "properties": [
+    "k8s_version",
+    "name",
+    "namespace",
+    "target"
+   ],
+   "required": [
+    "k8s_version",
+    "name",
+    "namespace"
+   ]
+  }
+ }
+}

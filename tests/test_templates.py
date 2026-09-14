@@ -255,6 +255,16 @@ class TestComplianceScan:
         assert "monitor" in skills
         assert "aria" in skills
 
+    def test_capacity_uses_aria_only_with_a_cluster_id(self):
+        # Aria's get_capacity_overview requires cluster_id; without one the step
+        # reads monitor's per-cluster rollup rather than a call Aria refuses.
+        with_id = [s for s in compliance_scan(cluster_id="c-1").steps
+                   if s.action == "check_capacity"][0]
+        assert (with_id.skill, with_id.tool) == ("aria", "get_capacity_overview")
+        assert with_id.params["cluster_id"] == "c-1"
+        without = [s for s in compliance_scan().steps if s.action == "check_capacity"][0]
+        assert (without.skill, without.tool) == ("monitor", "cluster_health_summary")
+
 
 @pytest.mark.unit
 class TestNetworkSegmentSetup:
@@ -570,6 +580,19 @@ class TestInvestigateAlert:
     def test_state_starts_pending(self):
         wf = investigate_alert(alert_entity="vm-prod-01")
         assert wf.state.value == "pending"
+
+    def test_aria_target_applies_to_aria_steps_only(self):
+        wf = investigate_alert(alert_entity="192.168.60.15", deep_dive=True,
+                               target="home-vcenter", aria_target="home-aria")
+        for s in wf.steps:
+            if s.action.startswith("gather_"):
+                want = "home-aria" if s.skill == "aria" else "home-vcenter"
+                assert s.params["target"] == want, (s.action, s.params)
+
+    def test_checkpoint_tells_the_agent_to_filter_by_entity(self):
+        wf = investigate_alert(alert_entity="192.168.60.15")
+        approval = [s for s in wf.steps if s.action == "require_approval"][0]
+        assert "192.168.60.15" in approval.params["message"]
 
 
 @pytest.mark.unit

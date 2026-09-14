@@ -1,3 +1,28 @@
+## Unreleased
+
+**`investigate_alert` named three tools that do not exist.** The template behind "investigate
+this alert's root cause" told the agent to call `monitor:list_alarms`, `monitor:list_events` and
+`aria:capacity_overview`, and passed `resource_name` and `hours` to Aria tools that take neither.
+Pilot dispatches and the agent calls, so an agent following it failed on the first step. The steps
+now call `get_alarms`, `get_events` (last 2 hours), `list_alerts` (`active_only`), `list_anomalies`,
+and vmware-monitor's `cluster_health_summary` for capacity. None of these filters by object, so the
+checkpoint tells the agent to keep the rows for `alert_entity`. Step counts are unchanged (4, or 8
+with `deep_dive`). New optional `aria_target`: the Aria steps use it when the Aria target is named
+differently from the vCenter one; without it they use `target`, as before.
+
+**`compliance_scan` called Aria's capacity overview without the cluster id it requires.** New
+optional `cluster_id`: with it the step calls `aria:get_capacity_overview`; without it the step reads
+vmware-monitor's `cluster_health_summary`, which covers every cluster.
+
+**Every built-in template step is now checked against the tools its skill registers.** A new
+regression test builds all 15 templates (each variant that changes the steps) and checks every
+companion step's tool name, that it passes no parameter the tool lacks, and that it passes every
+parameter the tool requires — and that `get_skill_catalog` lists only registered tools. The truth
+is `tests/fixtures/companion_tools.json` (254 tools in 8 skills), written only by
+`tests/fixtures/snapshot_companion_tools.py` from the companions' live `mcp.list_tools()`; its
+`--check` mode reports a stale snapshot. Found on 2026-09-14 by comparing all 68 template steps with
+the live registries: these two templates had the only mismatches.
+
 ## v1.10.0 — a step that returns a failure is a failed step
 
 **Behaviour change: workflows that used to report `completed` now report `failed`.**

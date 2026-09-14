@@ -79,14 +79,15 @@ def compliance_scan(
     target: str = "",
     check_alarms: bool = True,
     check_capacity: bool = True,
+    cluster_id: str = "",
 ) -> Workflow:
     """Periodic compliance scan — collect health data, report, and flag issues.
 
     Steps:
       1. Check active alarms (monitor)
-      2. Check capacity remaining (aria)
+      2. Check capacity — Aria's capacity overview for ``cluster_id`` when one is
+         given, otherwise vmware-monitor's per-cluster rollup (CPU/memory %)
       3. Collect anomalies (aria)
-      4. Generate compliance report summary
 
     All steps are read-only — no approval gate needed.
 
@@ -94,6 +95,9 @@ def compliance_scan(
         target: vCenter/Aria target name.
         check_alarms: Include alarm check (default True).
         check_capacity: Include capacity check (default True).
+        cluster_id: Aria resource id of a cluster. Aria's ``get_capacity_overview``
+            requires one; without it the capacity step reads monitor's
+            ``cluster_health_summary`` instead, which covers every cluster.
     """
     now = datetime.now(tz=timezone.utc).isoformat()
     steps = []
@@ -112,15 +116,26 @@ def compliance_scan(
         idx += 1
 
     if check_capacity:
-        steps.append(
+        # get_capacity_overview requires cluster_id; the step used to omit it,
+        # so an agent following this template was refused on this call.
+        capacity = (
             WorkflowStep(
                 index=idx,
                 action="check_capacity",
                 skill="aria",
                 tool="get_capacity_overview",
+                params={"cluster_id": cluster_id, "target": target},
+            )
+            if cluster_id
+            else WorkflowStep(
+                index=idx,
+                action="check_capacity",
+                skill="monitor",
+                tool="cluster_health_summary",
                 params={"target": target},
             )
         )
+        steps.append(capacity)
         idx += 1
 
     steps.append(
@@ -138,7 +153,12 @@ def compliance_scan(
         workflow_type="compliance_scan",
         state=WorkflowState.PENDING,
         steps=steps,
-        params={"target": target, "check_alarms": check_alarms, "check_capacity": check_capacity},
+        params={
+            "target": target,
+            "check_alarms": check_alarms,
+            "check_capacity": check_capacity,
+            "cluster_id": cluster_id,
+        },
         created_at=now,
         updated_at=now,
     )
@@ -149,6 +169,7 @@ def investigate_alert(
     alert_name: str = "",
     deep_dive: bool = False,
     target: str = "",
+    aria_target: str = "",
 ) -> Workflow:
     """Causal-chain root-cause investigation per investigation-protocol.md.
 
@@ -156,20 +177,32 @@ def investigate_alert(
     Harness Engineering framework as a pilot workflow.
 
     Stage 1 — parallel-group "round1-gather":
-        Fetch alarms, events, and Aria alerts/metrics for the affected entity
-        concurrently. All three are L1/L2 read-only and independent.
+        Active vCenter alarms, recent vCenter events and active Aria alerts,
+        concurrently. All three are read-only and independent. None of these
+        tools filters by object, so the agent keeps the rows that concern
+        ``alert_entity`` (alarms and alerts carry the object's name).
+
     Stage 2 — synthesis checkpoint:
         Pause for the AI agent to apply the four criteria
         (falsifiability / sufficiency / necessity / mechanism) and decide
         whether the root cause is complete.
+
     Stage 3 (only when ``deep_dive=True``) — parallel-group "round2-gather":
-        Broader evidence: anomalies, capacity context, recent alerts in the
-        same cluster. Used when round 1 fails the necessity or mechanism check.
+        Broader evidence: Aria anomalies, per-cluster capacity from
+        vmware-monitor, and Aria alerts including cancelled ones. Used when
+        round 1 fails the necessity or mechanism check.
+
     Stage 4 (only when ``deep_dive=True``) — final synthesis checkpoint.
 
     The agent is responsible for producing the structured report (root cause
     plus four-criteria evidence). Pilot only orchestrates the data gathering
     and the human-approval gates.
+
+    Every step names a tool its skill registers, with parameters it accepts —
+    tests/eval/regression/test_template_steps_name_real_tools.py holds that
+    against the companions' registries. Until 2026-09-14 this template named
+    ``list_alarms``, ``list_events`` and ``capacity_overview``, none of which
+    exist, so an agent following it failed on the first step.
 
     Args:
         alert_entity: Resource that triggered the alert (VM name, host, cluster).
@@ -177,33 +210,36 @@ def investigate_alert(
         deep_dive: If True, append a second round of broader gathering and a
             second synthesis checkpoint (max three rounds total — a third would
             require a follow-up workflow).
-        target: vCenter / Aria target identifier; defaults to the first
-            configured target on each skill.
+        target: vCenter target for the vmware-monitor steps; also the Aria
+            target unless ``aria_target`` is given. Empty = each skill's default.
+        aria_target: Aria target for the vmware-aria steps, when the Aria target
+            is named differently from the vCenter one (the usual case).
     """
     now = datetime.now(tz=timezone.utc).isoformat()
     label = alert_name or alert_entity
+    ops_target = aria_target or target
 
     round1 = [
         WorkflowStep(
             index=0,
             action="gather_alarms",
             skill="monitor",
-            tool="list_alarms",
-            params={"entity_name": alert_entity, "target": target},
+            tool="get_alarms",
+            params={"target": target},
         ),
         WorkflowStep(
             index=1,
             action="gather_events",
             skill="monitor",
-            tool="list_events",
-            params={"hours": 2, "entity_name": alert_entity, "target": target},
+            tool="get_events",
+            params={"hours": 2, "target": target},
         ),
         WorkflowStep(
             index=2,
             action="gather_aria_alerts",
             skill="aria",
             tool="list_alerts",
-            params={"resource_name": alert_entity, "target": target},
+            params={"active_only": True, "target": ops_target},
         ),
     ]
     parallel_group("round1-gather", round1)
@@ -216,6 +252,7 @@ def investigate_alert(
         params={
             "message": (
                 f"Round 1 evidence gathered for '{label}'. "
+                f"These reads cover the whole inventory — keep what concerns '{alert_entity}'. "
                 "Apply the four-criteria check from references/investigation-protocol.md: "
                 "(1) falsifiability, (2) sufficiency, (3) necessity, (4) mechanism. "
                 "APPROVE if root cause is complete and you are ready to write the report. "
@@ -233,21 +270,21 @@ def investigate_alert(
                 action="gather_anomalies",
                 skill="aria",
                 tool="list_anomalies",
-                params={"resource_name": alert_entity, "target": target},
+                params={"target": ops_target},
             ),
             WorkflowStep(
                 index=5,
                 action="gather_capacity",
-                skill="aria",
-                tool="capacity_overview",
-                params={"resource_name": alert_entity, "target": target},
+                skill="monitor",
+                tool="cluster_health_summary",
+                params={"target": target},
             ),
             WorkflowStep(
                 index=6,
                 action="gather_recent_alerts",
                 skill="aria",
                 tool="list_alerts",
-                params={"hours": 24, "target": target},
+                params={"active_only": False, "target": ops_target},
             ),
         ]
         parallel_group("round2-gather", round2)
@@ -267,7 +304,6 @@ def investigate_alert(
                 ),
             },
         )
-
         steps += round2 + [checkpoint2]
 
     return Workflow(
@@ -280,6 +316,7 @@ def investigate_alert(
             "alert_name": alert_name,
             "deep_dive": deep_dive,
             "target": target,
+            "aria_target": aria_target,
         },
         created_at=now,
         updated_at=now,
