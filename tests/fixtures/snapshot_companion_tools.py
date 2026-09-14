@@ -61,7 +61,8 @@ def read_live(root: pathlib.Path) -> tuple[dict, list[str]]:
             continue
         try:
             cmd = ["uv", "run", "--project", str(path), "python", "-c", _PROBE, pkg]
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
+            proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                                  timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             broken.append(f"{skill}: reading the registry did not finish in {TIMEOUT}s")
             continue
