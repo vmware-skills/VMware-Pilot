@@ -1322,6 +1322,7 @@
  "monitor": {
   "active_sessions": {
    "properties": [
+    "include_service",
     "limit",
     "target"
    ],
@@ -1403,8 +1404,11 @@
   },
   "get_events": {
    "properties": [
+    "end",
     "hours",
+    "include_routine",
     "severity",
+    "start",
     "target"
    ],
    "required": []
@@ -1435,6 +1439,7 @@
   },
   "host_log_scan": {
    "properties": [
+    "group",
     "host_name",
     "lines",
     "target"
