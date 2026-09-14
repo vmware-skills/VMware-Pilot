@@ -1,4 +1,4 @@
-## Unreleased
+## v1.10.1 — investigate_alert and compliance_scan call tools that exist
 
 **`investigate_alert` named three tools that do not exist.** The template behind "investigate
 this alert's root cause" told the agent to call `monitor:list_alarms`, `monitor:list_events` and

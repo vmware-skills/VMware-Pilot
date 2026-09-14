@@ -1,6 +1,6 @@
 {
   "name": "@zw008/vmware-pilot",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "Multi-step workflow orchestration for VMware MCP skills with approval gates and rollback.",
   "private": true,
   "license": "MIT",
