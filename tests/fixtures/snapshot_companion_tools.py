@@ -31,10 +31,15 @@ COMPANIONS = {
     "aiops": ("VMware-AIops", "vmware_aiops"),
     "aria": ("VMware-Aria", "vmware_aria"),
     "avi": ("VMware-AVI", "vmware_avi"),
+    "debug": ("VMware-Debug", "vmware_debug"),
+    "harden": ("VMware-Harden", "vmware_harden"),
+    "log-insight": ("VMware-Log-Insight", "vmware_log_insight"),
     "monitor": ("VMware-Monitor", "vmware_monitor"),
     "nsx": ("VMware-NSX", "vmware_nsx"),
     "nsx-security": ("VMware-NSX-Security", "vmware_nsx_security"),
+    "privateai": ("VMware-PrivateAI", "vmware_privateai"),
     "storage": ("VMware-Storage", "vmware_storage"),
+    "vdi": ("VMware-VDI", "vmware_vdi"),
     "vks": ("VMware-VKS", "vmware_vks"),
 }
 
@@ -49,6 +54,21 @@ for t in asyncio.run(s.list_tools()):
                    "required": sorted(schema.get("required", []))}
 print(json.dumps(out))
 """
+
+
+def unlisted_companions(root: pathlib.Path) -> list[str]:
+    """Sibling skills that register an MCP server but are missing from COMPANIONS.
+
+    A skill missing here is missing from the snapshot, and every test that reads
+    the snapshot then passes by not knowing the skill exists — which is how the
+    design catalog stayed at eight skills while the family grew to thirteen.
+    """
+    found = sorted(p.parent.parent.name for p in root.glob("VMware-*/vmware_*/mcp_server/server.py"))
+    if not found:
+        return [f"no sibling checkout with an MCP server under {root}"]
+    listed = {pkg for _repo, pkg in COMPANIONS.values()}
+    return [f"{pkg} registers an MCP server but is not in COMPANIONS"
+            for pkg in found if pkg not in listed and pkg != "vmware_pilot"]
 
 
 def read_live(root: pathlib.Path) -> tuple[dict, list[str]]:
@@ -97,6 +117,11 @@ def main(argv: list[str]) -> int:
         print(__doc__, file=sys.stderr)
         return 2
     root, check = pathlib.Path(argv[0]), "--check" in argv[1:]
+    unlisted = unlisted_companions(root)
+    if unlisted:
+        for u in unlisted:
+            print(f"BROKEN {u}")
+        return 2
     live, broken = read_live(root)
     if broken:
         for b in broken:

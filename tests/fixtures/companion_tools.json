@@ -1319,6 +1319,270 @@
    ]
   }
  },
+ "debug": {
+  "case_close": {
+   "properties": [
+    "case_id"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "case_get": {
+   "properties": [
+    "case_id"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "case_grade": {
+   "properties": [
+    "case_id"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "case_hypotheses": {
+   "properties": [
+    "case_id",
+    "statement"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "case_knowledge": {
+   "properties": [
+    "case_id"
+   ],
+   "required": []
+  },
+  "case_list": {
+   "properties": [
+    "limit"
+   ],
+   "required": []
+  },
+  "case_open": {
+   "properties": [
+    "determined_by",
+    "objects",
+    "product_versions",
+    "summary",
+    "window_end",
+    "window_start"
+   ],
+   "required": [
+    "determined_by",
+    "summary"
+   ]
+  },
+  "case_plan": {
+   "properties": [
+    "available_skills",
+    "case_id",
+    "category",
+    "max_steps"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "case_readiness": {
+   "properties": [
+    "available_skills"
+   ],
+   "required": []
+  },
+  "case_record_gap": {
+   "properties": [
+    "blocks",
+    "case_id",
+    "could_falsify",
+    "how_to_close",
+    "what",
+    "why"
+   ],
+   "required": [
+    "case_id",
+    "how_to_close",
+    "what",
+    "why"
+   ]
+  },
+  "case_submit_evidence": {
+   "properties": [
+    "case_id",
+    "clock_skew_s",
+    "falsifies",
+    "fetched_at",
+    "knowledge_entry_id",
+    "payload",
+    "query",
+    "source_skill",
+    "source_tool",
+    "summary",
+    "time_source",
+    "window_end",
+    "window_start"
+   ],
+   "required": [
+    "case_id",
+    "source_skill",
+    "source_tool",
+    "summary"
+   ]
+  },
+  "case_timeline": {
+   "properties": [
+    "bin_seconds",
+    "case_id",
+    "top_n",
+    "z_threshold"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "incident_timeline": {
+   "properties": [
+    "bin_seconds",
+    "events",
+    "top_n",
+    "z_threshold"
+   ],
+   "required": [
+    "events"
+   ]
+  },
+  "list_symptom_categories": {
+   "properties": [],
+   "required": []
+  }
+ },
+ "harden": {
+  "describe_stig_content_sync": {
+   "properties": [],
+   "required": []
+  },
+  "get_baseline_rules": {
+   "properties": [
+    "baseline_id"
+   ],
+   "required": [
+    "baseline_id"
+   ]
+  },
+  "get_remediation": {
+   "properties": [
+    "violation_id"
+   ],
+   "required": [
+    "violation_id"
+   ]
+  },
+  "list_baselines": {
+   "properties": [],
+   "required": []
+  },
+  "list_drift_events": {
+   "properties": [
+    "limit"
+   ],
+   "required": []
+  },
+  "list_stig_controls": {
+   "properties": [
+    "limit",
+    "offset"
+   ],
+   "required": []
+  },
+  "list_violations": {
+   "properties": [
+    "limit",
+    "offset",
+    "severity"
+   ],
+   "required": []
+  },
+  "scan_target": {
+   "properties": [
+    "baseline",
+    "target"
+   ],
+   "required": [
+    "target"
+   ]
+  }
+ },
+ "log-insight": {
+  "alert_get": {
+   "properties": [
+    "alert_id",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "alert_history": {
+   "properties": [
+    "alert_id",
+    "limit",
+    "target"
+   ],
+   "required": [
+    "alert_id"
+   ]
+  },
+  "alert_list": {
+   "properties": [
+    "limit",
+    "name_filter",
+    "target"
+   ],
+   "required": []
+  },
+  "log_aggregate": {
+   "properties": [
+    "aggregation",
+    "begin_ms",
+    "bin_width_ms",
+    "end_ms",
+    "last",
+    "target",
+    "text"
+   ],
+   "required": []
+  },
+  "log_fields": {
+   "properties": [
+    "name_filter",
+    "target"
+   ],
+   "required": []
+  },
+  "log_search": {
+   "properties": [
+    "begin_ms",
+    "end_ms",
+    "last",
+    "limit",
+    "target",
+    "text"
+   ],
+   "required": []
+  },
+  "log_version": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  }
+ },
  "monitor": {
   "active_sessions": {
    "properties": [
@@ -2191,6 +2455,166 @@
    ]
   }
  },
+ "privateai": {
+  "directpath_profile_list": {
+   "properties": [
+    "limit",
+    "name",
+    "offset",
+    "target",
+    "vendor"
+   ],
+   "required": []
+  },
+  "gpu_consumer_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "profile",
+    "target",
+    "vm"
+   ],
+   "required": []
+  },
+  "gpu_device_list": {
+   "properties": [
+    "host",
+    "limit",
+    "offset",
+    "target",
+    "vendor"
+   ],
+   "required": []
+  },
+  "gpu_host_get": {
+   "properties": [
+    "host_name",
+    "target"
+   ],
+   "required": [
+    "host_name"
+   ]
+  },
+  "gpu_host_list": {
+   "properties": [
+    "limit",
+    "name",
+    "offset",
+    "target",
+    "vendor"
+   ],
+   "required": []
+  },
+  "gpu_host_readiness": {
+   "properties": [
+    "host",
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "gpu_utilization": {
+   "properties": [
+    "limit",
+    "offset",
+    "target",
+    "top",
+    "vm"
+   ],
+   "required": []
+  },
+  "pais_bundle_verify": {
+   "properties": [
+    "manifest_path"
+   ],
+   "required": [
+    "manifest_path"
+   ]
+  },
+  "pais_data_source_list": {
+   "properties": [
+    "limit",
+    "name",
+    "offset"
+   ],
+   "required": []
+  },
+  "pais_knowledge_base_list": {
+   "properties": [
+    "limit",
+    "name",
+    "offset"
+   ],
+   "required": []
+  },
+  "pais_model_catalog": {
+   "properties": [
+    "limit",
+    "name",
+    "offset"
+   ],
+   "required": []
+  },
+  "pais_model_list": {
+   "properties": [
+    "limit",
+    "name",
+    "offset"
+   ],
+   "required": []
+  },
+  "pais_monitoring_summary": {
+   "properties": [
+    "hot_pct",
+    "target",
+    "top"
+   ],
+   "required": []
+  },
+  "pais_sizing_advise": {
+   "properties": [
+    "kv_overhead",
+    "model",
+    "model_billions",
+    "precision"
+   ],
+   "required": []
+  },
+  "vgpu_assign": {
+   "properties": [
+    "confirm",
+    "profile",
+    "target",
+    "vm_name"
+   ],
+   "required": [
+    "profile",
+    "vm_name"
+   ]
+  },
+  "vgpu_profile_list": {
+   "properties": [
+    "host",
+    "limit",
+    "model",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "vgpu_profile_validate": {
+   "properties": [
+    "target",
+    "target_profile",
+    "vm_name"
+   ],
+   "required": [
+    "target_profile",
+    "vm_name"
+   ]
+  }
+ },
  "storage": {
   "browse_datastore": {
    "properties": [
@@ -2306,6 +2730,268 @@
    ],
    "required": [
     "cluster_name"
+   ]
+  }
+ },
+ "vdi": {
+  "ad_user_search": {
+   "properties": [
+    "limit",
+    "name",
+    "target"
+   ],
+   "required": [
+    "name"
+   ]
+  },
+  "app_pool_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "entitlement_add": {
+   "properties": [
+    "ad_user_or_group_ids",
+    "confirm",
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "ad_user_or_group_ids",
+    "pool_id"
+   ]
+  },
+  "entitlement_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "pool_id"
+   ]
+  },
+  "entitlement_remove": {
+   "properties": [
+    "ad_user_or_group_ids",
+    "confirm",
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "ad_user_or_group_ids",
+    "pool_id"
+   ]
+  },
+  "event_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "severity",
+    "target"
+   ],
+   "required": []
+  },
+  "farm_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "health_summary": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "image_list": {
+   "properties": [
+    "base_vm_id",
+    "target"
+   ],
+   "required": []
+  },
+  "machine_get": {
+   "properties": [
+    "machine_id",
+    "target"
+   ],
+   "required": [
+    "machine_id"
+   ]
+  },
+  "machine_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "pool",
+    "state",
+    "target"
+   ],
+   "required": []
+  },
+  "machine_maintenance": {
+   "properties": [
+    "confirm",
+    "enabled",
+    "machine_ids",
+    "target"
+   ],
+   "required": [
+    "enabled",
+    "machine_ids"
+   ]
+  },
+  "machine_remove": {
+   "properties": [
+    "confirm",
+    "machine_ids",
+    "target"
+   ],
+   "required": [
+    "machine_ids"
+   ]
+  },
+  "machine_reset": {
+   "properties": [
+    "confirm",
+    "machine_ids",
+    "target"
+   ],
+   "required": [
+    "machine_ids"
+   ]
+  },
+  "pool_get": {
+   "properties": [
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "pool_id"
+   ]
+  },
+  "pool_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
+  "pool_push_image": {
+   "properties": [
+    "acknowledge_unknown_occupancy",
+    "confirm",
+    "logoff_policy",
+    "pool_id",
+    "stop_on_error",
+    "target"
+   ],
+   "required": [
+    "pool_id"
+   ]
+  },
+  "pool_set_enabled": {
+   "properties": [
+    "confirm",
+    "enabled",
+    "pool_id",
+    "target"
+   ],
+   "required": [
+    "enabled",
+    "pool_id"
+   ]
+  },
+  "pool_utilization": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "session_disconnect": {
+   "properties": [
+    "confirm",
+    "session_ids",
+    "target",
+    "user"
+   ],
+   "required": []
+  },
+  "session_get": {
+   "properties": [
+    "session_id",
+    "target"
+   ],
+   "required": [
+    "session_id"
+   ]
+  },
+  "session_list": {
+   "properties": [
+    "limit",
+    "offset",
+    "pool",
+    "state",
+    "target",
+    "user"
+   ],
+   "required": []
+  },
+  "session_logoff": {
+   "properties": [
+    "confirm",
+    "session_ids",
+    "target",
+    "user"
+   ],
+   "required": []
+  },
+  "session_send_message": {
+   "properties": [
+    "message",
+    "message_type",
+    "session_ids",
+    "target",
+    "user"
+   ],
+   "required": [
+    "message"
+   ]
+  },
+  "session_stats": {
+   "properties": [
+    "target"
+   ],
+   "required": []
+  },
+  "task_cancel": {
+   "properties": [
+    "confirm",
+    "pool_id",
+    "target",
+    "task_id"
+   ],
+   "required": [
+    "pool_id",
+    "task_id"
+   ]
+  },
+  "task_status": {
+   "properties": [
+    "pool_id",
+    "target",
+    "task_id"
+   ],
+   "required": [
+    "pool_id"
    ]
   }
  },
