@@ -17,6 +17,7 @@ import typer
 
 from vmware_pilot import __version__
 import sys
+from vmware_policy import cli_local
 
 
 def _harden_console_encoding() -> None:
@@ -60,12 +61,14 @@ def _root() -> None:
 
 
 @app.command("version")
+@cli_local("prints the installed version")
 def version_cmd() -> None:
     """Print the installed vmware-pilot version."""
     typer.echo(f"vmware-pilot {__version__}")
 
 
 @app.command("mcp")
+@cli_local("starts the MCP server; its tools audit themselves")
 def mcp_cmd() -> None:
     """Start the MCP server (stdio transport).
 

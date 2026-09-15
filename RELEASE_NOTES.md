@@ -1,3 +1,15 @@
+## v1.11.1 — every CLI command declares what it reaches
+
+Across the family, CLI reads never wrote `~/.vmware/audit.db`; they now do (`@audited`, under the
+MCP tool's name). To keep that from regressing, every CLI command must declare `@guarded` (a write),
+`@audited` (reaches a remote system) or `@cli_local` (reaches nothing remote), and a family gate fails
+any command that declares none.
+
+This skill's 2 CLI commands reach nothing remote; each is marked `@cli_local` with its reason.
+Their behaviour does not change.
+
+Requires `vmware-policy>=1.15.0`.
+
 ## v1.11.0 — the design catalog covers all thirteen companions
 
 **`get_skill_catalog` listed eight skills; the family has thirteen with an MCP server.** debug, harden,
