@@ -52,11 +52,16 @@ def test_the_catalog_names_no_skill_the_snapshot_lacks():
 def test_capabilities_table_matches_the_snapshot_and_catalog():
     text = (DOCS / "references" / "capabilities.md").read_text(encoding="utf-8")
     registry = _registry()
-    rows = {
-        m.group(1): (int(m.group(2)), int(m.group(3)))
-        for m in re.finditer(r"^\| vmware-([a-z-]+) \| `[^`]+` \| (\d+) \| (\d+) \|", text, re.M)
-    }
-    assert rows, "no skill rows parsed from capabilities.md — the check would verify nothing"
+    matches = [
+        (m.group(1), (int(m.group(2)), int(m.group(3))))
+        for m in re.finditer(r"^\|\s*vmware-([a-z-]+)\s*\|\s*`[^`]+`\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|", text, re.M)
+    ]
+    assert matches, "no skill rows parsed from capabilities.md — the check would verify nothing"
+    names = [name for name, _counts in matches]
+    duplicates = sorted({n for n in names if names.count(n) > 1})
+    # A dict would keep only the last row, so a stale duplicate would pass.
+    assert not duplicates, f"capabilities.md lists these skills more than once: {duplicates}"
+    rows = dict(matches)
     assert set(rows) == set(registry), f"table skills {sorted(rows)} != snapshot {sorted(registry)}"
     wrong = {
         skill: {"doc": rows[skill], "real": (len(registry[skill]), len(SKILL_CATALOG[skill]["tools"]))}
@@ -85,9 +90,12 @@ def test_capabilities_table_matches_the_snapshot_and_catalog():
 )
 def test_prose_counts_match_the_catalog(doc, pattern):
     text = (DOCS / doc).read_text(encoding="utf-8")
-    found = re.search(pattern, text)
+    found = re.findall(pattern, text)
     assert found, f"{doc}: count sentence not found — pattern {pattern!r}"
-    assert (int(found.group(1)), int(found.group(2))) == (_catalog_total(), len(SKILL_CATALOG))
+    # Every occurrence, not the first: a second, stale copy of the sentence
+    # would otherwise pass.
+    wrong = [(int(a), int(b)) for a, b in found if (int(a), int(b)) != (_catalog_total(), len(SKILL_CATALOG))]
+    assert not wrong, f"{doc}: stale counts {wrong}, catalog is {(_catalog_total(), len(SKILL_CATALOG))}"
 
 
 @pytest.mark.unit

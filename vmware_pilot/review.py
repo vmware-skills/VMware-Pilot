@@ -109,8 +109,8 @@ def _catalog_risk(skill: str, tool: str) -> str:
     """The catalog's risk label for ``skill.tool``, or ``""`` if it has none.
 
     Looks up ``(skill, tool)`` first. A workflow may name a skill the catalog
-    does not carry (harden, vdi, privateai, log-insight all publish tools and
-    none of them are in it), so a bare tool-name match across skills is accepted
+    does not carry (a skill added to the family after the catalog, or a misspelt
+    skill name), so a bare tool-name match across skills is accepted
     as a fallback — and when that matches more than one skill with different
     labels, the highest wins. Guessing downward is the only guess that can hide a
     destructive step.
