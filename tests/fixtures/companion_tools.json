@@ -903,6 +903,7 @@
     "metric_keys",
     "resource_id",
     "rollup_type",
+    "summary",
     "target"
    ],
    "required": [
