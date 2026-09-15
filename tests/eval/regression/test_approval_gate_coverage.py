@@ -225,9 +225,10 @@ class TestCatalogLookup:
     """How a tool is found in the catalog, including when the answer is unclear."""
 
     def test_a_tool_named_by_a_skill_the_catalog_does_not_carry_still_resolves(self):
-        """harden / vdi / privateai / log-insight publish tools and are absent.
+        """A step may name a skill the catalog does not carry.
 
-        A step naming one of those skills would otherwise fall to ``unknown``
+        A skill added after the catalog, or a misspelt skill name, would otherwise
+        fall to ``unknown``
         even for a tool the catalog knows perfectly well under another skill.
         """
         from vmware_pilot.review import TIER_DESTRUCTIVE, classify_step

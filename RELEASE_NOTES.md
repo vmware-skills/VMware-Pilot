@@ -2,7 +2,7 @@
 
 **`get_skill_catalog` listed eight skills; the family has thirteen with an MCP server.** debug, harden,
 log-insight, privateai and vdi were missing, so an agent designing a workflow was never shown them.
-They are now in the catalog (99 tools across 13 skills, up from 71 across 8 — the docs said 69), labelled with each
+They are now in the catalog (99 tools across 13 skills, up from 72 across 8 — the docs said 69), labelled with each
 skill's own risk level and destructive hint. One rule sits on top: a tool that is a write is never
 labelled `low`, because review reads `low` as an inspection — vdi's `session_send_message` is
 published at low and is catalogued at medium.
