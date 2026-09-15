@@ -1,4 +1,4 @@
-## Unreleased — the design catalog covers all thirteen companions
+## v1.11.0 — the design catalog covers all thirteen companions
 
 **`get_skill_catalog` listed eight skills; the family has thirteen with an MCP server.** debug, harden,
 log-insight, privateai and vdi were missing, so an agent designing a workflow was never shown them.

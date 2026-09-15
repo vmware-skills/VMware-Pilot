@@ -19,12 +19,12 @@ client.
 
 ```bash
 # Recommended: installed entry point, never touches the network
-uv tool install vmware-pilot==1.10.1
+uv tool install vmware-pilot==1.11.0
 vmware-pilot mcp
 
 # Fallback: uvx re-resolves against PyPI each start and fails behind a
 # TLS-inspecting corporate proxy — set UV_NATIVE_TLS=true if you must use it
-uvx --from vmware-pilot==1.10.1 vmware-pilot-mcp
+uvx --from vmware-pilot==1.11.0 vmware-pilot-mcp
 ```
 
 The server runs on **stdio** transport and exposes 13 MCP tools (4 read, 9 write).

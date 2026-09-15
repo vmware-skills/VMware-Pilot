@@ -11,16 +11,16 @@
 ### Via uv (Recommended)
 
 ```bash
-uv tool install vmware-pilot==1.10.1
+uv tool install vmware-pilot==1.11.0
 ```
 
 ### Via pip
 
 ```bash
-uv tool install vmware-pilot==1.10.1
+uv tool install vmware-pilot==1.11.0
 
 # China mainland mirror
-pip install vmware-pilot==1.10.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install vmware-pilot==1.11.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ### Verify Installation
@@ -84,7 +84,7 @@ The `uvx` form still works and needs no prior install:
   "mcpServers": {
     "vmware-pilot": {
       "command": "uvx",
-      "args": ["--from", "vmware-pilot==1.10.1", "vmware-pilot-mcp"]
+      "args": ["--from", "vmware-pilot==1.11.0", "vmware-pilot-mcp"]
     }
   }
 }
@@ -100,7 +100,7 @@ invalid peer certificate: UnknownIssuer
 
 `uv` ships its own certificate bundle and ignores the system trust store, which is what breaks.
 Either set `UV_NATIVE_TLS=true` so it honours your corporate CA, or install the tool once
-(`uv tool install vmware-pilot==1.10.1`) and launch `vmware-pilot mcp`, which touches the network
+(`uv tool install vmware-pilot==1.11.0`) and launch `vmware-pilot mcp`, which touches the network
 zero times.
 
 ---
