@@ -1064,6 +1064,7 @@
   },
   "list_resources": {
    "properties": [
+    "collection_status",
     "limit",
     "name_filter",
     "resource_kind",
