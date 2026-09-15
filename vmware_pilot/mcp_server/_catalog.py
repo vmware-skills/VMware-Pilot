@@ -152,4 +152,67 @@ SKILL_CATALOG = {
             "ako_sync_force": {"risk": "high", "desc": "Force AKO to resync all K8s resources with the Controller"},
         },
     },
+    # The five below were missing until 2026-09-15 while the family grew from
+    # eight companions to thirteen. Labels are each skill's own risk_level and
+    # destructiveHint, with one rule on top: a tool that declares
+    # readOnlyHint=False is never labelled "low", because the review reads "low"
+    # as an inspection and would pass a write as one.
+    "debug": {
+        "description": "Offline incident correlation and evidence-graded investigation cases",
+        # Only the reads. The case_* writes touch the local case ledger, not
+        # VMware, and a design catalog has no use for them.
+        "tools": {
+            "incident_timeline": {"risk": "low", "desc": "Correlate fetched events into spikes and ranked hypotheses"},
+            "list_symptom_categories": {"risk": "low", "desc": "Symptom categories and what to check for each"},
+            "case_readiness": {"risk": "low", "desc": "Strongest conclusion reachable per category with these skills"},
+            "case_plan": {"risk": "low", "desc": "Which skill and tool to fetch next for a case"},
+        },
+    },
+    "harden": {
+        "description": "Compliance baselines, violations, drift and remediation suggestions",
+        "tools": {
+            "list_baselines": {"risk": "low", "desc": "Available compliance baselines"},
+            # Read-only, but harden publishes it at medium: a scan is a long
+            # sweep of every host in scope.
+            "scan_target": {"risk": "medium", "desc": "Scan a vCenter target against a baseline"},
+            "list_violations": {"risk": "low", "desc": "Violations from the latest scan, per node"},
+            "list_drift_events": {"risk": "low", "desc": "What changed against the baseline, and when"},
+            "get_remediation": {"risk": "low", "desc": "Stored remediation suggestion for one violation"},
+        },
+    },
+    "log-insight": {
+        "description": "Log Insight search, aggregation and alerts",
+        "tools": {
+            "log_search": {"risk": "low", "desc": "Search log events in a time window"},
+            "log_aggregate": {"risk": "low", "desc": "Counts over time, with spike detection"},
+            "alert_list": {"risk": "low", "desc": "Defined alerts"},
+            "alert_history": {"risk": "low", "desc": "Recent triggers of one alert"},
+        },
+    },
+    "privateai": {
+        "description": "GPU hosts, vGPU profiles and utilisation for Private AI Foundation",
+        "tools": {
+            "gpu_host_list": {"risk": "low", "desc": "Hosts with GPUs"},
+            "gpu_utilization": {"risk": "low", "desc": "GPU utilisation per vGPU VM"},
+            "gpu_host_readiness": {"risk": "low", "desc": "Whether each GPU host can serve vGPU"},
+            "vgpu_profile_validate": {"risk": "low", "desc": "Pre-flight a vGPU profile change"},
+            "vgpu_assign": {"risk": "high", "desc": "Set a VM's vGPU profile (VM must be off)"},
+        },
+    },
+    "vdi": {
+        "description": "Horizon VDI: pools, sessions, machines, images",
+        "tools": {
+            "health_summary": {"risk": "low", "desc": "Sessions, problem machines and pool availability"},
+            "session_list": {"risk": "low", "desc": "Sessions filtered by user, pool or state"},
+            "pool_utilization": {"risk": "low", "desc": "Capacity and use per desktop pool"},
+            "task_status": {"risk": "low", "desc": "Status of a pool's long-running task"},
+            # vdi publishes this at low, but it is a write (readOnlyHint=False):
+            # labelled low, the review would call it an inspection.
+            "session_send_message": {"risk": "medium", "desc": "Message users before maintenance"},
+            "machine_maintenance": {"risk": "medium", "desc": "Enter or exit maintenance mode for machines"},
+            "session_logoff": {"risk": "high", "desc": "Force-logoff sessions"},
+            "machine_reset": {"risk": "high", "desc": "Hard-reset desktop machines"},
+            "pool_push_image": {"risk": "high", "desc": "Push a new image — recreates every desktop in the pool"},
+        },
+    },
 }

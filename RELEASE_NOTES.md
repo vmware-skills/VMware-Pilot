@@ -1,3 +1,20 @@
+## Unreleased — the design catalog covers all thirteen companions
+
+**`get_skill_catalog` listed eight skills; the family has thirteen with an MCP server.** debug, harden,
+log-insight, privateai and vdi were missing, so an agent designing a workflow was never shown them.
+They are now in the catalog (99 tools across 13 skills, up from 71 across 8 — the docs said 69), labelled with each
+skill's own risk level and destructive hint. One rule sits on top: a tool that is a write is never
+labelled `low`, because review reads `low` as an inspection — vdi's `session_send_message` is
+published at low and is catalogued at medium.
+
+The companion snapshot the tests read had the same eight skills, so every test passed by not knowing
+the other five existed. The snapshot script now refuses to run (exit 2) when a sibling checkout
+registers an MCP server that is not in its list.
+
+The counts in the docs were prose and had drifted ("aiops alone has 49 tools" — it registers 60).
+The capabilities table, the totals and the count sentences in SKILL.md and integration-patterns.md
+are now checked against the snapshot and the catalog.
+
 ## v1.10.1 — investigate_alert and compliance_scan call tools that exist
 
 **`investigate_alert` named three tools that do not exist.** The template behind "investigate

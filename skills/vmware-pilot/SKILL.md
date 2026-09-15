@@ -32,7 +32,7 @@ Multi-step workflow orchestration for VMware MCP skills — design, approve, exe
 
 | Capability | Description |
 |---|---|
-| Workflow Design | Natural language goal → AI designs steps from the `get_skill_catalog` building-block list (69 curated tools across 8 skills) |
+| Workflow Design | Natural language goal → AI designs steps from the `get_skill_catalog` building-block list (99 curated tools across 13 skills) |
 | Approval Gates | Pause execution for human review before destructive operations |
 | State Persistence | SQLite-backed, survives restarts, supports resume from checkpoint |
 | Rollback | Explicit, best-effort undo of completed steps in reverse order — never automatic (see Troubleshooting) |
@@ -147,7 +147,7 @@ Deploy a backend VM, create a K8s namespace, and wire up AKO Ingress to the AVI 
 
 This is intentional v2-style architecture: pilot's context stays small, state is always on disk, and there are no persistent agent threads. Full contract details: see [`references/integration-patterns.md`](references/integration-patterns.md#the-dispatch-contract).
 
-**`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 69 hand-picked building blocks across 8 skills — a deliberate subset of what those skills expose (aiops alone has 49 tools; the catalog lists 18). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
+**`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 99 hand-picked building blocks across 13 skills — a deliberate subset of what those skills expose (aiops alone has 60 tools; the catalog lists 19). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
 
 ## MCP Tools (13 — 4 read, 9 write/control)
 
