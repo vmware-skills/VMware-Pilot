@@ -2629,6 +2629,16 @@
     "ds_name"
    ]
   },
+  "fc_adapter_list": {
+   "properties": [
+    "cluster",
+    "host",
+    "limit",
+    "offset",
+    "target"
+   ],
+   "required": []
+  },
   "list_all_datastores": {
    "properties": [
     "target"
@@ -2651,6 +2661,20 @@
    "required": [
     "ds_name"
    ]
+  },
+  "storage_device_paths": {
+   "properties": [
+    "adapter",
+    "cluster",
+    "datastore",
+    "device",
+    "host",
+    "limit",
+    "offset",
+    "only_differences",
+    "target"
+   ],
+   "required": []
   },
   "storage_iscsi_add_target": {
    "properties": [
