@@ -471,6 +471,8 @@
   },
   "vm_delete": {
    "properties": [
+    "acknowledge_blast_radius",
+    "confirm",
     "target",
     "vm_name"
    ],
