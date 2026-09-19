@@ -25,15 +25,29 @@ def vks_cluster_deploy(
     """Deploy a complete VKS environment: namespace + TKC cluster + verify.
 
     Steps:
-      1. Create vSphere Namespace
-      2. Approve before cluster creation
-      3. Create TKC cluster
-      4. Verify cluster health
+      1. Approve before namespace creation
+      2. Create vSphere Namespace
+      3. Approve before cluster creation
+      4. Create TKC cluster
+      5. Verify cluster health
+
+    Every step that passes ``confirm=True`` sits behind an approval step: that
+    flag tells the companion tool a human already decided.
     """
     now = datetime.now(tz=timezone.utc).isoformat()
     steps = [
         WorkflowStep(
             index=0,
+            action="require_approval",
+            skill="pilot",
+            tool="approve",
+            params={
+                "message": f"Create vSphere Namespace '{namespace_name}' on cluster "
+                f"'{cluster_id}' (storage policy '{storage_policy}'). Approve?"
+            },
+        ),
+        WorkflowStep(
+            index=1,
             action="create_namespace",
             skill="vks",
             tool="create_namespace",
@@ -41,19 +55,18 @@ def vks_cluster_deploy(
                 "name": namespace_name,
                 "cluster_id": cluster_id,
                 "storage_policy": storage_policy,
-                "dry_run": False,
                 "target": target,
+                "confirm": True,
             },
             rollback_tool="delete_namespace",
             rollback_params={
                 "name": namespace_name,
-                "confirmed": True,
-                "dry_run": False,
                 "target": target,
+                "confirm": True,
             },
         ),
         WorkflowStep(
-            index=1,
+            index=2,
             action="require_approval",
             skill="pilot",
             tool="approve",
@@ -62,7 +75,7 @@ def vks_cluster_deploy(
             },
         ),
         WorkflowStep(
-            index=2,
+            index=3,
             action="create_tkc",
             skill="vks",
             tool="create_tkc_cluster",
@@ -72,20 +85,19 @@ def vks_cluster_deploy(
                 "k8s_version": k8s_version,
                 "vm_class": vm_class,
                 "worker_count": worker_count,
-                "dry_run": False,
                 "target": target,
+                "confirm": True,
             },
             rollback_tool="delete_tkc_cluster",
             rollback_params={
                 "name": tkc_name,
                 "namespace": namespace_name,
-                "confirmed": True,
-                "dry_run": False,
                 "target": target,
+                "confirm": True,
             },
         ),
         WorkflowStep(
-            index=3,
+            index=4,
             action="verify_cluster",
             skill="vks",
             tool="get_tkc_cluster",

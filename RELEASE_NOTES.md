@@ -1,3 +1,78 @@
+## v1.12.0 — rollback and cancel_workflow preview first; templates pass confirm=True
+
+**Breaking for callers: `rollback` and `cancel_workflow` no longer act on the first call.** Both take
+`confirm: bool = False`. A bare call returns `{"action": "preview", "blast_radius": ..., "hint": ...}`
+and leaves the workflow untouched; call again with `confirm=True` after the user has seen it. The
+acting response carries `action` (`rolled_back` / `cancelled`) and the same `blast_radius`.
+`blast_radius` names the workflow (id, type, state) and `state_after`, and lists — as counts plus up
+to 16 steps — `would_roll_back` / `would_skip`, `left_in_place` (executed steps that stay applied;
+cancelling part-way leaves a half-applied change), `not_reversed_by_pilot` (rollback: steps the agent
+performed from `pending_dispatch`), `unknown_effects` (steps interrupted mid-dispatch), `blockers` and
+`unmeasured`. `confirm=True` refuses, naming the reason, when the state does not allow the transition,
+when a step's status is one Pilot does not write, when the stored record cannot be read (previously
+an unreadable record surfaced as `JSONDecodeError: operation failed.`), or when a step is in
+`unknown_effects` — left `running`/`interrupted` by a Pilot process that stopped mid-dispatch, so
+whether it changed anything is unknown. For that last case only, after checking the step in the
+target system, re-run with the new `acknowledge_unknown_effects=True` (default `False`); it lifts no
+other refusal. The crash message from `run_workflow` now says so. `cancel_workflow` is now
+annotated `destructiveHint: true`.
+
+**A step that only previewed is a failure, not a success.** Destructive companion tools now return
+`action: preview` unless called with `confirm=True`. The executor used to count only a top-level
+`error` as failure, so such a step would have been recorded `success` while nothing changed — and a
+previewed undo as "rolled back". A top-level `"action": "preview"` (in a dict, an MCP result's
+`structuredContent`, or its single JSON text block) now fails the step with "step only previewed; …
+the template must pass confirm=True". A nested `action: preview` is data and still succeeds.
+
+**Built-in templates pass `confirm=True`** to every companion tool that previews by default, on
+forward steps and in `rollback_params`, and no longer send the deprecated `confirmed` / `dry_run`:
+`clone_and_test`, `plan_and_approve`, `rolling_restart`, `disaster_recovery`, `patch_deployment`,
+`network_segment_setup` (rollbacks), `vks_cluster_deploy`, `storage_expansion`.
+
+**Every such step now comes after an approval gate.** Two did not: `vks_cluster_deploy` created the
+namespace at step 0 and `storage_expansion` enabled the iSCSI adapter at step 1, both before any
+`approve` — on the MCP server that handed the agent a `pending_dispatch` carrying `confirm=True` with
+no human decision. `vks_cluster_deploy` now opens with an approval gate (5 steps, was 4);
+`storage_expansion` keeps its read-only status check first and moves its gate ahead of the adapter
+enable (still 6 steps; the gate is now step 1). A test fails any built-in template that sends
+`confirm=True` before its first approval step. `baseline_remediate`
+adds `confirm=True` to caller-supplied drift items for those tools and refuses (at plan time) an item
+that already carries `confirm`, `confirmed` or `dry_run`, rather than overriding a caller's "hold".
+The gated list lives in `vmware_pilot/templates/_gated.py`.
+
+**The same rule now holds for user-authored workflows.** A step whose params carry `confirm: True`
+(or the legacy `confirmed: True`) must come after a `require_approval` step in every custom workflow
+too — `create_workflow`, `update_draft` / `confirm_draft`, custom YAML (`plan_workflow` and the
+loader), `run_workflow` (`force=True` does not override it) and `validate_workflow.py`. Before, custom
+workflows were gated only by catalog risk tier, so a medium-risk (`write`-tier) step could pass
+`confirm=True` with no human decision ahead of it. The refusal names the step (violation kind
+`confirm_without_approval`) and the gate to insert.
+
+Final-review fixes (2026-09-19):
+
+* A step counts as acting — and so needs an approval step before it — when **any** decision key says
+  act: `confirm` / `confirmed` truthy in any spelling (`True`, `1`, `"yes"`, `"True"`, `"on"`; a string
+  is false only if it is `""`, `"0"`, `"false"`, `"no"`, `"off"`, `"none"` or `"null"`), or a legacy
+  `dry_run` passed explicitly falsy (`False`, `0`, `"false"`). Before, only `True` / `"true"` counted.
+* `run_workflow` now actually enforces `confirm_without_approval` on custom workflows (it checked only
+  the risk-tier findings), so a workflow stored by an earlier version without the gate is refused at
+  run time, `force=True` included.
+* `rollback_params` carrying `confirm: True` run on any `rollback(confirm=True)` without an approval
+  step of their own — by decision: `rollback` is itself gated, and its preview now lists each rollback
+  step's `rollback_params` (secrets redacted) next to its `rollback_tool` in `would_roll_back` and
+  `not_reversed_by_pilot`, so the human deciding `confirm=True` sees exactly what will run.
+
+### Known and not fixed
+
+* `network_segment_setup` runs all its NSX creates (Tier-1 gateway, segment, NAT rule, DFW policy)
+  before its only approval step; the approval guards only the final verification. The creates are
+  medium-risk and pass no `confirm=True` on their forward steps, so the rules above do not refuse it.
+  Not restructured in this release.
+* Requires `vmware-policy>=1.17.0`, which audits a `confirm=False` preview as `dry_run` and redacts long
+  audit text in linear time.
+* The `rollback` preview's `rollback_params` redact any secret-looking key (`db_password`, `apiToken`, …), not
+  only exact names.
+
 ## v1.11.1 — every CLI command declares what it reaches
 
 Across the family, CLI reads never wrote `~/.vmware/audit.db`; they now do (`@audited`, under the

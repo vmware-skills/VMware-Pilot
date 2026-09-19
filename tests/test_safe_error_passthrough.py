@@ -126,7 +126,7 @@ def test_cancel_of_terminal_workflow_refusal_survives_verbatim(store):
     wf = _workflow(state=WorkflowState.COMPLETED)
     store.save(wf)
 
-    out = cancel_workflow(wf.id, reason="test")
+    out = cancel_workflow(wf.id, reason="test", confirm=True)
     assert "terminal" in out["error"]
     assert "operation failed" not in out["error"]
 

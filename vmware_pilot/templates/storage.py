@@ -21,9 +21,9 @@ def storage_expansion(
     """Storage expansion: add iSCSI target → rescan → verify.
 
     Steps:
-      1. Check current iSCSI status
-      2. Enable iSCSI adapter (if not enabled)
-      3. Approve before adding target
+      1. Check current iSCSI status (read-only)
+      2. Approve before enabling the adapter and adding the target
+      3. Enable iSCSI adapter (if not enabled)
       4. Add iSCSI target
       5. Rescan storage
       6. Verify new datastores visible
@@ -39,20 +39,20 @@ def storage_expansion(
         ),
         WorkflowStep(
             index=1,
-            action="enable_iscsi",
-            skill="storage",
-            tool="storage_iscsi_enable",
-            params={"host_name": host_name, "target": target},
-        ),
-        WorkflowStep(
-            index=2,
             action="require_approval",
             skill="pilot",
             tool="approve",
             params={
-                "message": f"Add iSCSI target {iscsi_address}:{iscsi_port} "
-                f"to '{host_name}'. Approve?"
+                "message": f"Enable the software iSCSI adapter on '{host_name}' (if it is "
+                f"not already) and add iSCSI target {iscsi_address}:{iscsi_port}. Approve?"
             },
+        ),
+        WorkflowStep(
+            index=2,
+            action="enable_iscsi",
+            skill="storage",
+            tool="storage_iscsi_enable",
+            params={"host_name": host_name, "target": target, "confirm": True},
         ),
         WorkflowStep(
             index=3,
@@ -64,6 +64,7 @@ def storage_expansion(
                 "address": iscsi_address,
                 "port": iscsi_port,
                 "target": target,
+                "confirm": True,
             },
             rollback_tool="storage_iscsi_remove_target",
             rollback_params={
@@ -71,6 +72,7 @@ def storage_expansion(
                 "address": iscsi_address,
                 "port": iscsi_port,
                 "target": target,
+                "confirm": True,
             },
         ),
         WorkflowStep(
@@ -78,7 +80,7 @@ def storage_expansion(
             action="rescan_storage",
             skill="storage",
             tool="storage_rescan",
-            params={"host_name": host_name, "target": target},
+            params={"host_name": host_name, "target": target, "confirm": True},
         ),
         WorkflowStep(
             index=5,

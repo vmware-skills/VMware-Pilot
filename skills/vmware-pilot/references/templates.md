@@ -3,6 +3,11 @@
 vmware-pilot ships with 15 built-in workflow templates. Each template is a Python function
 that generates a `Workflow` with pre-configured steps, approval gates, and rollback mappings.
 
+Steps (and rollback steps) that call a companion tool which previews by default pass
+`confirm=True`. In every built-in template such a step comes after an approval gate — Pilot's
+`approve`, which is the human decision; a test fails any template that sends `confirm=True`
+before its first gate. Read-only checks may come first.
+
 ---
 
 ## 1. clone_and_test
@@ -209,16 +214,17 @@ plan_workflow("network_segment_setup", {
 
 ## 6. vks_cluster_deploy
 
-**Purpose**: Deploy a complete VKS (vSphere with Tanzu) environment: create namespace, then deploy TKC cluster with approval gate.
+**Purpose**: Deploy a complete VKS (vSphere with Tanzu) environment: create namespace, then deploy TKC cluster, each behind its own approval gate.
 
-**Steps** (4):
+**Steps** (5):
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
-| 0 | Create vSphere Namespace | vks | `create_namespace` | `delete_namespace` |
-| 1 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 2 | Create TKC cluster | vks | `create_tkc_cluster` | `delete_tkc_cluster` |
-| 3 | Verify cluster health | vks | `get_tkc_cluster` | -- |
+| 0 | **APPROVAL GATE** — create the namespace? | pilot | `approve` | -- |
+| 1 | Create vSphere Namespace | vks | `create_namespace` | `delete_namespace` |
+| 2 | **APPROVAL GATE** — deploy the TKC cluster? | pilot | `approve` | -- |
+| 3 | Create TKC cluster | vks | `create_tkc_cluster` | `delete_tkc_cluster` |
+| 4 | Verify cluster health | vks | `get_tkc_cluster` | -- |
 
 **Parameters**:
 
@@ -398,9 +404,9 @@ plan_workflow("patch_deployment", {
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
-| 0 | Check iSCSI status | storage | `storage_iscsi_status` | -- |
-| 1 | Enable iSCSI adapter | storage | `storage_iscsi_enable` | -- |
-| 2 | **APPROVAL GATE** | pilot | `approve` | -- |
+| 0 | Check iSCSI status (read-only) | storage | `storage_iscsi_status` | -- |
+| 1 | **APPROVAL GATE** — enable the adapter and add the target? | pilot | `approve` | -- |
+| 2 | Enable iSCSI adapter | storage | `storage_iscsi_enable` | -- |
 | 3 | Add iSCSI target | storage | `storage_iscsi_add_target` | `storage_iscsi_remove_target` |
 | 4 | Rescan storage | storage | `storage_rescan` | -- |
 | 5 | Verify new datastores | storage | `list_all_datastores` | -- |
@@ -621,7 +627,7 @@ plan_workflow("investigate_alert", {
 | `plan_and_approve` | 3 | Yes | aiops | High |
 | `compliance_scan` | 1-3 | No | monitor, aria | Low |
 | `network_segment_setup` | 3-6 | Yes | nsx, nsx-security | Medium |
-| `vks_cluster_deploy` | 4 | Yes | vks | Medium |
+| `vks_cluster_deploy` | 5 | Yes | vks | Medium |
 | `rolling_restart` | 2+3n | Yes | aiops, monitor | Medium |
 | `capacity_expansion` | 5 | Yes | aria, aiops, monitor | Medium |
 | `disaster_recovery` | 5 | Yes | aiops, monitor, nsx | High |

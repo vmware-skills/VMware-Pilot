@@ -13,10 +13,10 @@
 | 7 | `create_workflow` | medium | Execute | Create custom workflow from step list (refused if a destructive step has no approval gate before it) |
 | 8 | `run_workflow` | medium | Execute | Execute workflow, pauses at approval gates |
 | 9 | `approve` | high | Control | Human approval to continue past approval gate |
-| 10 | `rollback` | high | Control | Explicit, best-effort undo of steps pilot recorded as succeeded, in reverse order — never automatic |
+| 10 | `rollback` | high | Control | Explicit, best-effort undo of steps pilot recorded as succeeded, in reverse order — never automatic. Previews (`blast_radius`) unless `confirm=True` |
 | 11 | `get_workflow_status` | low | Control | Query workflow state, audit log, diff report |
 | 12 | `review_workflow` | low | Discovery | Sanity-check a planned workflow before anyone runs it |
-| 13 | `cancel_workflow` | medium | Control | Cancel a workflow — moves it to the terminal CANCELLED state |
+| 13 | `cancel_workflow` | high | Control | Cancel a workflow — moves it to the terminal CANCELLED state. Previews (`blast_radius`) unless `confirm=True` |
 
 ---
 
@@ -29,7 +29,7 @@
 | 3 | `plan_and_approve` | 3 | Yes | aiops | High |
 | 4 | `compliance_scan` | 1-3 | No | monitor, aria | Low |
 | 5 | `network_segment_setup` | 3-6 | Yes | nsx, nsx-security | Medium |
-| 6 | `vks_cluster_deploy` | 4 | Yes | vks | Medium |
+| 6 | `vks_cluster_deploy` | 5 | Yes | vks | Medium |
 | 7 | `rolling_restart` | 2+3n | Yes | aiops, monitor | Medium |
 | 8 | `capacity_expansion` | 5 | Yes | aria, aiops, monitor | Medium |
 | 9 | `disaster_recovery` | 5 | Yes | aiops, monitor, nsx | High |
@@ -105,10 +105,16 @@ DRAFT -> PENDING -> RUNNING -> AWAITING_APPROVAL -> RUNNING -> COMPLETED
 ## Key Features
 
 ### Approval Gates
-Pause execution for human review before destructive operations. Workflows can have multiple approval gates. Each gate requires an explicit `approve()` call to continue. In a custom workflow (YAML, `create_workflow`, or AI-designed) every destructive or unclassifiable step must have a gate before it: otherwise pilot refuses to save, confirm, plan or run it, and `force=True` does not override that.
+Pause execution for human review before destructive operations. Workflows can have multiple approval gates. Each gate requires an explicit `approve()` call to continue. In a custom workflow (YAML, `create_workflow`, or AI-designed) every destructive or unclassifiable step, and every step whose params tell its tool to act whatever its risk tier — `confirm` / `confirmed` truthy in any spelling (`True`, `1`, `"yes"`), or a legacy `dry_run` passed falsy — must have a gate before it: otherwise pilot refuses to save, confirm, plan or run it, and `force=True` does not override that.
 
 ### Rollback (explicit, never automatic)
 A failed step stops the workflow; nothing is reversed until someone calls `rollback`. It undoes, last first, only steps pilot recorded as `success` — on the MCP server (no dispatcher) that is none of the steps the agent performed, so the agent calls each step's `rollback_tool` itself. Best-effort: if one undo fails, the rest still run. Steps without a `rollback_tool` cannot be undone.
+
+### Preview first: rollback and cancel_workflow
+Both take `confirm: bool = False`. A bare call returns `{"action": "preview", "blast_radius": ...}` and changes nothing. `blast_radius` names the workflow (id, type, state), `state_after`, and — each as a count plus up to 16 steps — `would_roll_back` / `would_skip` (rollback entries carry each step's `rollback_tool` and `rollback_params`, secrets redacted), `left_in_place` (executed steps that stay applied: cancelling part-way leaves a half-applied change), `not_reversed_by_pilot` (rollback: steps the agent performed from `pending_dispatch`), `unknown_effects` (steps interrupted mid-dispatch), plus `blockers` and `unmeasured`. `confirm=True` refuses when either list is non-empty: a state the transition is not allowed from, a step status Pilot does not recognise, a workflow record that cannot be read, or a step in `unknown_effects` (left `running`/`interrupted` by a Pilot process that stopped mid-dispatch). For the last, the refusal says what to check; after the user has checked in the target system whether each such step took effect, re-run with `acknowledge_unknown_effects=True` (default `False`). That acknowledgement covers only those steps — it lifts no blocker and no other unmeasured item.
+
+### Companion tools that preview by default
+Destructive companion tools take `confirm: bool = False` and return `action: preview` on a bare call. Built-in template steps (and their `rollback_params`) pass `confirm=True`, because in every built-in template they come after an `approve` gate (a test enforces it). `rollback_params` with `confirm: True` in any workflow, built-in or custom, run on a `rollback(confirm=True)` call without an approval step of their own: `rollback` is itself gated, and that `confirm=True` is the human decision taken after its preview listed every rollback step's tool and parameters; they no longer pass the deprecated `confirmed` / `dry_run`. A step or rollback whose result is a top-level `action: preview` is recorded `failed` ("step only previewed"), never `success`. `baseline_remediate` adds `confirm=True` to caller-supplied drift items for those tools and refuses items that already carry `confirm`, `confirmed` or `dry_run`.
 
 ### State Persistence
 All workflow state is stored in SQLite at `~/.vmware/workflows.db` (WAL mode). Workflows survive MCP server restarts and can be resumed.

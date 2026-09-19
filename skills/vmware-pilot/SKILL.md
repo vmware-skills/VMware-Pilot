@@ -42,7 +42,7 @@ Multi-step workflow orchestration for VMware MCP skills — design, approve, exe
 ## Quick Install
 
 ```bash
-uv tool install vmware-pilot==1.11.1
+uv tool install vmware-pilot==1.12.0
 vmware-pilot mcp          # start the MCP server (stdio)
 ```
 
@@ -163,8 +163,12 @@ This is intentional v2-style architecture: pilot's context stays small, state is
 | | `review_workflow` | low | Structural sanity check before execution (approved \| needs_revision) |
 | | `run_workflow` | medium | Execute next checkpoint (agent dispatches each step) |
 | **Control** | `approve` | high | Human approval to continue |
-| | `cancel_workflow` | high | Cancel a workflow (approval rejected / unsafe) → terminal CANCELLED, can't be run |
-| | `rollback` | high | Explicit, best-effort undo; never runs on its own |
+| | `cancel_workflow` | high | Cancel a workflow (approval rejected / unsafe) → terminal CANCELLED, can't be run. Previews unless `confirm=True` |
+| | `rollback` | high | Explicit, best-effort undo; never runs on its own. Previews unless `confirm=True` |
+
+**`rollback` and `cancel_workflow` preview by default.** Without `confirm=True` they return `blast_radius` (steps that would be undone, left applied, or skipped) and change nothing. Show it to the user; the user has not seen the preview yet, so do not set `confirm=True` on your own. They refuse when the state does not allow the transition, the record cannot be read, or a step was left `running`/`interrupted` (its effect is unknown: have the user check it in the target system, then pass `acknowledge_unknown_effects=True`).
+
+**Template steps pass `confirm=True`.** Destructive companion tools preview unless called with `confirm=True`; in every built-in template such a step comes after an `approve` gate, so it carries `confirm=True` — dispatch it as listed. A step that only returned `action: preview` is recorded `failed`, not `success`.
 | | `get_workflow_status` | low | State + audit log |
 
 ## Built-in Templates (15)
@@ -264,7 +268,7 @@ vmware-audit log --status denied
 ## Troubleshooting
 
 ### Workflow stuck in "awaiting_approval"
-Call `approve(workflow_id, approver=...)` with the correct workflow ID to continue, or `cancel_workflow(workflow_id)` if the approval is rejected. If the MCP session was lost, reconnect and call `get_workflow_status(workflow_id)` to see the current state -- workflows persist in SQLite and survive restarts.
+Call `approve(workflow_id, approver=...)` with the correct workflow ID to continue, or `cancel_workflow(workflow_id)` if the approval is rejected (it previews first; call again with `confirm=True` once the user has seen it). If the MCP session was lost, reconnect and call `get_workflow_status(workflow_id)` to see the current state -- workflows persist in SQLite and survive restarts.
 
 ### "Unknown workflow type" error from plan_workflow
 The template name is case-sensitive. Use `list_workflows()` to see all available built-in and custom template names. Custom templates must be valid YAML in `~/.vmware/workflows/`.
@@ -276,7 +280,7 @@ The template name is case-sensitive. Use `list_workflows()` to see all available
 4. A file that lists but will not plan is missing an approval gate -- the `plan_workflow` error names the step and the file
 
 ### Rollback did nothing, or fails on some steps
-Rollback never happens on its own: a failed step leaves the workflow `failed` and stops. `rollback` only reverses steps pilot recorded as `success`, and on the MCP server (no dispatcher) the steps you performed from `pending_dispatch` stay `not_executed` — so `rollback` there reverses nothing but approval gates. Undo them yourself: call each performed step's `rollback_tool` with its `rollback_params`, last step first, after confirming with the user. Steps without a `rollback_tool` cannot be undone. When pilot does dispatch (an embedder supplied a dispatcher), rollback is best-effort: a failed undo does not stop the rest, and the result reports each one.
+Rollback never happens on its own: a failed step leaves the workflow `failed` and stops. A bare `rollback(workflow_id)` only previews; `confirm=True` acts. It only reverses steps pilot recorded as `success`, and on the MCP server (no dispatcher) the steps you performed from `pending_dispatch` stay `not_executed` — so `rollback` there reverses nothing but approval gates. Undo them yourself: call each performed step's `rollback_tool` with its `rollback_params`, last step first, after confirming with the user. Steps without a `rollback_tool` cannot be undone. When pilot does dispatch (an embedder supplied a dispatcher), rollback is best-effort: a failed undo does not stop the rest, and the result reports each one.
 
 ### "Workflow cannot be run" state error
 A workflow can only be run from `pending` or `running` states. If it is in `draft`, call `confirm_draft()` first. If it is in `completed` or `failed`, create a new workflow -- completed workflows cannot be re-run.
@@ -299,7 +303,7 @@ No vCenter credentials needed — pilot orchestrates other skills that handle co
 }
 ```
 
-> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==1.11.1", "vmware-pilot-mcp"]}` also
+> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==1.12.0", "vmware-pilot-mcp"]}` also
 > works, but `uvx` re-resolves the package against PyPI on every start and fails behind a
 > TLS-inspecting corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed
 > entry point above touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.

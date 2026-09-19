@@ -11,6 +11,7 @@ from vmware_pilot.templates._common import (
     new_workflow_id,
     timezone,
 )
+from vmware_pilot.templates._gated import confirmed_params, refuse_caller_decision
 
 
 def baseline_capture(
@@ -290,17 +291,31 @@ def baseline_remediate(
     )
     idx += 1
 
-    # One step per drift item
+    # One step per drift item. Each runs after the approval step above, so a
+    # companion tool that previews by default is sent confirm=True (_gated).
     for i, item in enumerate(drift_items):
+        skill = item.get("skill", "aiops")
+        tool = item.get("tool", "vm_create_plan")
+        rollback_tool = item.get("rollback_tool", "")
+        params = item.get("params", {})
+        rollback_params = item.get("rollback_params", {})
+        where = f"baseline_remediate drift item {i}"
+        refuse_caller_decision(skill, tool, params, where)
+        if rollback_tool:
+            refuse_caller_decision(skill, rollback_tool, rollback_params, f"{where} rollback")
         steps.append(
             WorkflowStep(
                 index=idx,
                 action=f"fix_{item.get('resource', f'item_{i}')}",
-                skill=item.get("skill", "aiops"),
-                tool=item.get("tool", "vm_create_plan"),
-                params=item.get("params", {}),
-                rollback_tool=item.get("rollback_tool", ""),
-                rollback_params=item.get("rollback_params", {}),
+                skill=skill,
+                tool=tool,
+                params=confirmed_params(skill, tool, params),
+                rollback_tool=rollback_tool,
+                rollback_params=(
+                    confirmed_params(skill, rollback_tool, rollback_params)
+                    if rollback_tool
+                    else dict(rollback_params)
+                ),
             )
         )
         idx += 1

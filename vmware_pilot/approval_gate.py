@@ -18,6 +18,22 @@ here is how the helper script ended up with its own, shorter one.
 Medium-risk writes (the catalog's ``write`` tier — create_segment,
 vm_power_on, …) are deliberately *not* in that set; see the ``review`` module
 docstring for why, and for the built-in templates that depend on it.
+
+One rule is not about the tier: a step whose params tell a gated tool to act
+— ``confirm`` / ``confirmed`` truthy in any spelling, or a legacy ``dry_run``
+passed falsy (see ``_acts``) — says "a human already decided", so it needs a
+``require_approval`` step ahead of it whatever its tier — the same rule the
+built-in templates are tested for (``test_templates_pass_confirm``). It is
+reported as ``confirm_without_approval``, and every door enforces it:
+saving, confirming, planning from YAML and ``run_workflow`` (so a workflow
+stored by an earlier version that lacks the gate is refused at run time).
+
+``rollback_params`` are the exception, by decision. A step's rollback often
+carries ``confirm: True`` (``delete_segment`` after ``create_segment``) and runs
+on any ``rollback`` call without an approval step of its own, because Pilot's
+``rollback`` tool is itself gated: ``confirm=False`` previews, listing every
+rollback step's tool and parameters (secrets redacted), and ``confirm=True`` is
+the human decision taken after seeing that list (``lifecycle_gate``).
 """
 
 from __future__ import annotations
@@ -31,6 +47,13 @@ from vmware_pilot.review import classify_step, review
 #: ``review()`` finding kinds that mean "this step would run with no human gate
 #: in front of it". The same two kinds ``run_workflow`` blocks on.
 GATE_FINDING_KINDS = ("ungated_destructive", "ungated_unclassified")
+
+#: A step passing an acting ``confirm`` with no approval step before it.
+CONFIRM_KIND = "confirm_without_approval"
+_CONFIRM_REASON = (
+    "it passes confirm=True, which tells the tool a human already approved, and "
+    "no require_approval step comes before it"
+)
 
 
 @dataclass(frozen=True)
@@ -47,8 +70,49 @@ class GateViolation:
         return f"step {self.step_index} ({self.skill}.{self.tool}: {self.reason})"
 
 
+#: String values read as "no" by a tool's truthiness or boolean coercion.
+_FALSE_STRINGS = frozenset({"", "0", "false", "no", "off", "none", "null"})
+
+
+def _truthy(value: Any) -> bool:
+    """How a tool would read ``value`` as a flag: a string is true unless it says no."""
+    if isinstance(value, str):
+        return value.strip().lower() not in _FALSE_STRINGS
+    return bool(value)
+
+
+def _acts(params: dict[str, Any]) -> bool:
+    """True if ANY decision key in ``params`` tells a gated tool to act rather than preview.
+
+    ``confirm`` / ``confirmed`` truthy (True, a non-zero number, a string not in
+    ``_FALSE_STRINGS``), or a legacy ``dry_run`` passed explicitly falsy. Read
+    generously on purpose: a false positive costs one approval step, a false
+    negative lets a step act with no human decision ahead of it.
+    """
+    if _truthy(params.get("confirm")) or _truthy(params.get("confirmed")):
+        return True
+    return "dry_run" in params and params["dry_run"] is not None and not _truthy(
+        params["dry_run"])
+
+
+def _confirm_violations(wf: Workflow, flagged: set[int]) -> list[GateViolation]:
+    """Steps passing confirm=True with no approval step before them."""
+    approvals = [s.index for s in wf.steps if s.action == "require_approval"]
+    return [
+        GateViolation(s.index, s.skill, s.tool, CONFIRM_KIND, _CONFIRM_REASON)
+        for s in wf.steps
+        if s.action != "require_approval" and s.index not in flagged
+        and isinstance(s.params, dict) and _acts(s.params)
+        and not any(a < s.index for a in approvals)
+    ]
+
+
 def gate_violations(wf: Workflow) -> tuple[GateViolation, ...]:
-    """Every step of ``wf`` that ``review()`` says runs ungated, in step order."""
+    """Every step of ``wf`` that would run with no human gate before it, in step order.
+
+    ``review()``'s tier findings, plus any step passing ``confirm=True`` ahead
+    of every approval step.
+    """
     by_index = {s.index: s for s in wf.steps}
     found = []
     for finding in review(wf)["findings"]:
@@ -57,6 +121,7 @@ def gate_violations(wf: Workflow) -> tuple[GateViolation, ...]:
         step = by_index[finding["step_index"]]
         _, reason = classify_step(step.skill, step.tool, step.action)
         found.append(GateViolation(step.index, step.skill, step.tool, finding["kind"], reason))
+    found += _confirm_violations(wf, {v.step_index for v in found})
     return tuple(sorted(found, key=lambda v: v.step_index))
 
 
@@ -136,7 +201,8 @@ def refusal(
         f"Refusing to {verb} custom workflow '{workflow_name}'{where}: "
         f"{len(violations)} step(s) could change the estate and have no "
         f"require_approval gate before them — {listing}. Custom workflows must put a "
-        "human approval gate ahead of every destructive or unclassifiable step. "
+        "human approval gate ahead of every destructive or unclassifiable step and "
+        "every step passing confirm=True. "
         f"{how}"
     )
     if retry:

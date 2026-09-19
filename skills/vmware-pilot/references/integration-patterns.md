@@ -216,8 +216,9 @@ user wants the VM back on.
 Provision a complete Tanzu Kubernetes environment.
 
 ```
-vks.create_namespace            -> Create Supervisor Namespace with storage policy
     [APPROVAL GATE]             -> Human reviews namespace config
+vks.create_namespace            -> Create Supervisor Namespace with storage policy
+    [APPROVAL GATE]             -> Human approves the TKC cluster
 vks.create_tkc_cluster          -> Deploy TKC cluster
 vks.get_tkc_cluster             -> Verify cluster is ready
     [APPROVAL GATE]             -> get_tkc_kubeconfig returns a live credential
@@ -241,9 +242,9 @@ provisioning.
 Add or expand storage on ESXi hosts.
 
 ```
-storage.storage_iscsi_status    -> Check current iSCSI state
+storage.storage_iscsi_status    -> Check current iSCSI state (read-only)
+    [APPROVAL GATE]             -> Human confirms adapter enable + storage target
 storage.storage_iscsi_enable    -> Enable adapter if needed
-    [APPROVAL GATE]             -> Human confirms storage target
 storage.storage_iscsi_add_target -> Add iSCSI target
 storage.storage_rescan          -> Rescan HBAs
 storage.list_all_datastores     -> Verify new datastores visible
@@ -329,6 +330,8 @@ When a workflow step fails:
      reverse order. The failed step itself is not rolled back (it is `failed`,
      not `success`).
 5. Steps without a `rollback_tool` are skipped; they cannot be undone this way
+6. `rollback()` itself previews first: a bare call returns `blast_radius` and
+   changes nothing; call it again with `confirm=True` after the user decides
 
 If an undo call fails, the remaining ones still run; the result reports each one
 and sets `blocked_reason: rollback_failed`.

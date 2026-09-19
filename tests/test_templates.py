@@ -74,9 +74,10 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
     #: vmware-aiops vm_reconfigure(vm_name, cpu, memory_mb, target) — no memory_gb.
     RECONFIGURE_PARAMS = {"vm_name", "cpu", "memory_mb", "target"}
     #: vmware-aiops vm_guest_exec(vm_name, command, username, arguments,
-    #: password, working_directory, target).
+    #: password, working_directory, target, confirm). confirm since 2026-09-19:
+    #: the tool previews without it, and the step runs after Pilot's approval.
     GUEST_EXEC_PARAMS = {"vm_name", "command", "username", "arguments", "password",
-                         "working_directory", "target"}
+                         "working_directory", "target", "confirm"}
 
     def _apply_steps(self, wf):
         return [s for s in wf.steps if s.action in ("apply_changes", "apply_to_production")]
@@ -303,7 +304,7 @@ class TestVksClusterDeploy:
             storage_policy="vsan-default", tkc_name="dev-tkc", k8s_version="v1.28",
         )
         assert wf.workflow_type == "vks_cluster_deploy"
-        assert len(wf.steps) == 4
+        assert len(wf.steps) == 5
 
     def test_has_approval(self):
         wf = vks_cluster_deploy("ns", "c1", "pol", "tkc1", "v1.28")

@@ -11,7 +11,10 @@ The accepted-key sets are copied from the aiops signatures (checked
 
 * ``vm_reconfigure(vm_name, cpu, memory_mb, target)`` — no ``memory_gb``.
 * ``vm_guest_exec(vm_name, command, username, arguments, password,
-  working_directory, target)`` — ``username`` required, no default account.
+  working_directory, target, confirm)`` — ``username`` required, no default
+  account. ``confirm`` is not a change_spec key: the template adds
+  ``confirm=True`` itself (``_gated``), because the step runs after Pilot's
+  approval gate.
 """
 
 from __future__ import annotations

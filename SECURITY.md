@@ -37,9 +37,11 @@ A workflow pauses at each `require_approval` step until `approve()` is called wi
 ### Rollback (explicit, best-effort — never automatic)
 
 - A failed step stops the workflow (`failed`); remaining steps are marked `skipped` and nothing is undone automatically
+- `rollback()` and `cancel_workflow()` preview by default: without `confirm=True` they return `blast_radius` (steps undone, left applied, or skipped) and change nothing; `confirm=True` refuses when the state does not allow the transition, a step status is unrecognised, the record cannot be read, or a step was left `running`/`interrupted` (unknown effect) — the last only lifts with an explicit `acknowledge_unknown_effects=True` after the step is checked in the target system
 - `rollback()` must be called deliberately. It reverses, last first, only the steps pilot recorded as `success`, dispatching each step's `rollback_tool` — which only happens when an embedder supplied a dispatcher. On the MCP server (no dispatcher) the steps the agent performed are recorded `not_executed`, so `rollback()` reverses nothing but approval gates; the agent must call each performed step's `rollback_tool` itself
 - Steps without a `rollback_tool` are reported `skipped`; a failed undo does not stop the rest and sets `blocked_reason: rollback_failed`
 - Rollback results are kept on the workflow record and each `rollback` call is audited to `~/.vmware/audit.db`
+- A dispatched step or undo that returns a top-level `action: preview` (a companion tool called without `confirm=True`) is recorded `failed`, never `success`; built-in templates pass `confirm=True` to those tools only in steps that come after an approval gate (a test fails any template that does so earlier)
 
 ### State Persistence
 

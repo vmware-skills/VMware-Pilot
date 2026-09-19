@@ -46,7 +46,8 @@ def create_workflow(
     Each step dict must have: action, skill, tool, params. Optional:
     rollback_tool, rollback_params. action="require_approval" (skill "pilot",
     tool "approve") inserts a human approval gate. A workflow whose
-    destructive or unclassifiable step has no gate before it is REFUSED —
+    destructive or unclassifiable step, or a step passing confirm=True, has
+    no gate before it is REFUSED —
     nothing is saved — and the error names the step and the gate to insert.
 
     Args:
@@ -319,8 +320,8 @@ def confirm_draft(
     instead if anything still needs changing. After confirmation, the workflow
     can be executed via run_workflow(). Optionally saves as a YAML template
     for future reuse. Refused — the draft stays a draft and nothing is saved —
-    while any destructive or unclassifiable step lacks a require_approval
-    gate before it.
+    while any destructive or unclassifiable step, or any step passing
+    confirm=True, lacks a require_approval gate before it.
 
     Args:
         workflow_id: The draft workflow ID to confirm.

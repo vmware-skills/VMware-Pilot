@@ -147,7 +147,7 @@ SKILL_CATALOG = {
             "pool_member_enable": {"risk": "medium", "desc": "Return a pool member to service after maintenance"},
             "ssl_expiry_check": {"risk": "low", "desc": "Certificates expiring within N days"},
             "ako_status": {"risk": "low", "desc": "AKO pod status on a Kubernetes context"},
-            "ako_config_upgrade": {"risk": "medium", "desc": "Apply AKO Helm upgrade (dry_run=true by default)"},
+            "ako_config_upgrade": {"risk": "medium", "desc": "Apply AKO Helm upgrade (previews unless confirm=True)"},
             "ako_restart": {"risk": "high", "desc": "Restart the AKO pod"},
             "ako_sync_force": {"risk": "high", "desc": "Force AKO to resync all K8s resources with the Controller"},
         },

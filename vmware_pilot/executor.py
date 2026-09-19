@@ -14,6 +14,7 @@ state ``completed``.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -53,13 +54,58 @@ class _StepReturnedFailure(Exception):
         self.payload = payload if isinstance(payload, dict) else {"error": message}
 
 
+#: What a step that merely previewed is recorded as. Across the family a
+#: destructive tool called without ``confirm=True`` returns
+#: ``{"action": "preview", "blast_radius": ...}`` and changes nothing (HLD §7,
+#: 2026-09-19). Read as success, a forgotten ``confirm`` would record a change
+#: that never happened — and a previewed undo would read as "rolled back".
+_PREVIEW_ONLY = (
+    "step only previewed; nothing was changed. The tool returned "
+    "action='preview' because it was called without confirm=True — the template "
+    "must pass confirm=True (Pilot's approve step is the human decision). The "
+    "preview's blast_radius is kept in this step's result."
+)
+
+
+def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
+    """The dicts a dispatch result may carry at its top level.
+
+    A plain dict, or an MCP ``CallToolResult``'s ``structuredContent`` (and the
+    ``{"result": ...}`` wrapper FastMCP puts around non-object returns), or its
+    single text block when that block is a JSON object. Never recurses: a
+    nested ``action`` is data.
+    """
+    if isinstance(result, dict):
+        return [result]
+    payloads: list[dict[str, Any]] = []
+    structured = getattr(result, "structuredContent", None)
+    if isinstance(structured, dict):
+        payloads.append(structured)
+        if isinstance(structured.get("result"), dict):
+            payloads.append(structured["result"])
+    content = getattr(result, "content", None)
+    if isinstance(content, list) and len(content) == 1:
+        text = getattr(content[0], "text", None)
+        if isinstance(text, str) and text.lstrip().startswith("{"):
+            try:
+                parsed = json.loads(text)
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, dict):
+                payloads.append(parsed)
+    return payloads
+
+
 def _returned_failure(result: Any) -> str | None:
     """Return the failure message if this dispatch result reports failure.
 
     Only a TOP-LEVEL, non-empty ``error`` counts: ``{"error": None}`` is an
     explicit "no error", and an ``error`` nested inside a row (an alarm's
-    ``error_count``, say) is data, not a failed call.
+    ``error_count``, say) is data, not a failed call. A TOP-LEVEL
+    ``"action": "preview"`` is a failure too: the tool changed nothing.
     """
+    if any(p.get("action") == "preview" for p in _top_level_payloads(result)):
+        return _PREVIEW_ONLY
     if getattr(result, "isError", False):
         # Unwrap the content block if there is one: the skill's own teaching
         # message is the useful part, not the repr of the transport object.
@@ -173,8 +219,10 @@ class WorkflowExecutor:
                     f"Step {step.index} ({step.skill}.{step.tool}) was "
                     "interrupted mid-execution by a previous crash. Its side "
                     "effects are unknown — verify the target system state "
-                    "manually, then either rollback() this workflow or create "
-                    "a new plan that retries from a verified state."
+                    "manually, then either rollback() this workflow (it refuses "
+                    "until you pass acknowledge_unknown_effects=True, which says "
+                    "you checked) or create a new plan that retries from a "
+                    "verified state."
                 )
                 return result
 

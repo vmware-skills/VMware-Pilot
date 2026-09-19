@@ -15,6 +15,14 @@ from vmware_pilot.approval_gate import (
     is_custom_workflow,
     refusal,
 )
+from vmware_pilot.lifecycle_gate import (
+    cancel_blast_radius,
+    load_for_gate,
+    rollback_blast_radius,
+)
+from vmware_pilot.lifecycle_gate import (
+    refusal as gate_refusal,
+)
 from vmware_pilot.mcp_server._shared import _get_executor, _get_store, _safe_error, mcp
 from vmware_pilot.models import WorkflowState
 from vmware_pilot.review import review as _review_workflow_impl
@@ -40,8 +48,8 @@ def plan_workflow(
 
     Use this when the goal matches one of the built-in types below; use
     create_workflow instead when none of them fit. A custom YAML template whose
-    destructive or unclassifiable step has no require_approval gate before it
-    is refused, naming the step and the file to fix.
+    destructive or unclassifiable step (or step passing confirm=True) has no
+    require_approval gate before it is refused, naming the step and the file to fix.
 
     Available workflow types:
       - clone_and_test: Clone VM → apply changes → monitor → approve → commit
@@ -182,10 +190,13 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
         gate_findings = [
             f for f in review_result.get("findings", []) if f.get("kind") in GATE_FINDING_KINDS
         ]
-        if is_custom_workflow(wf) and gate_findings:
+        # gate_violations also holds confirm_without_approval, which review()
+        # does not report — a workflow stored by an earlier version can carry it.
+        violations = gate_violations(wf) if is_custom_workflow(wf) else ()
+        if violations:
             payload = refusal(
                 wf.workflow_type,
-                gate_violations(wf),
+                violations,
                 verb="run",
                 retry=(
                     "cancel_workflow this one and create_workflow the corrected steps "
@@ -311,8 +322,21 @@ def approve(workflow_id: str, approver: str = "") -> dict:
     }
 )
 @vmware_tool(risk_level="high")
-def rollback(workflow_id: str) -> dict:
+def rollback(
+    workflow_id: str, confirm: bool = False, acknowledge_unknown_effects: bool = False
+) -> dict:
     """[WRITE] Abort a workflow and rollback completed steps in reverse order.
+
+    Without confirm=True this only previews: it returns blast_radius — the
+    workflow's id, type and state, the executed steps whose rollback_tool would
+    run with its rollback_params, secrets redacted (would_roll_back — these
+    often carry confirm=True, and this call's confirm=True is the decision to
+    run them), the executed steps that have none and stay applied
+    (left_in_place), steps you performed from pending_dispatch that Pilot will
+    not reverse (not_reversed_by_pilot), steps with unknown effects, and
+    blockers — and changes nothing. Show that to the user and get their
+    explicit decision. Do not set confirm=True on your own because the user
+    asked for a rollback earlier — the user has not seen the preview yet.
 
     Nothing rolls back automatically: a failed step leaves the workflow
     'failed' and stops. This tool is the explicit, best-effort undo, and it
@@ -322,26 +346,50 @@ def rollback(workflow_id: str) -> dict:
     one's rollback_tool with its rollback_params yourself, last step first.
     Embedders that pass a dispatcher to WorkflowExecutor get those calls made
     for them. Steps without a rollback_tool are skipped; a failed undo does not
-    stop the rest. Works in any state except draft, completed, rolling_back or
-    cancelled. The workflow state is set to 'failed' afterwards.
+    stop the rest. The workflow state is set to 'failed' afterwards.
+
+    Refused with confirm=True: a workflow in draft, completed, rolling_back or
+    cancelled state, a step whose status Pilot does not recognise, a workflow
+    record that cannot be read, and — unless acknowledge_unknown_effects=True —
+    a step left 'running' or 'interrupted' by a Pilot process that stopped
+    mid-dispatch (listed in unknown_effects).
 
     Args:
         workflow_id: The workflow ID to rollback.
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
+        acknowledge_unknown_effects: Set True only after the user has checked, in
+            the target system, whether each unknown_effects step took effect.
+            Covers only those steps; every other refusal still applies.
 
     Returns:
-        Rollback results for each step pilot recorded as succeeded. Check
+        Preview: {"action": "preview", "blast_radius", "hint"}. Acting: the
+        workflow state with "action": "rolled_back", rollback_results for each
+        step pilot recorded as succeeded, and blast_radius. Check
         get_workflow_status afterwards to see which steps were actually
         reversed and which were skipped.
     """
     try:
-        wf = _get_store().load(workflow_id)
-        if not wf:
-            return {"error": f"Workflow '{workflow_id}' not found"}
+        wf, unreadable = load_for_gate(_get_store(), workflow_id, "rollback")
+        if wf is None:
+            return unreadable or {"error": f"Workflow '{workflow_id}' not found"}
 
-        if wf.state == WorkflowState.COMPLETED:
-            return {"error": f"Workflow '{workflow_id}' is already completed, cannot rollback"}
+        radius = rollback_blast_radius(wf, acknowledge_unknown_effects)
+        if not confirm:
+            return {
+                "action": "preview",
+                "workflow_id": workflow_id,
+                "blast_radius": radius,
+                "hint": "Nothing was rolled back. Show blast_radius to the user; to roll "
+                "back, re-run with confirm=True after their explicit decision.",
+            }
+        refused = gate_refusal("roll back", wf, radius)
+        if refused:
+            return refused
 
-        return _get_executor().rollback(wf)
+        result = _get_executor().rollback(wf)
+        if "error" in result:
+            return {**result, "blast_radius": radius}
+        return {**result, "action": "rolled_back", "blast_radius": radius}
     except Exception as e:
         return {
             "error": _safe_error(e, "rollback"),
@@ -353,13 +401,18 @@ def rollback(workflow_id: str) -> dict:
 @mcp.tool(
     annotations={
         "readOnlyHint": False,
-        "destructiveHint": False,
+        "destructiveHint": True,
         "idempotentHint": False,
         "openWorldHint": True,
     }
 )
 @vmware_tool(risk_level="high")
-def cancel_workflow(workflow_id: str, reason: str = "") -> dict:
+def cancel_workflow(
+    workflow_id: str,
+    reason: str = "",
+    confirm: bool = False,
+    acknowledge_unknown_effects: bool = False,
+) -> dict:
     """[WRITE] Cancel a workflow — move it to the terminal CANCELLED state.
 
     Use this when an approval is REJECTED, a review flags the plan as unsafe,
@@ -367,26 +420,59 @@ def cancel_workflow(workflow_id: str, reason: str = "") -> dict:
     is dead: run_workflow and approve refuse to execute it. Without this, an
     approval-rejected PENDING workflow could still be picked up and run.
 
+    Without confirm=True this only previews: it returns blast_radius — the
+    workflow's id, type and state, the executed steps that stay applied
+    (left_in_place: cancelling part-way leaves a half-applied change), the
+    steps that would be skipped (would_skip), steps with unknown effects, and
+    blockers — and changes nothing. Show that to the user and get their
+    explicit decision. Do not set confirm=True on your own because the user
+    asked to cancel earlier — the user has not seen the preview yet.
+
     Cancel only stops FUTURE steps. It does NOT undo already-completed steps —
-    use rollback() to reverse those. Cancel is valid only from a non-terminal
-    state; cancelling an already completed/failed/cancelled workflow returns a
-    teaching error. The cancellation is written to the workflow audit log.
+    use rollback() to reverse those. Refused with confirm=True: an already
+    completed/failed/cancelled workflow, a step whose status Pilot does not
+    recognise, a workflow record that cannot be read, and — unless
+    acknowledge_unknown_effects=True — a step left 'running' or 'interrupted'
+    (listed in unknown_effects). The cancellation is written to the workflow
+    audit log.
 
     Args:
         workflow_id: The workflow ID to cancel.
         reason: Optional human-readable reason (e.g. "approval rejected by
             on-call"), recorded in the audit log.
+        confirm: False (default) returns the blast radius and changes nothing. True applies it.
+        acknowledge_unknown_effects: Set True only after the user has checked, in
+            the target system, whether each unknown_effects step took effect.
+            Covers only those steps; every other refusal still applies.
 
     Returns:
-        Updated workflow state (state='cancelled', outcome='cancelled'), or an
-        error if the workflow is already terminal.
+        Preview: {"action": "preview", "blast_radius", "hint"}. Acting: the
+        workflow state (state='cancelled', outcome='cancelled',
+        action='cancelled') with blast_radius, or an error if refused.
     """
     try:
-        wf = _get_store().load(workflow_id)
-        if not wf:
-            return {"error": f"Workflow '{workflow_id}' not found"}
+        wf, unreadable = load_for_gate(_get_store(), workflow_id, "cancel_workflow")
+        if wf is None:
+            return unreadable or {"error": f"Workflow '{workflow_id}' not found"}
 
-        return _get_executor().cancel(wf, reason=reason)
+        radius = cancel_blast_radius(wf, acknowledge_unknown_effects)
+        if not confirm:
+            return {
+                "action": "preview",
+                "workflow_id": workflow_id,
+                "blast_radius": radius,
+                "hint": "Nothing was cancelled. Show blast_radius to the user (left_in_place "
+                "stays applied — rollback reverses what can be reversed); to cancel, re-run "
+                "with confirm=True after their explicit decision.",
+            }
+        refused = gate_refusal("cancel", wf, radius)
+        if refused:
+            return refused
+
+        result = _get_executor().cancel(wf, reason=reason)
+        if "error" in result:
+            return {**result, "blast_radius": radius}
+        return {**result, "action": "cancelled", "blast_radius": radius}
     except Exception as e:
         return {
             "error": _safe_error(e, "cancel_workflow"),

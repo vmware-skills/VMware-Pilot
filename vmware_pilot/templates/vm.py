@@ -13,6 +13,7 @@ from vmware_pilot.templates._common import (
     new_workflow_id,
     timezone,
 )
+from vmware_pilot.templates._gated import confirmed_params
 
 
 def _guest_gate(change_params: dict[str, Any], staging_name: str) -> dict[str, Any]:
@@ -79,7 +80,9 @@ def clone_and_test(
                 "target": target,
             },
             "rollback_tool": "vm_power_off",
-            "rollback_params": {"vm_name": staging_name, "force": True, "target": target},
+            "rollback_params": {
+                "vm_name": staging_name, "force": True, "target": target, "confirm": True,
+            },
         },
         # vm_guest_exec is destructive (aiops publishes destructiveHint=True), and
         # the approval at the end comes after it has already run in staging.
@@ -88,7 +91,9 @@ def clone_and_test(
             "action": "apply_changes",
             "skill": "aiops",
             "tool": tool,
-            "params": {"vm_name": staging_name, **change_params, "target": target},
+            "params": confirmed_params(
+                "aiops", tool, {"vm_name": staging_name, **change_params, "target": target}
+            ),
         },
         {
             "action": "monitor",
@@ -106,13 +111,15 @@ def clone_and_test(
             "action": "apply_to_production",
             "skill": "aiops",
             "tool": tool,
-            "params": {"vm_name": target_vm, **change_params, "target": target},
+            "params": confirmed_params(
+                "aiops", tool, {"vm_name": target_vm, **change_params, "target": target}
+            ),
         },
         {
             "action": "cleanup",
             "skill": "aiops",
             "tool": "vm_power_off",
-            "params": {"vm_name": staging_name, "force": True, "target": target},
+            "params": {"vm_name": staging_name, "force": True, "target": target, "confirm": True},
         },
     ]
     steps = [WorkflowStep(index=i, **spec) for i, spec in enumerate(specs)]
@@ -193,9 +200,11 @@ def plan_and_approve(
             action="apply_plan",
             skill="aiops",
             tool="vm_apply_plan",
-            params={"plan_id": "__from_step_0__:plan_id", "target": target},
+            params={"plan_id": "__from_step_0__:plan_id", "target": target, "confirm": True},
             rollback_tool="vm_rollback_plan",
-            rollback_params={"plan_id": "__from_step_0__:plan_id", "target": target},
+            rollback_params={
+                "plan_id": "__from_step_0__:plan_id", "target": target, "confirm": True,
+            },
         ),
     ]
 
@@ -263,7 +272,7 @@ def rolling_restart(
                 action=f"power_off_{vm}",
                 skill="aiops",
                 tool="vm_power_off",
-                params={"vm_name": vm, "force": False, "target": target},
+                params={"vm_name": vm, "force": False, "target": target, "confirm": True},
                 rollback_tool="vm_power_on",
                 rollback_params={"vm_name": vm, "target": target},
             )
@@ -415,7 +424,12 @@ def disaster_recovery(
             action="revert_snapshot",
             skill="aiops",
             tool="vm_clean_slate",
-            params={"vm_name": vm_name, "snapshot_name": snapshot_name, "target": target},
+            params={
+                "vm_name": vm_name,
+                "snapshot_name": snapshot_name,
+                "target": target,
+                "confirm": True,
+            },
         ),
         WorkflowStep(
             index=2,
@@ -504,6 +518,7 @@ def patch_deployment(
                     "username": username,
                     "password": password,
                     "target": target,
+                    "confirm": True,
                 },
             )
         )
@@ -521,6 +536,7 @@ def patch_deployment(
                     "username": username,
                     "password": password,
                     "target": target,
+                    "confirm": True,
                 },
             )
         )

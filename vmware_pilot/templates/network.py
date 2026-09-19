@@ -26,6 +26,10 @@ def network_segment_setup(
 ) -> Workflow:
     """Set up a complete app network: segment + gateway + NAT + firewall.
 
+    Known limitation (not restructured; see RELEASE_NOTES "Known and not
+    fixed"): every NSX create runs before the only approval step, which
+    guards only the final verification.
+
     Steps:
       1. Create Tier-1 gateway (if tier1_id provided)
       2. Create network segment
@@ -52,7 +56,7 @@ def network_segment_setup(
                     "target": target,
                 },
                 rollback_tool="delete_tier1_gateway",
-                rollback_params={"tier1_id": tier1_id, "target": target},
+                rollback_params={"tier1_id": tier1_id, "target": target, "confirm": True},
             )
         )
         idx += 1
@@ -71,7 +75,7 @@ def network_segment_setup(
                 "target": target,
             },
             rollback_tool="delete_segment",
-            rollback_params={"segment_id": segment_id, "target": target},
+            rollback_params={"segment_id": segment_id, "target": target, "confirm": True},
         )
     )
     idx += 1
@@ -96,6 +100,7 @@ def network_segment_setup(
                     "tier1_id": tier1_id,
                     "rule_id": f"{segment_id}-snat",
                     "target": target,
+                    "confirm": True,
                 },
             )
         )
@@ -114,7 +119,7 @@ def network_segment_setup(
                     "target": target,
                 },
                 rollback_tool="delete_dfw_policy",
-                rollback_params={"policy_id": dfw_policy_id, "target": target},
+                rollback_params={"policy_id": dfw_policy_id, "target": target, "confirm": True},
             )
         )
         idx += 1

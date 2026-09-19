@@ -44,8 +44,8 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `run_workflow` | 执行工作流，在审批门控处暂停 |
 | `get_workflow_status` | 查询状态 + 差异报告 + 审计日志 |
 | `approve` | 人工审批，继续执行 |
-| `rollback` | 显式、尽力而为地逆序撤销 pilot 记录为成功的步骤——从不自动执行 |
-| `cancel_workflow` | 取消工作流，置为终态 CANCELLED |
+| `rollback` | 显式、尽力而为地逆序撤销 pilot 记录为成功的步骤——从不自动执行。不带 `confirm=True` 时只预览（`blast_radius`） |
+| `cancel_workflow` | 取消工作流，置为终态 CANCELLED。不带 `confirm=True` 时只预览（`blast_radius`） |
 
 ## 内置模板（15 个）
 
@@ -61,7 +61,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `plan_and_approve` | 3 | 是 | aiops |
 | `compliance_scan` | 1-3 | 否 | monitor, aria |
 | `network_segment_setup` | 3-6 | 是 | nsx, nsx-security |
-| `vks_cluster_deploy` | 4 | 是 | vks |
+| `vks_cluster_deploy` | 5 | 是 | vks |
 | `rolling_restart` | 2+3n | 是 | aiops, monitor |
 | `capacity_expansion` | 5 | 是 | aria, aiops, monitor |
 | `disaster_recovery` | 5 | 是 | aiops, monitor, nsx |

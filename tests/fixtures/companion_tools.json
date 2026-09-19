@@ -129,6 +129,7 @@
   },
   "cluster_delete": {
    "properties": [
+    "confirm",
     "name",
     "target"
    ],
@@ -157,6 +158,7 @@
   "cluster_remove_host": {
    "properties": [
     "cluster_name",
+    "confirm",
     "host_name",
     "target"
    ],
@@ -392,6 +394,7 @@
   },
   "vm_apply_plan": {
    "properties": [
+    "confirm",
     "plan_id",
     "target"
    ],
@@ -409,6 +412,7 @@
   },
   "vm_clean_slate": {
    "properties": [
+    "confirm",
     "snapshot_name",
     "target",
     "vm_name"
@@ -482,6 +486,7 @@
   },
   "vm_delete_snapshot": {
    "properties": [
+    "confirm",
     "remove_children",
     "snapshot_name",
     "target",
@@ -514,6 +519,7 @@
    "properties": [
     "arguments",
     "command",
+    "confirm",
     "password",
     "target",
     "username",
@@ -529,6 +535,7 @@
   "vm_guest_exec_output": {
    "properties": [
     "command",
+    "confirm",
     "password",
     "target",
     "timeout",
@@ -543,6 +550,7 @@
   },
   "vm_guest_provision": {
    "properties": [
+    "confirm",
     "password",
     "steps",
     "target",
@@ -559,6 +567,7 @@
   },
   "vm_guest_upload": {
    "properties": [
+    "confirm",
     "guest_path",
     "local_path",
     "password",
@@ -602,6 +611,7 @@
   },
   "vm_migrate": {
    "properties": [
+    "confirm",
     "target",
     "to_datastore",
     "to_host",
@@ -614,6 +624,7 @@
   },
   "vm_power_off": {
    "properties": [
+    "confirm",
     "force",
     "target",
     "vm_name"
@@ -644,6 +655,7 @@
   },
   "vm_revert_snapshot": {
    "properties": [
+    "confirm",
     "snapshot_name",
     "target",
     "vm_name"
@@ -655,6 +667,7 @@
   },
   "vm_rollback_plan": {
    "properties": [
+    "confirm",
     "plan_id",
     "target"
    ],
@@ -664,6 +677,7 @@
   },
   "vm_set_ttl": {
    "properties": [
+    "confirm",
     "minutes",
     "target",
     "vm_name"
@@ -704,6 +718,7 @@
   "acknowledge_alert": {
    "properties": [
     "alert_id",
+    "confirm",
     "confirmed",
     "target"
    ],
@@ -725,6 +740,7 @@
   "cancel_alert": {
    "properties": [
     "alert_id",
+    "confirm",
     "confirmed",
     "target"
    ],
@@ -751,6 +767,7 @@
   },
   "delete_alert_definition": {
    "properties": [
+    "confirm",
     "confirmed",
     "definition_id",
     "target"
@@ -761,6 +778,7 @@
   },
   "delete_report": {
    "properties": [
+    "confirm",
     "confirmed",
     "report_id",
     "target"
@@ -771,6 +789,7 @@
   },
   "end_resource_maintenance": {
    "properties": [
+    "confirm",
     "confirmed",
     "resource_id",
     "target"
@@ -1118,6 +1137,7 @@
   },
   "start_resource_maintenance": {
    "properties": [
+    "confirm",
     "confirmed",
     "duration_minutes",
     "end_time_ms",
@@ -1151,6 +1171,7 @@
   "ako_config_upgrade": {
    "properties": [
     "chart_version",
+    "confirm",
     "confirmed",
     "dry_run"
    ],
@@ -1191,6 +1212,7 @@
   },
   "ako_restart": {
    "properties": [
+    "confirm",
     "confirmed",
     "context"
    ],
@@ -1210,6 +1232,7 @@
   },
   "ako_sync_force": {
    "properties": [
+    "confirm",
     "confirmed",
     "context"
    ],
@@ -1235,6 +1258,7 @@
   },
   "pool_member_disable": {
    "properties": [
+    "confirm",
     "confirmed",
     "pool",
     "server"
@@ -1313,6 +1337,7 @@
   },
   "vs_toggle": {
    "properties": [
+    "confirm",
     "confirmed",
     "enable",
     "name"
@@ -1950,6 +1975,7 @@
   },
   "delete_ip_pool": {
    "properties": [
+    "confirm",
     "pool_id",
     "target"
    ],
@@ -1959,6 +1985,7 @@
   },
   "delete_nat_rule": {
    "properties": [
+    "confirm",
     "rule_id",
     "target",
     "tier1_id"
@@ -1970,6 +1997,7 @@
   },
   "delete_segment": {
    "properties": [
+    "confirm",
     "segment_id",
     "target"
    ],
@@ -1979,6 +2007,7 @@
   },
   "delete_static_route": {
    "properties": [
+    "confirm",
     "gateway_type",
     "route_id",
     "target",
@@ -1991,6 +2020,7 @@
   },
   "delete_tier1_gateway": {
    "properties": [
+    "confirm",
     "target",
     "tier1_id"
    ],
@@ -2268,6 +2298,7 @@
   },
   "delete_dfw_policy": {
    "properties": [
+    "confirm",
     "policy_id",
     "target"
    ],
@@ -2277,6 +2308,7 @@
   },
   "delete_dfw_rule": {
    "properties": [
+    "confirm",
     "policy_id",
     "rule_id",
     "target"
@@ -2288,6 +2320,7 @@
   },
   "delete_group": {
    "properties": [
+    "confirm",
     "group_id",
     "target"
    ],
@@ -2681,6 +2714,7 @@
   "storage_iscsi_add_target": {
    "properties": [
     "address",
+    "confirm",
     "dry_run",
     "host_name",
     "port",
@@ -2693,6 +2727,7 @@
   },
   "storage_iscsi_enable": {
    "properties": [
+    "confirm",
     "dry_run",
     "host_name",
     "target"
@@ -2704,6 +2739,7 @@
   "storage_iscsi_remove_target": {
    "properties": [
     "address",
+    "confirm",
     "dry_run",
     "host_name",
     "port",
@@ -2725,6 +2761,7 @@
   },
   "storage_rescan": {
    "properties": [
+    "confirm",
     "dry_run",
     "host_name",
     "target"
@@ -3033,6 +3070,7 @@
   "create_namespace": {
    "properties": [
     "cluster_id",
+    "confirm",
     "cpu_limit",
     "description",
     "dry_run",
@@ -3049,6 +3087,7 @@
   },
   "create_tkc_cluster": {
    "properties": [
+    "confirm",
     "control_plane_count",
     "dry_run",
     "k8s_version",
@@ -3068,6 +3107,7 @@
   },
   "delete_namespace": {
    "properties": [
+    "confirm",
     "confirmed",
     "dry_run",
     "name",
@@ -3079,6 +3119,7 @@
   },
   "delete_tkc_cluster": {
    "properties": [
+    "confirm",
     "confirmed",
     "dry_run",
     "force",

@@ -73,8 +73,8 @@ pip install --no-index --find-links dist vmware-pilot
 | `run_workflow` | Execute workflow, pauses at approval gates |
 | `get_workflow_status` | Query state + diff report + audit log |
 | `approve` | Human approval, continue execution |
-| `rollback` | Explicit, best-effort undo of steps pilot recorded as succeeded — never automatic |
-| `cancel_workflow` | Cancel a workflow — move it to the terminal CANCELLED state |
+| `rollback` | Explicit, best-effort undo of steps pilot recorded as succeeded — never automatic. Previews (`blast_radius`) unless `confirm=True` |
+| `cancel_workflow` | Cancel a workflow — move it to the terminal CANCELLED state. Previews (`blast_radius`) unless `confirm=True` |
 
 ## Built-in Templates (15)
 
@@ -91,7 +91,7 @@ See `skills/vmware-pilot/references/templates.md` for parameters and steps.
 | `plan_and_approve` | 3 | Yes | aiops |
 | `compliance_scan` | 1-3 | No | monitor, aria |
 | `network_segment_setup` | 3-6 | Yes | nsx, nsx-security |
-| `vks_cluster_deploy` | 4 | Yes | vks |
+| `vks_cluster_deploy` | 5 | Yes | vks |
 | `rolling_restart` | 2+3n | Yes | aiops, monitor |
 | `capacity_expansion` | 5 | Yes | aria, aiops, monitor |
 | `disaster_recovery` | 5 | Yes | aiops, monitor, nsx |

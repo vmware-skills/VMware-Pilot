@@ -19,12 +19,12 @@ client.
 
 ```bash
 # Recommended: installed entry point, never touches the network
-uv tool install vmware-pilot==1.11.1
+uv tool install vmware-pilot==1.12.0
 vmware-pilot mcp
 
 # Fallback: uvx re-resolves against PyPI each start and fails behind a
 # TLS-inspecting corporate proxy — set UV_NATIVE_TLS=true if you must use it
-uvx --from vmware-pilot==1.11.1 vmware-pilot-mcp
+uvx --from vmware-pilot==1.12.0 vmware-pilot-mcp
 ```
 
 The server runs on **stdio** transport and exposes 13 MCP tools (4 read, 9 write).
@@ -158,8 +158,20 @@ are `not_executed`, so undo them yourself with each step's `rollback_tool`.
 
 ```
 rollback(workflow_id="wf-...")
-→ {state: "failed", rollback_results: [...]}
+→ {action: "preview", blast_radius: {would_roll_back: [...], left_in_place: [...], blockers: [], ...}}
+
+rollback(workflow_id="wf-...", confirm=True)   # after the user has seen the preview
+→ {action: "rolled_back", state: "failed", rollback_results: [...], blast_radius: {...}}
 ```
+
+`cancel_workflow(workflow_id, reason, confirm=False)` works the same way: the
+preview lists the executed steps that stay applied and the steps that would be
+skipped; `confirm=True` cancels.
+
+Both refuse `confirm=True` while a step is in `unknown_effects` (left `running`
+or `interrupted` when a Pilot process stopped mid-dispatch). Check in the target
+system whether that step took effect, then re-run with
+`acknowledge_unknown_effects=True`.
 
 #### get_workflow_status
 

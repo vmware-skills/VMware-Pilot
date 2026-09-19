@@ -162,7 +162,7 @@ class TestCancelWorkflow:
                          tool="approve", params={}),
             _step(1, "delete_segment"),
         ], "wf-c1")
-        cancel = server.cancel_workflow("wf-c1", reason="approval rejected")
+        cancel = server.cancel_workflow("wf-c1", reason="approval rejected", confirm=True)
         assert cancel["state"] == "cancelled"
 
         run = server.run_workflow("wf-c1")
@@ -179,7 +179,7 @@ class TestCancelWorkflow:
         wf = _save(store, [_step(0, "list_segments")], "wf-c2")
         wf.state = WorkflowState.COMPLETED
         store.save(wf)
-        result = server.cancel_workflow("wf-c2")
+        result = server.cancel_workflow("wf-c2", confirm=True)
         assert "error" in result
         assert "terminal" in result["error"]
 
