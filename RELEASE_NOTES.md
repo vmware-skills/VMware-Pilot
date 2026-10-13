@@ -1,3 +1,10 @@
+## v1.12.1 — `reset_vcenter_alarm` is labelled high risk
+
+* vmware-aiops 1.12.1 publishes `reset_vcenter_alarm` with `destructiveHint: True` (vSphere has no per-alarm clear;
+  it clears every triggered alarm with the named one's status and entity type). The catalog now labels it `high`,
+  matching the annotation, like the other destructive aiops tools. The companion-tool snapshot picks up its new
+  `confirm` parameter; a workflow step that passes `confirm=True` still needs an approval step before it.
+
 ## v1.12.0 — rollback and cancel_workflow preview first; templates pass confirm=True
 
 **Breaking for callers: `rollback` and `cancel_workflow` no longer act on the first call.** Both take
