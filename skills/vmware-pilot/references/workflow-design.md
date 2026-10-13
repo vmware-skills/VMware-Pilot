@@ -105,7 +105,7 @@ custom workflow, or pilot refuses the workflow. `medium` writes need no gate.
 | `batch_clone_vms` | medium | Clone multiple VMs at once |
 | `vm_clean_slate` | high | Revert VM to snapshot |
 | `acknowledge_vcenter_alarm` | medium | Acknowledge an alarm |
-| `reset_vcenter_alarm` | medium | Reset an alarm |
+| `reset_vcenter_alarm` | high | Clear triggered alarms — every one with the named alarm's status and entity type |
 | `cluster_create` | medium | Create a new cluster |
 | `deploy_vm_from_ova` | medium | Deploy from OVA |
 | `deploy_vm_from_template` | medium | Deploy from template |

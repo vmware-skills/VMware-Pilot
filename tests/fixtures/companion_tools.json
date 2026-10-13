@@ -348,6 +348,7 @@
   "reset_vcenter_alarm": {
    "properties": [
     "alarm_name",
+    "confirm",
     "entity_name",
     "target"
    ],

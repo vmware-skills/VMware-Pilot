@@ -42,7 +42,10 @@ SKILL_CATALOG = {
             "cluster_create": {"risk": "medium", "desc": "Create cluster with HA/DRS"},
             "cluster_delete": {"risk": "high", "desc": "Delete empty cluster"},
             "acknowledge_vcenter_alarm": {"risk": "medium", "desc": "Acknowledge alarm"},
-            "reset_vcenter_alarm": {"risk": "medium", "desc": "Clear alarm"},
+            # risk high since aiops 1.12.1 publishes it destructiveHint=True:
+            # vSphere has no per-alarm clear, so it clears every triggered alarm
+            # with the named one's status and entity type, not only the one named.
+            "reset_vcenter_alarm": {"risk": "high", "desc": "Clear triggered alarms (all matching status + entity type)"},
         },
     },
     "monitor": {
