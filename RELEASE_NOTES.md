@@ -9,9 +9,10 @@
   own skill when Pilot builds the step, so review, the approval gate, dispatch and rollback all see the
   new name. A name Pilot does not know is still refused as before. `validate_workflow.py` warns about
   each old name in a file and names its replacement.
-* vmware-debug's `record_case_timeline` is in the catalog at `medium`: it writes `timeline.md`, and its
-  new `get` prefix would otherwise read as an inspection.
-* Requires vmware-policy ≥ 1.18.0 (the rename table comes from `vmware_policy.renames`).
+* vmware-debug's `record_case_timeline` is in the catalog at `medium`: it writes `timeline.md` (a write the
+  catalog must label, not an inspection).
+* Requires vmware-policy ≥ 1.18.1 (the rename table comes from `vmware_policy.renames`; 1.18.1 carries
+  `case_timeline` → `record_case_timeline`).
 
 ## v1.12.1 — `reset_vcenter_alarm` is labelled high risk
 
