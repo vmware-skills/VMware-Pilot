@@ -121,7 +121,7 @@ plan_workflow("incident_response", {
 | `target` | str | No | vCenter target name |
 | `description` | str | No | Human-readable description |
 
-**Supported operations**: `power_on`, `power_off`, `reset`, `clone`, `deploy_ova`, `deploy_template`, `linked_clone`, `create_snapshot`, `delete_snapshot`, `revert_snapshot`.
+**Supported operations** (values of the step's `operation` field, not MCP tool names): power_on, power_off, reset, clone, deploy_ova, deploy_template, linked_clone, create_snapshot, delete_snapshot, revert_snapshot.
 
 **Example**:
 ```
