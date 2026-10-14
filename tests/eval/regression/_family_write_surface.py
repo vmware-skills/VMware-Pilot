@@ -58,7 +58,7 @@ FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
     }),
     "debug": frozenset({
         "close_case", "grade_case", "record_case_hypothesis", "open_case", "record_case_gap",
-        "submit_case_evidence", "get_case_timeline",
+        "submit_case_evidence", "record_case_timeline",
     }),
     "nsx": frozenset({
         "configure_tier0_bgp", "create_ip_pool", "create_nat_rule", "create_segment",

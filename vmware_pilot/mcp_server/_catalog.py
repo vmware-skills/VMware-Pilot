@@ -175,7 +175,7 @@ SKILL_CATALOG = {
             # inspection. It writes timeline.md into the case folder
             # (readOnlyHint=False); debug publishes it at low, and a write is
             # never labelled low here.
-            "get_case_timeline": {"risk": "medium", "desc": "Correlate a case's evidence; writes timeline.md"},
+            "record_case_timeline": {"risk": "medium", "desc": "Correlate a case's evidence; writes timeline.md"},
         },
     },
     "harden": {

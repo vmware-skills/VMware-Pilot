@@ -1389,17 +1389,6 @@
    ],
    "required": []
   },
-  "get_case_timeline": {
-   "properties": [
-    "bin_seconds",
-    "case_id",
-    "top_n",
-    "z_threshold"
-   ],
-   "required": [
-    "case_id"
-   ]
-  },
   "grade_case": {
    "properties": [
     "case_id"
@@ -1463,6 +1452,17 @@
    "properties": [
     "case_id",
     "statement"
+   ],
+   "required": [
+    "case_id"
+   ]
+  },
+  "record_case_timeline": {
+   "properties": [
+    "bin_seconds",
+    "case_id",
+    "top_n",
+    "z_threshold"
    ],
    "required": [
     "case_id"

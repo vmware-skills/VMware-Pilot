@@ -54,7 +54,7 @@ FAMILY_TOOLS: dict[str, frozenset[str]] = {
     }),
     'vmware-debug': frozenset({
         'build_incident_timeline', 'close_case', 'get_case', 'get_case_knowledge',
-        'get_case_readiness', 'get_case_timeline', 'grade_case', 'list_cases',
+        'get_case_readiness', 'record_case_timeline', 'grade_case', 'list_cases',
         'list_symptom_categories', 'open_case', 'plan_case', 'record_case_gap',
         'record_case_hypothesis', 'submit_case_evidence',
     }),
