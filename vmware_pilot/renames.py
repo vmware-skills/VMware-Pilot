@@ -24,8 +24,8 @@ _log = logging.getLogger("vmware-pilot.renames")
 
 
 def _server(skill: str) -> str:
-    """``"aiops"`` / ``"vmware-aiops"`` / ``"log_insight"`` -> ``"vmware-<skill>"``."""
-    bare = skill.strip().lower().removeprefix("vmware-").replace("_", "-")
+    """``"aiops"`` / ``"vmware-aiops"`` / ``"vmware_aiops"`` / ``"log_insight"`` -> ``"vmware-<skill>"``."""
+    bare = skill.strip().lower().replace("_", "-").removeprefix("vmware-")
     return f"vmware-{bare}"
 
 

@@ -239,3 +239,11 @@ def test_validate_script_names_the_new_tool_and_says_to_rename(tmp_path):
     assert any("'pool_list' is the pre-2.0 name of vdi's 'list_desktop_pools'" in w
                for w in warnings), warnings
     assert not any("not in the catalog" in w and "power_off_vm" in w for w in warnings)
+
+
+@pytest.mark.parametrize("skill", ["aiops", "vmware-aiops", "vmware_aiops", "VMware-AIops"])
+def test_every_spelling_of_the_skill_translates(skill):
+    """A step may name its skill with the package spelling (vmware_aiops); found by the 2.0 integration review."""
+    from vmware_pilot.renames import current_tool_name
+
+    assert current_tool_name(skill, "vm_delete") == "delete_vm"
