@@ -1,3 +1,18 @@
+## v1.13.0 — companion tools at their 2.0 names
+
+* Ten companion skills renamed their MCP tools verb-first in 2.0 (`vm_power_off` → `power_off_vm`,
+  `pool_list` → `list_lb_pools` in vmware-avi and `list_desktop_pools` in vmware-vdi, …). The skill
+  catalog (`get_skill_catalog`, `design_workflow`) and every built-in template now use the 2.0 names.
+  Pilot's own 13 tools keep their names; risk labels are unchanged.
+* Workflows saved with the old names keep working: a stored workflow, a YAML file in
+  `~/.vmware/workflows/`, a draft and an undo descriptor are translated to the 2.0 name for the step's
+  own skill when Pilot builds the step, so review, the approval gate, dispatch and rollback all see the
+  new name. A name Pilot does not know is still refused as before. `validate_workflow.py` warns about
+  each old name in a file and names its replacement.
+* vmware-debug's `get_case_timeline` is in the catalog at `medium`: it writes `timeline.md`, and its
+  new `get` prefix would otherwise read as an inspection.
+* Requires vmware-policy ≥ 1.18.0 (the rename table comes from `vmware_policy.renames`).
+
 ## v1.12.1 — `reset_vcenter_alarm` is labelled high risk
 
 * vmware-aiops 1.12.1 publishes `reset_vcenter_alarm` with `destructiveHint: True` (vSphere has no per-alarm clear;
