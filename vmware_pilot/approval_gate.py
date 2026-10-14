@@ -16,7 +16,7 @@ own ``ungated_destructive`` / ``ungated_unclassified`` findings, which come from
 here is how the helper script ended up with its own, shorter one.
 
 Medium-risk writes (the catalog's ``write`` tier — create_segment,
-vm_power_on, …) are deliberately *not* in that set; see the ``review`` module
+power_on_vm, …) are deliberately *not* in that set; see the ``review`` module
 docstring for why, and for the built-in templates that depend on it.
 
 One rule is not about the tier: a step whose params tell a gated tool to act

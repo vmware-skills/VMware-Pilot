@@ -55,10 +55,10 @@ def clone_and_test(
         target_vm: Production VM name to clone.
         change_spec: What to apply. Either a resize — ``cpu`` and/or
             ``memory_mb`` (``memory_gb`` is converted to ``memory_mb``) — applied
-            with aiops ``vm_reconfigure``; or one guest command — ``command``,
+            with aiops ``reconfigure_vm``; or one guest command — ``command``,
             ``username`` (required, no default account), ``password``, optional
             ``arguments`` / ``working_directory`` — applied with aiops
-            ``vm_guest_exec``. Anything the chosen tool would reject is refused
+            ``run_vm_guest_command``. Anything the chosen tool would reject is refused
             here, before the staging clone exists.
         monitor_minutes: How long to monitor staging (default 5).
         target: vCenter target name.
@@ -79,14 +79,14 @@ def clone_and_test(
                 "power_on": True,
                 "target": target,
             },
-            "rollback_tool": "vm_power_off",
+            "rollback_tool": "power_off_vm",
             "rollback_params": {
                 "vm_name": staging_name, "force": True, "target": target, "confirm": True,
             },
         },
-        # vm_guest_exec is destructive (aiops publishes destructiveHint=True), and
+        # run_vm_guest_command is destructive (aiops publishes destructiveHint=True), and
         # the approval at the end comes after it has already run in staging.
-        *([_guest_gate(change_params, staging_name)] if tool == "vm_guest_exec" else []),
+        *([_guest_gate(change_params, staging_name)] if tool == "run_vm_guest_command" else []),
         {
             "action": "apply_changes",
             "skill": "aiops",
@@ -118,7 +118,7 @@ def clone_and_test(
         {
             "action": "cleanup",
             "skill": "aiops",
-            "tool": "vm_power_off",
+            "tool": "power_off_vm",
             "params": {"vm_name": staging_name, "force": True, "target": target, "confirm": True},
         },
     ]
@@ -148,7 +148,7 @@ def plan_and_approve(
 ) -> Workflow:
     """Wrap aiops Plan→Apply with an approval gate.
 
-    Uses aiops's existing vm_create_plan / vm_apply_plan / vm_rollback_plan
+    Uses aiops's existing create_vm_plan / apply_vm_plan / rollback_vm_plan
     but inserts a human approval step between plan creation and execution.
 
     This is the bridge between aiops's single-skill batch operations and
@@ -162,7 +162,7 @@ def plan_and_approve(
     On failure at step 3, the workflow exposes aiops's rollback capability.
 
     Args:
-        operations: List of operation dicts for vm_create_plan. Each has
+        operations: List of operation dicts for create_vm_plan. Each has
             "action" key plus action-specific params. Allowed actions:
             power_on, power_off, reset, clone, deploy_ova, deploy_template,
             linked_clone, create_snapshot, delete_snapshot, revert_snapshot, etc.
@@ -185,7 +185,7 @@ def plan_and_approve(
             index=0,
             action="create_plan",
             skill="aiops",
-            tool="vm_create_plan",
+            tool="create_vm_plan",
             params={"operations": operations, "target": target},
         ),
         WorkflowStep(
@@ -199,9 +199,9 @@ def plan_and_approve(
             index=2,
             action="apply_plan",
             skill="aiops",
-            tool="vm_apply_plan",
+            tool="apply_vm_plan",
             params={"plan_id": "__from_step_0__:plan_id", "target": target, "confirm": True},
-            rollback_tool="vm_rollback_plan",
+            rollback_tool="rollback_vm_plan",
             rollback_params={
                 "plan_id": "__from_step_0__:plan_id", "target": target, "confirm": True,
             },
@@ -271,9 +271,9 @@ def rolling_restart(
                 index=idx,
                 action=f"power_off_{vm}",
                 skill="aiops",
-                tool="vm_power_off",
+                tool="power_off_vm",
                 params={"vm_name": vm, "force": False, "target": target, "confirm": True},
-                rollback_tool="vm_power_on",
+                rollback_tool="power_on_vm",
                 rollback_params={"vm_name": vm, "target": target},
             )
         )
@@ -284,7 +284,7 @@ def rolling_restart(
                 index=idx,
                 action=f"power_on_{vm}",
                 skill="aiops",
-                tool="vm_power_on",
+                tool="power_on_vm",
                 params={"vm_name": vm, "target": target},
             )
         )
@@ -360,7 +360,7 @@ def capacity_expansion(
             index=3,
             action="apply_change",
             skill="aiops",
-            tool="vm_create_plan",
+            tool="create_vm_plan",
             params={
                 "operations": [
                     {
@@ -423,7 +423,7 @@ def disaster_recovery(
             index=1,
             action="revert_snapshot",
             skill="aiops",
-            tool="vm_clean_slate",
+            tool="restore_vm_clean_slate",
             params={
                 "vm_name": vm_name,
                 "snapshot_name": snapshot_name,
@@ -435,7 +435,7 @@ def disaster_recovery(
             index=2,
             action="verify_vm",
             skill="monitor",
-            tool="vm_info",
+            tool="get_vm_info",
             params={"vm_name": vm_name, "target": target},
         ),
         WorkflowStep(
@@ -510,7 +510,7 @@ def patch_deployment(
                 index=idx,
                 action=f"upload_{vm}",
                 skill="aiops",
-                tool="vm_guest_upload",
+                tool="upload_vm_guest_file",
                 params={
                     "vm_name": vm,
                     "local_path": patch_local_path,
@@ -529,7 +529,7 @@ def patch_deployment(
                 index=idx,
                 action=f"install_{vm}",
                 skill="aiops",
-                tool="vm_guest_exec_output",
+                tool="run_vm_guest_command_with_output",
                 params={
                     "vm_name": vm,
                     "command": install_command,

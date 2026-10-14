@@ -33,8 +33,8 @@ class TestExecutor:
         wf = Workflow(
             id="wf-1", workflow_type="test", state=WorkflowState.PENDING,
             steps=[
-                WorkflowStep(index=0, action="step1", skill="aiops", tool="vm_power_on", params={"vm": "a"}),
-                WorkflowStep(index=1, action="step2", skill="aiops", tool="vm_power_off", params={"vm": "a"}),
+                WorkflowStep(index=0, action="step1", skill="aiops", tool="power_on_vm", params={"vm": "a"}),
+                WorkflowStep(index=1, action="step2", skill="aiops", tool="power_off_vm", params={"vm": "a"}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -52,7 +52,7 @@ class TestExecutor:
             steps=[
                 WorkflowStep(index=0, action="clone", skill="aiops", tool="deploy_linked_clone", params={}),
                 WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve", params={"message": "ok?"}),
-                WorkflowStep(index=2, action="commit", skill="aiops", tool="vm_power_on", params={}),
+                WorkflowStep(index=2, action="commit", skill="aiops", tool="power_on_vm", params={}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -74,7 +74,7 @@ class TestExecutor:
             steps=[
                 WorkflowStep(index=0, action="clone", skill="aiops", tool="deploy_linked_clone", params={}),
                 WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve", params={}),
-                WorkflowStep(index=2, action="commit", skill="aiops", tool="vm_power_on", params={}),
+                WorkflowStep(index=2, action="commit", skill="aiops", tool="power_on_vm", params={}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -94,9 +94,9 @@ class TestExecutor:
         wf = Workflow(
             id="wf-4", workflow_type="test", state=WorkflowState.PENDING,
             steps=[
-                WorkflowStep(index=0, action="ok", skill="aiops", tool="vm_power_on", params={}),
+                WorkflowStep(index=0, action="ok", skill="aiops", tool="power_on_vm", params={}),
                 WorkflowStep(index=1, action="fail", skill="aiops", tool="failing_tool", params={}),
-                WorkflowStep(index=2, action="skip", skill="aiops", tool="vm_power_off", params={}),
+                WorkflowStep(index=2, action="skip", skill="aiops", tool="power_off_vm", params={}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -117,10 +117,10 @@ class TestExecutor:
             steps=[
                 WorkflowStep(
                     index=0, action="clone", skill="aiops", tool="deploy_linked_clone", params={},
-                    status="success", rollback_tool="vm_power_off", rollback_params={"vm": "staging"},
+                    status="success", rollback_tool="power_off_vm", rollback_params={"vm": "staging"},
                 ),
                 WorkflowStep(
-                    index=1, action="apply", skill="aiops", tool="vm_reconfigure", params={},
+                    index=1, action="apply", skill="aiops", tool="reconfigure_vm", params={},
                     status="failed",
                 ),
             ],
@@ -142,8 +142,8 @@ class TestNoDispatchHonesty:
         return Workflow(
             id=wf_id, workflow_type="test", state=WorkflowState.PENDING,
             steps=[
-                WorkflowStep(index=0, action="a", skill="aiops", tool="vm_power_on", params={"vm": "x"}),
-                WorkflowStep(index=1, action="b", skill="aiops", tool="vm_power_off", params={"vm": "x"}),
+                WorkflowStep(index=0, action="a", skill="aiops", tool="power_on_vm", params={"vm": "x"}),
+                WorkflowStep(index=1, action="b", skill="aiops", tool="power_off_vm", params={"vm": "x"}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -164,7 +164,7 @@ class TestNoDispatchHonesty:
         pending = result["pending_dispatch"]
         assert [p["index"] for p in pending] == [0, 1]
         assert pending[0]["skill"] == "aiops"
-        assert pending[0]["tool"] == "vm_power_on"
+        assert pending[0]["tool"] == "power_on_vm"
         assert pending[0]["params"] == {"vm": "x"}
         assert "message" in result
 
@@ -186,9 +186,9 @@ class TestNoDispatchHonesty:
         wf = Workflow(
             id="wf-noop3", workflow_type="test", state=WorkflowState.PENDING,
             steps=[
-                WorkflowStep(index=0, action="a", skill="aiops", tool="vm_power_on", params={}),
+                WorkflowStep(index=0, action="a", skill="aiops", tool="power_on_vm", params={}),
                 WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve", params={}),
-                WorkflowStep(index=2, action="c", skill="aiops", tool="vm_power_off", params={}),
+                WorkflowStep(index=2, action="c", skill="aiops", tool="power_off_vm", params={}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -210,9 +210,9 @@ class TestCrashResume:
         wf = Workflow(
             id="wf-crash", workflow_type="test", state=WorkflowState.RUNNING,
             steps=[
-                WorkflowStep(index=0, action="a", skill="aiops", tool="vm_power_on", params={}, status="success"),
-                WorkflowStep(index=1, action="b", skill="aiops", tool="vm_reconfigure", params={}, status="running"),
-                WorkflowStep(index=2, action="c", skill="aiops", tool="vm_power_off", params={}),
+                WorkflowStep(index=0, action="a", skill="aiops", tool="power_on_vm", params={}, status="success"),
+                WorkflowStep(index=1, action="b", skill="aiops", tool="reconfigure_vm", params={}, status="running"),
+                WorkflowStep(index=2, action="c", skill="aiops", tool="power_off_vm", params={}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -349,7 +349,7 @@ class TestRollbackPersistence:
             steps=[
                 WorkflowStep(index=0, action="a", skill="aiops", tool="deploy_linked_clone",
                              params={}, status="success",
-                             rollback_tool="vm_delete", rollback_params={"vm": "staging"}),
+                             rollback_tool="delete_vm", rollback_params={"vm": "staging"}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -399,7 +399,7 @@ class TestRedactedSecretGuard:
             id=wf_id, workflow_type="test", state=WorkflowState.PENDING,
             steps=[
                 WorkflowStep(index=0, action="connect", skill="aiops",
-                             tool="vm_power_on",
+                             tool="power_on_vm",
                              params={"vm": "x", "password": "s3cret"}),
             ],
             params={}, created_at="", updated_at="",
@@ -463,7 +463,7 @@ class TestRedactedSecretGuard:
             id="wf-star-note", workflow_type="test", state=WorkflowState.PENDING,
             steps=[
                 WorkflowStep(index=0, action="a", skill="aiops",
-                             tool="vm_power_on", params={"note": "***"}),
+                             tool="power_on_vm", params={"note": "***"}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -618,7 +618,7 @@ class TestReturnedFailureIsNotSuccess:
             steps=[
                 WorkflowStep(index=0, action="ok", skill="monitor", tool="get_alarms", params={}),
                 WorkflowStep(index=1, action="fail", skill="aiops", tool="failing_tool", params={}),
-                WorkflowStep(index=2, action="skip", skill="aiops", tool="vm_power_off", params={}),
+                WorkflowStep(index=2, action="skip", skill="aiops", tool="power_off_vm", params={}),
             ],
             params={}, created_at="", updated_at="",
         )
@@ -688,8 +688,8 @@ class TestReturnedFailureIsNotSuccess:
         wf = Workflow(
             id="wf-env-6", workflow_type="test", state=WorkflowState.PENDING,
             steps=[
-                WorkflowStep(index=0, action="write", skill="aiops", tool="vm_power_on",
-                             params={}, rollback_tool="vm_power_off", rollback_params={}),
+                WorkflowStep(index=0, action="write", skill="aiops", tool="power_on_vm",
+                             params={}, rollback_tool="power_off_vm", rollback_params={}),
                 WorkflowStep(index=1, action="fail", skill="aiops", tool="failing_tool", params={}),
             ],
             params={}, created_at="", updated_at="",
@@ -699,7 +699,7 @@ class TestReturnedFailureIsNotSuccess:
         def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
             if tool == "failing_tool":
                 return {"error": "boom"}
-            if tool == "vm_power_off":                      # the rollback itself fails
+            if tool == "power_off_vm":                      # the rollback itself fails
                 return {"error": "VM 'x' not found on target 'home-vcenter'."}
             return {"ok": True}
 

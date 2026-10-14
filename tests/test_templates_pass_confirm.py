@@ -20,27 +20,27 @@ from vmware_pilot.templates._gated import GATED_TOOLS, confirmed_params
 
 _EXPECTED_GATED = {
     "aiops": {
-        "vm_power_off", "vm_migrate", "vm_revert_snapshot", "vm_delete_snapshot",
-        "vm_guest_exec", "vm_guest_exec_output", "vm_guest_upload", "vm_guest_provision",
-        "cluster_delete", "cluster_remove_host", "vm_set_ttl", "vm_clean_slate",
-        "vm_rollback_plan", "vm_apply_plan", "vm_delete",
+        "power_off_vm", "migrate_vm", "revert_vm_snapshot", "delete_vm_snapshot",
+        "run_vm_guest_command", "run_vm_guest_command_with_output", "upload_vm_guest_file", "provision_vm_guest",
+        "delete_cluster", "remove_cluster_host", "set_vm_ttl", "restore_vm_clean_slate",
+        "rollback_vm_plan", "apply_vm_plan", "delete_vm",
         "create_dvs_portgroup", "add_host_vmk", "remove_host_vmk", "set_vmk_service",
         "create_drs_rule", "set_drs_rule_enabled", "delete_drs_rule",
     },
     "nsx": {"delete_segment", "delete_tier1_gateway", "delete_nat_rule",
             "delete_static_route", "delete_ip_pool"},
     "nsx-security": {"delete_dfw_policy", "delete_dfw_rule", "delete_group"},
-    "avi": {"vs_toggle", "pool_member_disable", "ako_restart", "ako_sync_force",
-            "ako_config_upgrade"},
+    "avi": {"set_virtual_service_enabled", "disable_lb_pool_member", "restart_ako", "force_ako_sync",
+            "upgrade_ako_config"},
     "aria": {"start_resource_maintenance", "end_resource_maintenance", "acknowledge_alert",
              "cancel_alert", "delete_alert_definition", "delete_report"},
     "vks": {"create_namespace", "delete_namespace", "create_tkc_cluster", "delete_tkc_cluster"},
-    "storage": {"storage_iscsi_enable", "storage_iscsi_add_target",
-                "storage_iscsi_remove_target", "storage_rescan"},
-    "vdi": {"machine_reset", "machine_remove", "machine_maintenance", "session_logoff",
-            "session_disconnect", "task_cancel", "pool_push_image", "pool_set_enabled",
-            "entitlement_add", "entitlement_remove"},
-    "privateai": {"vgpu_assign"},
+    "storage": {"enable_iscsi", "add_iscsi_target",
+                "remove_iscsi_target", "rescan_storage"},
+    "vdi": {"reset_vdi_machine", "remove_vdi_machine", "set_vdi_machine_maintenance", "logoff_vdi_session",
+            "disconnect_vdi_session", "cancel_vdi_task", "push_desktop_pool_image", "set_desktop_pool_enabled",
+            "add_entitlement", "remove_entitlement"},
+    "privateai": {"assign_vgpu"},
 }
 
 _LEGACY = ("confirmed", "dry_run")
@@ -100,13 +100,13 @@ def test_confirmed_params_does_not_mutate_and_drops_legacy():
 @pytest.mark.unit
 def test_baseline_remediate_confirms_a_gated_drift_item():
     wf = BUILTIN_TEMPLATES["baseline_remediate"](drift_items=[
-        {"resource": "r", "skill": "aiops", "action": "fix", "tool": "vm_power_off",
-         "params": {"vm_name": "r"}, "rollback_tool": "vm_power_on",
+        {"resource": "r", "skill": "aiops", "action": "fix", "tool": "power_off_vm",
+         "params": {"vm_name": "r"}, "rollback_tool": "power_on_vm",
          "rollback_params": {"vm_name": "r"}},
     ])
-    fix = next(s for s in wf.steps if s.tool == "vm_power_off")
+    fix = next(s for s in wf.steps if s.tool == "power_off_vm")
     assert fix.params == {"vm_name": "r", "confirm": True}
-    assert fix.rollback_params == {"vm_name": "r"}  # vm_power_on is not gated
+    assert fix.rollback_params == {"vm_name": "r"}  # power_on_vm is not gated
 
 
 @pytest.mark.unit

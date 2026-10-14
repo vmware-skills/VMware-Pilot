@@ -3,7 +3,7 @@
 Built-in templates are authored and reviewed here. Custom workflows — a YAML file
 in ``~/.vmware/workflows/``, a ``create_workflow`` step list, or an AI-designed
 draft — are not. Until this change the only thing standing between an ungated
-``vm_power_off`` in a custom workflow and the calling agent was a *warning* from a
+``power_off_vm`` in a custom workflow and the calling agent was a *warning* from a
 helper script and a ``run_workflow`` refusal that ``force=True`` switched off.
 A warning is not a control, and a flag that turns a refusal off is a refusal only
 for callers who chose to keep it.
@@ -41,12 +41,12 @@ from vmware_pilot.models import Workflow, WorkflowState, WorkflowStep, WorkflowS
 GATE = {"action": "require_approval", "skill": "pilot", "tool": "approve",
         "params": {"message": "ok?"}}
 READ = {"action": "check", "skill": "monitor", "tool": "get_alarms", "params": {}}
-POWER_OFF = {"action": "stop", "skill": "aiops", "tool": "vm_power_off",
+POWER_OFF = {"action": "stop", "skill": "aiops", "tool": "power_off_vm",
              "params": {"vm_name": "db02"}}
 UNKNOWN = {"action": "frob", "skill": "nsx", "tool": "quiesce_appliance",
            "params": {"id": "x"}}
 #: The reproduction from the 2026-09-11 review: saved, then dispatched ungated.
-GUEST_RM = {"action": "wipe", "skill": "aiops", "tool": "vm_guest_exec",
+GUEST_RM = {"action": "wipe", "skill": "aiops", "tool": "run_vm_guest_command",
             "params": {"vm_name": "db02", "command": "/bin/rm", "arguments": "-rf /",
                        "username": "root"}}
 
@@ -91,7 +91,7 @@ class TestGateViolations:
         from vmware_pilot.approval_gate import gate_violations
 
         v = gate_violations(self._wf([READ, POWER_OFF]))
-        assert [(x.step_index, x.skill, x.tool) for x in v] == [(1, "aiops", "vm_power_off")]
+        assert [(x.step_index, x.skill, x.tool) for x in v] == [(1, "aiops", "power_off_vm")]
         assert "high" in v[0].reason
 
     def test_unclassifiable_is_a_violation(self):
@@ -135,7 +135,7 @@ class TestCreateWorkflowRejects:
             name="restart_db", description="d", steps=[READ, POWER_OFF, UNKNOWN],
         )
         err = result["error"]
-        assert "step 1 (aiops.vm_power_off" in err
+        assert "step 1 (aiops.power_off_vm" in err
         assert "step 2 (nsx.quiesce_appliance" in err
         assert "require_approval" in err
         # The remedy is concrete: the exact step to insert, and where.
@@ -160,10 +160,10 @@ class TestCreateWorkflowRejects:
         assert "error" not in result
 
     def test_an_ungated_guest_command_is_refused(self, store, home):
-        """vmware-aiops publishes vm_guest_exec with destructiveHint=True."""
+        """vmware-aiops publishes run_vm_guest_command with destructiveHint=True."""
         result = server.create_workflow(name="wipe", description="d", steps=[GUEST_RM])
         assert "error" in result
-        assert "step 0 (aiops.vm_guest_exec" in result["error"]
+        assert "step 0 (aiops.run_vm_guest_command" in result["error"]
         assert store.list_all() == []
 
     def test_an_ungated_guest_command_is_not_dispatched(self, store):
@@ -254,7 +254,7 @@ class TestDraftFlowRejects:
         wf_id, _ = self._draft([POWER_OFF])
         result = server.confirm_draft(wf_id, save_as_template=True)
         assert "error" in result
-        assert "step 0 (aiops.vm_power_off" in result["error"]
+        assert "step 0 (aiops.power_off_vm" in result["error"]
         assert store.load(wf_id).state == WorkflowState.DRAFT
         assert _yaml_files(home) == []
 
@@ -278,7 +278,7 @@ steps:
     params: {target: "{{target}}"}
   - action: stop_replica
     skill: aiops
-    tool: vm_power_off
+    tool: power_off_vm
     params: {vm_name: "{{replica_vm}}"}
 """
 
@@ -298,7 +298,7 @@ class TestCustomYamlRejects:
         result = server.plan_workflow("restart_db", {"target": "vc", "replica_vm": "db02"})
         assert "error" in result
         assert "restart_db.yaml" in result["error"], "must name the file to edit"
-        assert "step 1 (aiops.vm_power_off" in result["error"]
+        assert "step 1 (aiops.power_off_vm" in result["error"]
         assert "require_approval" in result["error"]
         assert store.list_all() == []
 
@@ -358,7 +358,7 @@ class TestRunWorkflowRejectsCustomEvenWithForce:
                       workflow_type=workflow_type, params=params)
         result = server.run_workflow("wf-r1", force=True)
         assert "error" in result
-        assert "step 0 (aiops.vm_power_off" in result["error"]
+        assert "step 0 (aiops.power_off_vm" in result["error"]
         assert "force" in result["error"], "must say why force did not work"
         assert wf.steps[0].status == "pending"
         assert not any(e["action"] == "forced_run" for e in wf.audit_log)
@@ -411,7 +411,7 @@ _BUILTIN_ARGS = {
     "baseline_capture": [{}],
     "baseline_audit": [{}],
     "baseline_remediate": [{"drift_items": [{"resource": "r", "skill": "aiops",
-                                             "tool": "vm_power_off", "params": {}}]}],
+                                             "tool": "power_off_vm", "params": {}}]}],
 }
 
 
@@ -471,8 +471,8 @@ class TestValidateScriptRejects:
         path = tmp_path / "restart_db.yaml"
         path.write_text(_UNGATED_YAML, encoding="utf-8")
         errors, warnings = _load_script().validate(path)
-        assert any("step 1 (aiops.vm_power_off" in e for e in errors), errors
-        assert not any("vm_power_off" in w for w in warnings)
+        assert any("step 1 (aiops.power_off_vm" in e for e in errors), errors
+        assert not any("power_off_vm" in w for w in warnings)
 
     def test_main_exits_nonzero(self, tmp_path, monkeypatch):
         path = tmp_path / "restart_db.yaml"
@@ -495,7 +495,7 @@ class TestValidateScriptRejects:
         path = tmp_path / "avi.yaml"
         path.write_text(
             "name: avi\nsteps:\n  - action: look\n    skill: avi\n"
-            "    tool: pool_members\n    params: {pool: p}\n",
+            "    tool: list_lb_pool_members\n    params: {pool: p}\n",
             encoding="utf-8",
         )
         errors, _ = _load_script().validate(path)

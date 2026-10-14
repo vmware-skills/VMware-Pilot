@@ -36,7 +36,7 @@ _RULES = textwrap.dedent(
     """
     deny:
       - name: no_destructive_writes_in_production
-        operations: ["vm_delete", "delete_*"]
+        operations: ["delete_vm", "delete_*"]
         environments: ["production"]
         reason: "Destructive work in production needs a change record."
     """
@@ -99,9 +99,9 @@ def _import_freshly(name: str):
 
 
 def _denied(engine: PolicyEngine, target: str) -> bool:
-    """Would the production deny rule refuse ``vm_delete`` against ``target``?"""
+    """Would the production deny rule refuse ``delete_vm`` against ``target``?"""
     return not engine.check_allowed(
-        "vm_delete", env=resolve_environment(target), risk_level="high"
+        "delete_vm", env=resolve_environment(target), risk_level="high"
     ).allowed
 
 

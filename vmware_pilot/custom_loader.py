@@ -23,10 +23,10 @@ Example YAML (``~/.vmware/workflows/restart_db_cluster.yaml``)::
 
       - action: stop_replica
         skill: aiops
-        tool: vm_power_off
+        tool: power_off_vm
         params:
           vm_name: "{{replica_vm}}"
-        rollback_tool: vm_power_on
+        rollback_tool: power_on_vm
         rollback_params:
           vm_name: "{{replica_vm}}"
 
@@ -38,15 +38,15 @@ Example YAML (``~/.vmware/workflows/restart_db_cluster.yaml``)::
 
       - action: restart_primary
         skill: aiops
-        tool: vm_power_off
+        tool: power_off_vm
         params:
           vm_name: "{{primary_vm}}"
           force: false
-        rollback_tool: vm_power_on
+        rollback_tool: power_on_vm
         rollback_params:
           vm_name: "{{primary_vm}}"
 
-Every step that could change the estate (``vm_power_off`` above) must have a
+Every step that could change the estate (``power_off_vm`` above) must have a
 ``require_approval`` step somewhere before it. A file that breaks that rule
 still lists, but building it — ``plan_workflow`` — is refused with the offending
 step named; see ``vmware_pilot.approval_gate``.

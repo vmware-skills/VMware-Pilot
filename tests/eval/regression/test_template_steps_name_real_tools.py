@@ -65,7 +65,7 @@ _ARGS = {
     "baseline_capture": [{}],
     "baseline_audit": [{}],
     "baseline_remediate": [{"drift_items": [{"resource": "r", "skill": "aiops", "action": "fix",
-                                             "tool": "vm_power_off", "params": {"vm_name": "r"}}]}],
+                                             "tool": "power_off_vm", "params": {"vm_name": "r"}}]}],
 }
 
 

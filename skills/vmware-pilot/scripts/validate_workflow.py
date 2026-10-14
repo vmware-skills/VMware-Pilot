@@ -66,6 +66,15 @@ def _structure_errors(spec: Any) -> list[str]:
     return errors
 
 
+def _current_tool_name(skill: Any, tool: Any) -> Any:
+    """The 2.0 name Pilot will run ``tool`` as (unchanged on a Pilot older than 1.13.0)."""
+    try:
+        from vmware_pilot.renames import current_tool_name
+    except ImportError:
+        return tool
+    return current_tool_name(skill, tool)
+
+
 def _catalog_warnings(steps: list[dict[str, Any]]) -> list[str]:
     from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
 
@@ -74,6 +83,13 @@ def _catalog_warnings(steps: list[dict[str, Any]]) -> list[str]:
         skill, tool = step.get("skill", ""), step.get("tool", "")
         if step.get("action") == "require_approval" or skill == "pilot":
             continue
+        current = _current_tool_name(skill, tool)
+        if current != tool:
+            warnings.append(
+                f"Step {i}: '{tool}' is the pre-2.0 name of {skill}'s '{current}'; it "
+                f"runs as '{current}' — rename it in the file"
+            )
+            tool = current
         if skill not in SKILL_CATALOG:
             warnings.append(
                 f"Step {i}: skill '{skill}' is not in pilot's skill catalog "

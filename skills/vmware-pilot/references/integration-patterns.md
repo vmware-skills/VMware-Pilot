@@ -1,7 +1,7 @@
 # Cross-Skill Integration Patterns
 
 vmware-pilot orchestrates the VMware skill family into coherent workflows. Its
-design catalog (`get_skill_catalog`) offers 99 curated building blocks across 13
+design catalog (`get_skill_catalog`) offers 100 curated building blocks across 13
 skills; a dispatched step may name any companion skill, catalogued or not.
 This reference documents the most common integration patterns and when to use
 Pilot vs. calling a skill directly.
@@ -16,7 +16,7 @@ The contract:
 
 1. **Pilot generates a plan** via `plan_workflow` or `design_workflow`. The plan is a sequence of `(skill, tool, params)` tuples plus approval gates and rollback metadata. State is persisted to SQLite.
 2. **Pilot tracks state** via `run_workflow`, `approve`, `rollback`. Each call returns immediately on the next checkpoint — running, awaiting approval, completed, or failed.
-3. **The calling AI agent dispatches each step**. After `run_workflow` returns a step description, the agent invokes the corresponding MCP tool on the target skill (e.g., `vmware-aiops::vm_clone`) and captures the result. Pilot has no call for reporting a step's result back, so on the MCP server those steps stay `not_executed` in pilot's record — which is why `rollback` there cannot undo them (see Error Handling).
+3. **The calling AI agent dispatches each step**. After `run_workflow` returns a step description, the agent invokes the corresponding MCP tool on the target skill (e.g., `vmware-aiops::clone_vm`) and captures the result. Pilot has no call for reporting a step's result back, so on the MCP server those steps stay `not_executed` in pilot's record — which is why `rollback` there cannot undo them (see Error Handling).
 
 In other words: pilot is the brain, the AI agent is the hands. Pilot never reaches across the wire to call other skills' tools itself — its `dispatch` function defaults to a no-op.
 
@@ -63,7 +63,7 @@ The approval gate ensures no one auto-acknowledges a real issue.
 
 **Variations**:
 - Add `aria.list_rightsizing_recommendations` if the alarm is resource-related
-- Add `aiops.vm_power_off` / `vm_power_on` if restart is the remediation
+- Add `aiops.power_off_vm` / `power_on_vm` if restart is the remediation
 - Add `nsx-security.run_traceflow` if the alarm is network-related
 
 ---
@@ -76,8 +76,8 @@ Validate capacity/health, make a change, confirm no regressions.
 aria.get_remaining_capacity             -> Confirm capacity exists
 aria.list_rightsizing_recommendations   -> Validate change is reasonable
     [APPROVAL GATE]                     -> Human confirms the plan
-aiops.vm_create_plan                    -> Create batch operation plan
-aiops.vm_apply_plan                     -> Execute the plan
+aiops.create_vm_plan                    -> Create batch operation plan
+aiops.apply_vm_plan                     -> Execute the plan
 monitor.get_alarms                      -> Verify no new alarms
 ```
 
@@ -87,8 +87,8 @@ monitor.get_alarms                      -> Verify no new alarms
 The pre-check steps prevent expanding a VM when the cluster is already at capacity.
 
 **Variations**:
-- Replace `vm_create_plan` with direct `vm_power_on`/`vm_power_off` for simpler ops
-- Add `storage.vsan_capacity` if the change involves disk expansion
+- Replace `create_vm_plan` with direct `power_on_vm`/`power_off_vm` for simpler ops
+- Add `storage.get_vsan_capacity` if the change involves disk expansion
 - Chain with Pattern 4 (baseline) to detect drift after the change
 
 ---
@@ -167,11 +167,11 @@ Safe change deployment using a staging clone.
 
 ```
 aiops.deploy_linked_clone       -> Clone production VM to staging
-aiops.vm_reconfigure            -> Apply changes to staging clone
+aiops.reconfigure_vm            -> Apply changes to staging clone
 monitor.get_alarms              -> Monitor staging for issues
     [APPROVAL GATE]             -> Human verifies staging is healthy
-aiops.vm_reconfigure            -> Apply same changes to production
-aiops.vm_power_off              -> Cleanup staging clone
+aiops.reconfigure_vm            -> Apply same changes to production
+aiops.power_off_vm              -> Cleanup staging clone
 ```
 
 **Built-in template**: `clone_and_test`
@@ -193,8 +193,8 @@ monitor.get_alarms              -> Pre-flight health check
     [APPROVAL GATE]             -> Human confirms VM list
 
 For each VM:
-    aiops.vm_power_off          -> Stop VM (graceful)
-    aiops.vm_power_on           -> Start VM
+    aiops.power_off_vm          -> Stop VM (graceful)
+    aiops.power_on_vm           -> Start VM
     monitor.get_alarms          -> Verify health after restart
     [If alarms -> stop rolling; undo only if the user asks]
 ```
@@ -206,7 +206,7 @@ be done simultaneously (database clusters, load-balanced web servers, etc.).
 
 **Key benefit**: If one VM fails the health check after restart, the workflow
 stops before touching remaining VMs. Nothing is undone automatically; the
-step's `rollback_tool` (`vm_power_on`) is there for the agent to call if the
+step's `rollback_tool` (`power_on_vm`) is there for the agent to call if the
 user wants the VM back on.
 
 ---
@@ -242,11 +242,11 @@ provisioning.
 Add or expand storage on ESXi hosts.
 
 ```
-storage.storage_iscsi_status    -> Check current iSCSI state (read-only)
+storage.get_iscsi_status    -> Check current iSCSI state (read-only)
     [APPROVAL GATE]             -> Human confirms adapter enable + storage target
-storage.storage_iscsi_enable    -> Enable adapter if needed
-storage.storage_iscsi_add_target -> Add iSCSI target
-storage.storage_rescan          -> Rescan HBAs
+storage.enable_iscsi    -> Enable adapter if needed
+storage.add_iscsi_target -> Add iSCSI target
+storage.rescan_storage          -> Rescan HBAs
 storage.list_all_datastores     -> Verify new datastores visible
 ```
 
@@ -255,7 +255,7 @@ storage.list_all_datastores     -> Verify new datastores visible
 **When to use**: Adding SAN/NAS storage to hosts, expanding storage pools.
 
 **Variations**:
-- Add `storage.vsan_health` + `storage.vsan_capacity` for vSAN operations
+- Add `storage.get_vsan_health` + `storage.get_vsan_capacity` for vSAN operations
 - Chain with Pattern 2 for VM disk expansion after new storage is available
 
 ---

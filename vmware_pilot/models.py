@@ -13,6 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from vmware_pilot.renames import current_tool_name
+
 _DEFAULT_DB = Path("~/.vmware/workflows.db").expanduser()
 
 
@@ -43,6 +45,13 @@ class WorkflowStep:
     group_id: str = (
         ""  # non-empty = parallel-group sibling; agent may dispatch concurrently with peers
     )
+
+    def __post_init__(self) -> None:
+        # The one choke point for pre-2.0 tool names (HLD §16 D-15, [M4]): every
+        # step — template, YAML, draft, create_workflow, a stored row — is built
+        # here, so review, the approval gate, dispatch and rollback see the new name.
+        self.tool = current_tool_name(self.skill, self.tool)
+        self.rollback_tool = current_tool_name(self.skill, self.rollback_tool)
 
 
 @dataclass

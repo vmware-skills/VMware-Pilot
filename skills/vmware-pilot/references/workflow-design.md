@@ -22,8 +22,8 @@ The user must know which skill has the right tool, call them in order, and remem
 User calls aria   -> get_remaining_capacity   (must know aria has this)
 User calls aria   -> list_rightsizing_recommendations  (must remember to check)
 User calls monitor -> get_alarms              (must remember to verify no active issues)
-User calls aiops  -> vm_create_plan           (must know parameters)
-User calls aiops  -> vm_apply_plan            (must remember to apply)
+User calls aiops  -> create_vm_plan           (must know parameters)
+User calls aiops  -> apply_vm_plan            (must remember to apply)
 User calls monitor -> get_alarms              (must verify no new alarms)
 ```
 
@@ -38,7 +38,7 @@ Pilot creates workflow:
   Step 0: aria.get_remaining_capacity     -> check if capacity exists
   Step 1: aria.list_rightsizing            -> validate against recommendations
   Step 2: [APPROVAL GATE]                 -> user reviews and confirms
-  Step 3: aiops.vm_create_plan            -> create the change plan
+  Step 3: aiops.create_vm_plan            -> create the change plan
   Step 4: monitor.get_alarms              -> verify health after change
 
 User reviews steps, approves at gate, Pilot completes execution.
@@ -92,21 +92,21 @@ custom workflow, or pilot refuses the workflow. `medium` writes need no gate.
 
 | Tool | Risk | Use For |
 |------|------|---------|
-| `vm_power_on` | medium | Start a VM |
-| `vm_power_off` | high | Stop a VM (graceful or force) |
+| `power_on_vm` | medium | Start a VM |
+| `power_off_vm` | high | Stop a VM (graceful or force) |
 | `deploy_linked_clone` | medium | Clone a VM from snapshot |
-| `vm_create_plan` | medium | Create a batch operation plan |
-| `vm_apply_plan` | medium | Execute a planned batch |
-| `vm_rollback_plan` | medium | Undo a batch operation |
-| `vm_guest_exec` | high | Run command inside guest OS — as the account you name; gate it |
-| `vm_guest_exec_output` | high | Run command and capture output |
-| `vm_guest_upload` | high | Upload file to guest OS |
-| `vm_guest_provision` | high | Bootstrap a new VM |
+| `create_vm_plan` | medium | Create a batch operation plan |
+| `apply_vm_plan` | medium | Execute a planned batch |
+| `rollback_vm_plan` | medium | Undo a batch operation |
+| `run_vm_guest_command` | high | Run command inside guest OS — as the account you name; gate it |
+| `run_vm_guest_command_with_output` | high | Run command and capture output |
+| `upload_vm_guest_file` | high | Upload file to guest OS |
+| `provision_vm_guest` | high | Bootstrap a new VM |
 | `batch_clone_vms` | medium | Clone multiple VMs at once |
-| `vm_clean_slate` | high | Revert VM to snapshot |
+| `restore_vm_clean_slate` | high | Revert VM to snapshot |
 | `acknowledge_vcenter_alarm` | medium | Acknowledge an alarm |
 | `reset_vcenter_alarm` | high | Clear triggered alarms — every one with the named alarm's status and entity type |
-| `cluster_create` | medium | Create a new cluster |
+| `create_cluster` | medium | Create a new cluster |
 | `deploy_vm_from_ova` | medium | Deploy from OVA |
 | `deploy_vm_from_template` | medium | Deploy from template |
 
@@ -120,7 +120,7 @@ custom workflow, or pilot refuses the workflow. `medium` writes need no gate.
 | `list_all_clusters` | low | Inventory all clusters |
 | `get_alarms` | low | Check active alarms |
 | `get_events` | low | Check recent events |
-| `vm_info` | low | Detailed VM information |
+| `get_vm_info` | low | Detailed VM information |
 
 ### nsx (Networking)
 
@@ -174,11 +174,11 @@ custom workflow, or pilot refuses the workflow. `medium` writes need no gate.
 | Tool | Risk | Use For |
 |------|------|---------|
 | `list_all_datastores` | low | List datastores |
-| `storage_iscsi_enable` | medium | Enable iSCSI adapter |
-| `storage_iscsi_add_target` | medium | Add iSCSI target |
-| `storage_rescan` | medium | Rescan storage adapters |
-| `vsan_health` | low | vSAN health check |
-| `vsan_capacity` | low | vSAN capacity info |
+| `enable_iscsi` | medium | Enable iSCSI adapter |
+| `add_iscsi_target` | medium | Add iSCSI target |
+| `rescan_storage` | medium | Rescan storage adapters |
+| `get_vsan_health` | low | vSAN health check |
+| `get_vsan_capacity` | low | vSAN capacity info |
 
 ---
 
@@ -200,7 +200,7 @@ steps:
     params:
       target: "{{target}}"
 
-  - action: require_approval       # required: vm_power_off below is high risk
+  - action: require_approval       # required: power_off_vm below is high risk
     skill: pilot
     tool: approve
     params:
@@ -208,11 +208,11 @@ steps:
 
   - action: stop_replica
     skill: aiops
-    tool: vm_power_off
+    tool: power_off_vm
     params:
       vm_name: "{{replica_vm}}"
       force: false
-    rollback_tool: vm_power_on
+    rollback_tool: power_on_vm
     rollback_params:
       vm_name: "{{replica_vm}}"
 
@@ -224,23 +224,23 @@ steps:
 
   - action: restart_primary
     skill: aiops
-    tool: vm_power_off
+    tool: power_off_vm
     params:
       vm_name: "{{primary_vm}}"
       force: false
-    rollback_tool: vm_power_on
+    rollback_tool: power_on_vm
     rollback_params:
       vm_name: "{{primary_vm}}"
 
   - action: start_primary
     skill: aiops
-    tool: vm_power_on
+    tool: power_on_vm
     params:
       vm_name: "{{primary_vm}}"
 
   - action: start_replica
     skill: aiops
-    tool: vm_power_on
+    tool: power_on_vm
     params:
       vm_name: "{{replica_vm}}"
 
@@ -285,9 +285,9 @@ create_workflow(
         {action: "pre_check", skill: "monitor", tool: "get_alarms", params: {target: "prod"}},
         {action: "require_approval", skill: "pilot", tool: "approve",
          params: {message: "Revert web01 to baseline?"}},
-        {action: "revert", skill: "aiops", tool: "vm_clean_slate",
+        {action: "revert", skill: "aiops", tool: "restore_vm_clean_slate",
          params: {vm_name: "web01", snapshot_name: "baseline", target: "prod"}},
-        {action: "verify", skill: "monitor", tool: "vm_info",
+        {action: "verify", skill: "monitor", tool: "get_vm_info",
          params: {vm_name: "web01", target: "prod"}},
     ]
 )

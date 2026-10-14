@@ -91,7 +91,7 @@ class TestGateViolations:
         assert [v.kind for v in gate_violations(_wf([step]))] == ["confirm_without_approval"]
 
     def test_a_step_already_flagged_by_its_tier_is_listed_once(self):
-        power_off = {"action": "stop", "skill": "aiops", "tool": "vm_power_off",
+        power_off = {"action": "stop", "skill": "aiops", "tool": "power_off_vm",
                      "params": {"vm_name": "db02", "confirm": True}}
         (v,) = gate_violations(_wf([power_off]))
         assert v.kind == "ungated_destructive"

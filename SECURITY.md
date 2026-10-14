@@ -31,7 +31,7 @@ A workflow pauses at each `require_approval` step until `approve()` is called wi
 
 1. **Review before every run** — `run_workflow` reviews the plan and refuses one whose destructive step (skill-catalog risk high/critical, or a destructive name) or unclassifiable step has no gate before it
 2. **Custom workflows are rejected, not warned** — for a custom YAML, `create_workflow`, or AI-designed workflow, that same finding makes `plan_workflow`, `create_workflow` and `confirm_draft` refuse to save it and `run_workflow` refuse it even with `force=True`; only built-in templates keep the audited `force=True` override
-3. **Credentials and guest commands count as destructive** — `vks get_tkc_kubeconfig` and `get_supervisor_kubeconfig` return a live Supervisor credential, and the aiops guest tools (`vm_guest_exec`, `vm_guest_exec_output`, `vm_guest_upload`, `vm_guest_provision`) run arbitrary commands or write files inside a VM as the account the caller names; all are gated like a delete
+3. **Credentials and guest commands count as destructive** — `vks get_tkc_kubeconfig` and `get_supervisor_kubeconfig` return a live Supervisor credential, and the aiops guest tools (`run_vm_guest_command`, `run_vm_guest_command_with_output`, `upload_vm_guest_file`, `provision_vm_guest`) run arbitrary commands or write files inside a VM as the account the caller names; all are gated like a delete
 4. **The gate is in pilot's workflow, not in the target skill** — on the MCP server pilot executes nothing itself; the calling agent performs each step through the companion skill, which applies its own policy rules
 
 ### Rollback (explicit, best-effort — never automatic)

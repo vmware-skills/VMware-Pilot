@@ -15,9 +15,9 @@ import and does not get told about.
 It did not keep pace. Measured on 2026-08-30 against every sibling's own MCP
 annotations: 120 tools across the family declare ``readOnlyHint: False``, and 24
 of them matched a substring. The other 96 produced no finding at all, 17 of them
-tools their own skill marks ``destructiveHint: True`` — ``vm_clean_slate``
-(reverts a VM to a baseline snapshot), ``pool_push_image``, ``machine_reset``,
-``session_logoff``, ``ako_restart``, ``vgpu_assign``. Adding those seventeen names
+tools their own skill marks ``destructiveHint: True`` — ``restore_vm_clean_slate``
+(reverts a VM to a baseline snapshot), ``push_desktop_pool_image``, ``reset_vdi_machine``,
+``logoff_vdi_session``, ``restart_ako``, ``assign_vgpu``. Adding those seventeen names
 to the tuple would fix today's list and lose again on the next release.
 
 So the shape changed rather than the contents:

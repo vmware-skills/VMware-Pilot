@@ -104,7 +104,7 @@ class TestSecretCacheLifecycle:
     def _wf_with_secret(self):
         return Workflow(
             id="wf-sec", workflow_type="test", state=WorkflowState.PENDING,
-            steps=[WorkflowStep(index=0, action="a", skill="aiops", tool="vm_guest_exec",
+            steps=[WorkflowStep(index=0, action="a", skill="aiops", tool="run_vm_guest_command",
                                 params={"vm": "db01", "password": "s3cr3t!"})],
             params={"token": "tok-abc"}, created_at="", updated_at="",
         )

@@ -9,38 +9,38 @@ SKILL_CATALOG = {
     "aiops": {
         "description": "VM lifecycle, deployment, clusters, guest operations, alarm management",
         "tools": {
-            "vm_power_on": {"risk": "medium", "desc": "Power on a VM"},
+            "power_on_vm": {"risk": "medium", "desc": "Power on a VM"},
             # risk high, not medium: vmware-aiops itself publishes this tool with
             # destructiveHint=True. Pilot's own label used to be the more
             # optimistic of the two, and since the label is what the approval
             # gate reads, the disagreement resolved in favour of not gating it.
-            "vm_power_off": {"risk": "high", "desc": "Power off a VM (graceful/force)"},
+            "power_off_vm": {"risk": "high", "desc": "Power off a VM (graceful/force)"},
             # clone_and_test dispatches this for a cpu/memory change_spec. Missing from
             # the catalog it read as "unclassifiable", and run_workflow refused the
             # built-in template unless force=True. Label = what vmware-aiops
             # publishes: risk medium, destructiveHint False.
-            "vm_reconfigure": {"risk": "medium", "desc": "Change a VM's CPU / memory"},
+            "reconfigure_vm": {"risk": "medium", "desc": "Change a VM's CPU / memory"},
             "deploy_linked_clone": {"risk": "medium", "desc": "Instant clone from snapshot"},
             "deploy_vm_from_template": {"risk": "medium", "desc": "Clone from vSphere template"},
             "deploy_vm_from_ova": {"risk": "medium", "desc": "Deploy from OVA file"},
             "batch_clone_vms": {"risk": "medium", "desc": "Batch clone multiple VMs"},
-            # risk high, as for vm_power_off: vmware-aiops publishes all four guest
+            # risk high, as for power_off_vm: vmware-aiops publishes all four guest
             # tools with destructiveHint=True (its own risk_level is medium). They
             # run an arbitrary command or write an arbitrary file inside the guest
             # as the account the caller names — `/bin/rm -rf /` is a well-formed
             # argument. Labelled medium, a custom workflow whose only step was
             # that command was saved and dispatched with no approval gate.
-            # vm_guest_download is not here: aiops keeps it destructiveHint=False.
-            "vm_guest_exec": {"risk": "high", "desc": "Execute command inside VM"},
-            "vm_guest_exec_output": {"risk": "high", "desc": "Execute and capture stdout"},
-            "vm_guest_upload": {"risk": "high", "desc": "Upload file to VM"},
-            "vm_guest_provision": {"risk": "high", "desc": "Multi-step VM provisioning"},
-            "vm_create_plan": {"risk": "medium", "desc": "Create multi-step execution plan"},
-            "vm_apply_plan": {"risk": "medium", "desc": "Execute a created plan"},
-            "vm_rollback_plan": {"risk": "medium", "desc": "Rollback a failed plan"},
-            "vm_clean_slate": {"risk": "high", "desc": "Revert VM to baseline snapshot"},
-            "cluster_create": {"risk": "medium", "desc": "Create cluster with HA/DRS"},
-            "cluster_delete": {"risk": "high", "desc": "Delete empty cluster"},
+            # download_vm_guest_file is not here: aiops keeps it destructiveHint=False.
+            "run_vm_guest_command": {"risk": "high", "desc": "Execute command inside VM"},
+            "run_vm_guest_command_with_output": {"risk": "high", "desc": "Execute and capture stdout"},
+            "upload_vm_guest_file": {"risk": "high", "desc": "Upload file to VM"},
+            "provision_vm_guest": {"risk": "high", "desc": "Multi-step VM provisioning"},
+            "create_vm_plan": {"risk": "medium", "desc": "Create multi-step execution plan"},
+            "apply_vm_plan": {"risk": "medium", "desc": "Execute a created plan"},
+            "rollback_vm_plan": {"risk": "medium", "desc": "Rollback a failed plan"},
+            "restore_vm_clean_slate": {"risk": "high", "desc": "Revert VM to baseline snapshot"},
+            "create_cluster": {"risk": "medium", "desc": "Create cluster with HA/DRS"},
+            "delete_cluster": {"risk": "high", "desc": "Delete empty cluster"},
             "acknowledge_vcenter_alarm": {"risk": "medium", "desc": "Acknowledge alarm"},
             # risk high since aiops 1.12.1 publishes it destructiveHint=True:
             # vSphere has no per-alarm clear, so it clears every triggered alarm
@@ -55,7 +55,7 @@ SKILL_CATALOG = {
             "list_esxi_hosts": {"risk": "low", "desc": "List ESXi hosts"},
             "get_alarms": {"risk": "low", "desc": "Get active alarms with remediation hints"},
             "get_events": {"risk": "low", "desc": "Recent events by severity"},
-            "vm_info": {"risk": "low", "desc": "Detailed VM info (CPU/mem/disk/NIC)"},
+            "get_vm_info": {"risk": "low", "desc": "Detailed VM info (CPU/mem/disk/NIC)"},
         },
     },
     "nsx": {
@@ -130,29 +130,29 @@ SKILL_CATALOG = {
     "storage": {
         "description": "Storage management: datastores, iSCSI, vSAN",
         "tools": {
-            "storage_iscsi_enable": {"risk": "medium", "desc": "Enable iSCSI adapter"},
-            "storage_iscsi_add_target": {"risk": "medium", "desc": "Add iSCSI target"},
-            "storage_rescan": {"risk": "medium", "desc": "Rescan all HBAs"},
-            "vsan_health": {"risk": "low", "desc": "vSAN cluster health"},
-            "vsan_capacity": {"risk": "low", "desc": "vSAN capacity overview"},
+            "enable_iscsi": {"risk": "medium", "desc": "Enable iSCSI adapter"},
+            "add_iscsi_target": {"risk": "medium", "desc": "Add iSCSI target"},
+            "rescan_storage": {"risk": "medium", "desc": "Rescan all HBAs"},
+            "get_vsan_health": {"risk": "low", "desc": "vSAN cluster health"},
+            "get_vsan_capacity": {"risk": "low", "desc": "vSAN capacity overview"},
         },
     },
     "avi": {
         "description": "AVI (NSX ALB) load balancing: virtual services, pool members, AKO on Kubernetes",
         "tools": {
-            "vs_list": {"risk": "low", "desc": "List Virtual Services with VIP and health"},
-            "vs_status": {"risk": "low", "desc": "Detailed status for one Virtual Service"},
-            "vs_analytics": {"risk": "low", "desc": "VS metrics — use to confirm a drain reached 0 connections"},
-            "vs_toggle": {"risk": "high", "desc": "Enable or disable a Virtual Service"},
-            "pool_list": {"risk": "low", "desc": "List pools on the Controller"},
-            "pool_members": {"risk": "low", "desc": "List pool members with health and enabled state"},
-            "pool_member_disable": {"risk": "high", "desc": "Drain a pool member gracefully before maintenance"},
-            "pool_member_enable": {"risk": "medium", "desc": "Return a pool member to service after maintenance"},
-            "ssl_expiry_check": {"risk": "low", "desc": "Certificates expiring within N days"},
-            "ako_status": {"risk": "low", "desc": "AKO pod status on a Kubernetes context"},
-            "ako_config_upgrade": {"risk": "medium", "desc": "Apply AKO Helm upgrade (previews unless confirm=True)"},
-            "ako_restart": {"risk": "high", "desc": "Restart the AKO pod"},
-            "ako_sync_force": {"risk": "high", "desc": "Force AKO to resync all K8s resources with the Controller"},
+            "list_virtual_services": {"risk": "low", "desc": "List Virtual Services with VIP and health"},
+            "get_virtual_service_status": {"risk": "low", "desc": "Detailed status for one Virtual Service"},
+            "get_virtual_service_analytics": {"risk": "low", "desc": "VS metrics — use to confirm a drain reached 0 connections"},
+            "set_virtual_service_enabled": {"risk": "high", "desc": "Enable or disable a Virtual Service"},
+            "list_lb_pools": {"risk": "low", "desc": "List pools on the Controller"},
+            "list_lb_pool_members": {"risk": "low", "desc": "List pool members with health and enabled state"},
+            "disable_lb_pool_member": {"risk": "high", "desc": "Drain a pool member gracefully before maintenance"},
+            "enable_lb_pool_member": {"risk": "medium", "desc": "Return a pool member to service after maintenance"},
+            "check_ssl_cert_expiry": {"risk": "low", "desc": "Certificates expiring within N days"},
+            "get_ako_status": {"risk": "low", "desc": "AKO pod status on a Kubernetes context"},
+            "upgrade_ako_config": {"risk": "medium", "desc": "Apply AKO Helm upgrade (previews unless confirm=True)"},
+            "restart_ako": {"risk": "high", "desc": "Restart the AKO pod"},
+            "force_ako_sync": {"risk": "high", "desc": "Force AKO to resync all K8s resources with the Controller"},
         },
     },
     # The five below were missing until 2026-09-15 while the family grew from
@@ -162,13 +162,20 @@ SKILL_CATALOG = {
     # as an inspection and would pass a write as one.
     "debug": {
         "description": "Offline incident correlation and evidence-graded investigation cases",
-        # Only the reads. The case_* writes touch the local case ledger, not
-        # VMware, and a design catalog has no use for them.
+        # Reads, plus one write below. The case writes (open_case,
+        # submit_case_evidence, …) touch the local case ledger, not VMware, and
+        # a design catalog has no use for them.
         "tools": {
-            "incident_timeline": {"risk": "low", "desc": "Correlate fetched events into spikes and ranked hypotheses"},
+            "build_incident_timeline": {"risk": "low", "desc": "Correlate fetched events into spikes and ranked hypotheses"},
             "list_symptom_categories": {"risk": "low", "desc": "Symptom categories and what to check for each"},
-            "case_readiness": {"risk": "low", "desc": "Strongest conclusion reachable per category with these skills"},
-            "case_plan": {"risk": "low", "desc": "Which skill and tool to fetch next for a case"},
+            "get_case_readiness": {"risk": "low", "desc": "Strongest conclusion reachable per category with these skills"},
+            "plan_case": {"risk": "low", "desc": "Which skill and tool to fetch next for a case"},
+            # The one write listed. Its 2.0 name starts with "get", a read-only
+            # name hint, so without an entry the review would call it an
+            # inspection. It writes timeline.md into the case folder
+            # (readOnlyHint=False); debug publishes it at low, and a write is
+            # never labelled low here.
+            "get_case_timeline": {"risk": "medium", "desc": "Correlate a case's evidence; writes timeline.md"},
         },
     },
     "harden": {
@@ -186,36 +193,36 @@ SKILL_CATALOG = {
     "log-insight": {
         "description": "Log Insight search, aggregation and alerts",
         "tools": {
-            "log_search": {"risk": "low", "desc": "Search log events in a time window"},
-            "log_aggregate": {"risk": "low", "desc": "Counts over time, with spike detection"},
-            "alert_list": {"risk": "low", "desc": "Defined alerts"},
-            "alert_history": {"risk": "low", "desc": "Recent triggers of one alert"},
+            "search_logs": {"risk": "low", "desc": "Search log events in a time window"},
+            "aggregate_logs": {"risk": "low", "desc": "Counts over time, with spike detection"},
+            "list_log_alerts": {"risk": "low", "desc": "Defined alerts"},
+            "get_log_alert_history": {"risk": "low", "desc": "Recent triggers of one alert"},
         },
     },
     "privateai": {
         "description": "GPU hosts, vGPU profiles and utilisation for Private AI Foundation",
         "tools": {
-            "gpu_host_list": {"risk": "low", "desc": "Hosts with GPUs"},
-            "gpu_utilization": {"risk": "low", "desc": "GPU utilisation per vGPU VM"},
-            "gpu_host_readiness": {"risk": "low", "desc": "Whether each GPU host can serve vGPU"},
-            "vgpu_profile_validate": {"risk": "low", "desc": "Pre-flight a vGPU profile change"},
-            "vgpu_assign": {"risk": "high", "desc": "Set a VM's vGPU profile (VM must be off)"},
+            "list_gpu_hosts": {"risk": "low", "desc": "Hosts with GPUs"},
+            "get_gpu_utilization": {"risk": "low", "desc": "GPU utilisation per vGPU VM"},
+            "check_gpu_host_readiness": {"risk": "low", "desc": "Whether each GPU host can serve vGPU"},
+            "validate_vgpu_profile": {"risk": "low", "desc": "Pre-flight a vGPU profile change"},
+            "assign_vgpu": {"risk": "high", "desc": "Set a VM's vGPU profile (VM must be off)"},
         },
     },
     "vdi": {
         "description": "Horizon VDI: pools, sessions, machines, images",
         "tools": {
-            "health_summary": {"risk": "low", "desc": "Sessions, problem machines and pool availability"},
-            "session_list": {"risk": "low", "desc": "Sessions filtered by user, pool or state"},
-            "pool_utilization": {"risk": "low", "desc": "Capacity and use per desktop pool"},
-            "task_status": {"risk": "low", "desc": "Status of a pool's long-running task"},
+            "get_vdi_health_summary": {"risk": "low", "desc": "Sessions, problem machines and pool availability"},
+            "list_vdi_sessions": {"risk": "low", "desc": "Sessions filtered by user, pool or state"},
+            "get_desktop_pool_utilization": {"risk": "low", "desc": "Capacity and use per desktop pool"},
+            "get_vdi_task_status": {"risk": "low", "desc": "Status of a pool's long-running task"},
             # vdi publishes this at low, but it is a write (readOnlyHint=False):
             # labelled low, the review would call it an inspection.
-            "session_send_message": {"risk": "medium", "desc": "Message users before maintenance"},
-            "machine_maintenance": {"risk": "medium", "desc": "Enter or exit maintenance mode for machines"},
-            "session_logoff": {"risk": "high", "desc": "Force-logoff sessions"},
-            "machine_reset": {"risk": "high", "desc": "Hard-reset desktop machines"},
-            "pool_push_image": {"risk": "high", "desc": "Push a new image — recreates every desktop in the pool"},
+            "send_vdi_session_message": {"risk": "medium", "desc": "Message users before maintenance"},
+            "set_vdi_machine_maintenance": {"risk": "medium", "desc": "Enter or exit maintenance mode for machines"},
+            "logoff_vdi_session": {"risk": "high", "desc": "Force-logoff sessions"},
+            "reset_vdi_machine": {"risk": "high", "desc": "Hard-reset desktop machines"},
+            "push_desktop_pool_image": {"risk": "high", "desc": "Push a new image — recreates every desktop in the pool"},
         },
     },
 }

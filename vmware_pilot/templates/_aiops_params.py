@@ -9,8 +9,8 @@ workflow is still being planned, when nothing has been created yet.
 The accepted-key sets are copied from the aiops signatures (checked
 2026-09-11); they are what to update if aiops changes them:
 
-* ``vm_reconfigure(vm_name, cpu, memory_mb, target)`` — no ``memory_gb``.
-* ``vm_guest_exec(vm_name, command, username, arguments, password,
+* ``reconfigure_vm(vm_name, cpu, memory_mb, target)`` — no ``memory_gb``.
+* ``run_vm_guest_command(vm_name, command, username, arguments, password,
   working_directory, target, confirm)`` — ``username`` required, no default
   account. ``confirm`` is not a change_spec key: the template adds
   ``confirm=True`` itself (``_gated``), because the step runs after Pilot's
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
-#: change_spec keys that route to ``vm_reconfigure``. ``memory_gb`` is pilot's
+#: change_spec keys that route to ``reconfigure_vm``. ``memory_gb`` is pilot's
 #: convenience and is converted; aiops itself only takes ``memory_mb``.
 RECONFIGURE_KEYS = frozenset({"cpu", "memory_mb", "memory_gb"})
 
@@ -63,8 +63,8 @@ def plan_change(change_spec: Any) -> tuple[str, dict[str, Any]]:
             f"{_CHANGE_SPEC_SHAPES} Then call plan_workflow again."
         )
     if set(change_spec) & RECONFIGURE_KEYS:
-        return "vm_reconfigure", _reconfigure_params(change_spec)
-    return "vm_guest_exec", _guest_exec_params(change_spec)
+        return "reconfigure_vm", _reconfigure_params(change_spec)
+    return "run_vm_guest_command", _guest_exec_params(change_spec)
 
 
 def _reconfigure_params(change_spec: dict[str, Any]) -> dict[str, Any]:
@@ -72,14 +72,14 @@ def _reconfigure_params(change_spec: dict[str, Any]) -> dict[str, Any]:
     if foreign:
         raise ValueError(
             f"clone_and_test: change_spec mixes a resize with {foreign}, which "
-            "vmware-aiops vm_reconfigure does not accept (it takes cpu and memory_mb "
+            "vmware-aiops reconfigure_vm does not accept (it takes cpu and memory_mb "
             "only). Plan the resize and the guest command as two separate "
             "plan_workflow('clone_and_test', ...) calls."
         )
     if "memory_gb" in change_spec and "memory_mb" in change_spec:
         raise ValueError(
             "clone_and_test: change_spec sets both memory_gb and memory_mb. Keep one "
-            "— vm_reconfigure takes memory_mb, and memory_gb is converted to it — "
+            "— reconfigure_vm takes memory_mb, and memory_gb is converted to it — "
             "and call plan_workflow again."
         )
     params = {k: v for k, v in change_spec.items() if k != "memory_gb"}
@@ -99,7 +99,7 @@ def _gb_to_mb(memory_gb: Any) -> int:
     if memory_mb <= 0 or memory_mb != int(memory_mb):
         raise ValueError(
             f"clone_and_test: memory_gb={memory_gb!r} is {memory_mb!r} MB, and "
-            "vm_reconfigure takes memory_mb as a positive whole number. Pass "
+            "reconfigure_vm takes memory_mb as a positive whole number. Pass "
             "memory_mb directly (e.g. {'memory_mb': 4096}) to plan_workflow."
         )
     return int(memory_mb)
@@ -110,7 +110,7 @@ def _guest_exec_params(change_spec: dict[str, Any]) -> dict[str, Any]:
     if foreign:
         raise ValueError(
             f"clone_and_test: change_spec has {foreign}, which is neither a resize "
-            f"key nor a vmware-aiops vm_guest_exec argument "
+            f"key nor a vmware-aiops run_vm_guest_command argument "
             f"({', '.join(sorted(GUEST_EXEC_KEYS))}). {_CHANGE_SPEC_SHAPES} Then call "
             "plan_workflow again."
         )

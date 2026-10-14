@@ -35,17 +35,17 @@ from __future__ import annotations
 FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
     "aiops": frozenset({
         "acknowledge_vcenter_alarm", "add_host_vmk", "attach_iso_to_vm", "batch_clone_vms",
-        "batch_deploy_from_spec", "batch_linked_clone_vms", "cluster_add_host",
-        "cluster_configure", "cluster_create", "cluster_delete", "cluster_remove_host",
+        "batch_deploy_from_spec", "batch_linked_clone_vms", "add_cluster_host",
+        "configure_cluster", "create_cluster", "delete_cluster", "remove_cluster_host",
         "convert_vm_to_template", "create_drs_rule", "create_dvs_portgroup",
         "delete_drs_rule", "deploy_linked_clone", "deploy_vm_from_ova",
         "deploy_vm_from_template", "remove_host_vmk", "reset_vcenter_alarm",
-        "set_drs_rule_enabled", "set_vmk_service", "vm_apply_plan", "vm_cancel_ttl",
-        "vm_clean_slate", "vm_clone", "vm_create", "vm_create_plan", "vm_create_snapshot",
-        "vm_delete", "vm_delete_snapshot", "vm_guest_download", "vm_guest_exec",
-        "vm_guest_exec_output", "vm_guest_provision", "vm_guest_upload", "vm_migrate",
-        "vm_power_off", "vm_power_on", "vm_reconfigure", "vm_revert_snapshot",
-        "vm_rollback_plan", "vm_set_ttl",
+        "set_drs_rule_enabled", "set_vmk_service", "apply_vm_plan", "cancel_vm_ttl",
+        "restore_vm_clean_slate", "clone_vm", "create_vm", "create_vm_plan", "create_vm_snapshot",
+        "delete_vm", "delete_vm_snapshot", "download_vm_guest_file", "run_vm_guest_command",
+        "run_vm_guest_command_with_output", "provision_vm_guest", "upload_vm_guest_file", "migrate_vm",
+        "power_off_vm", "power_on_vm", "reconfigure_vm", "revert_vm_snapshot",
+        "rollback_vm_plan", "set_vm_ttl",
     }),
     "aria": frozenset({
         "acknowledge_alert", "cancel_alert", "create_alert_definition",
@@ -53,12 +53,12 @@ FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
         "set_alert_definition_state",
     }),
     "avi": frozenset({
-        "ako_config_upgrade", "ako_restart", "ako_sync_force", "pool_member_disable",
-        "pool_member_enable", "vs_toggle",
+        "upgrade_ako_config", "restart_ako", "force_ako_sync", "disable_lb_pool_member",
+        "enable_lb_pool_member", "set_virtual_service_enabled",
     }),
     "debug": frozenset({
-        "case_close", "case_grade", "case_hypotheses", "case_open", "case_record_gap",
-        "case_submit_evidence", "case_timeline",
+        "close_case", "grade_case", "record_case_hypothesis", "open_case", "record_case_gap",
+        "submit_case_evidence", "get_case_timeline",
     }),
     "nsx": frozenset({
         "configure_tier0_bgp", "create_ip_pool", "create_nat_rule", "create_segment",
@@ -75,15 +75,15 @@ FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
         "approve", "cancel_workflow", "confirm_draft", "create_workflow", "design_workflow",
         "plan_workflow", "rollback", "run_workflow", "update_draft",
     }),
-    "privateai": frozenset({"vgpu_assign"}),
+    "privateai": frozenset({"assign_vgpu"}),
     "storage": frozenset({
-        "storage_iscsi_add_target", "storage_iscsi_enable", "storage_iscsi_remove_target",
-        "storage_rescan",
+        "add_iscsi_target", "enable_iscsi", "remove_iscsi_target",
+        "rescan_storage",
     }),
     "vdi": frozenset({
-        "entitlement_add", "entitlement_remove", "machine_maintenance", "machine_remove",
-        "machine_reset", "pool_push_image", "pool_set_enabled", "session_disconnect",
-        "session_logoff", "session_send_message", "task_cancel",
+        "add_entitlement", "remove_entitlement", "set_vdi_machine_maintenance", "remove_vdi_machine",
+        "reset_vdi_machine", "push_desktop_pool_image", "set_desktop_pool_enabled", "disconnect_vdi_session",
+        "logoff_vdi_session", "send_vdi_session_message", "cancel_vdi_task",
     }),
     "vks": frozenset({
         "create_namespace", "create_tkc_cluster", "delete_namespace", "delete_tkc_cluster",
@@ -94,12 +94,12 @@ FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
 #: skill → the subset above that also declares ``destructiveHint: True``.
 FAMILY_SELF_DECLARED_DESTRUCTIVE: dict[str, frozenset[str]] = {
     "aiops": frozenset({
-        "cluster_delete", "cluster_remove_host", "delete_drs_rule", "remove_host_vmk",
-        "vm_cancel_ttl", "vm_clean_slate", "vm_delete", "vm_delete_snapshot",
-        "vm_power_off", "vm_revert_snapshot", "vm_rollback_plan", "vm_set_ttl",
+        "delete_cluster", "remove_cluster_host", "delete_drs_rule", "remove_host_vmk",
+        "cancel_vm_ttl", "restore_vm_clean_slate", "delete_vm", "delete_vm_snapshot",
+        "power_off_vm", "revert_vm_snapshot", "rollback_vm_plan", "set_vm_ttl",
     }),
     "aria": frozenset({"cancel_alert", "delete_alert_definition", "delete_report"}),
-    "avi": frozenset({"ako_restart", "ako_sync_force", "pool_member_disable", "vs_toggle"}),
+    "avi": frozenset({"restart_ako", "force_ako_sync", "disable_lb_pool_member", "set_virtual_service_enabled"}),
     "nsx": frozenset({
         "delete_ip_pool", "delete_nat_rule", "delete_segment", "delete_static_route",
         "delete_tier1_gateway",
@@ -108,11 +108,11 @@ FAMILY_SELF_DECLARED_DESTRUCTIVE: dict[str, frozenset[str]] = {
         "delete_dfw_policy", "delete_dfw_rule", "delete_group", "remove_vm_tag",
     }),
     "pilot": frozenset({"rollback"}),
-    "privateai": frozenset({"vgpu_assign"}),
-    "storage": frozenset({"storage_iscsi_remove_target"}),
+    "privateai": frozenset({"assign_vgpu"}),
+    "storage": frozenset({"remove_iscsi_target"}),
     "vdi": frozenset({
-        "entitlement_remove", "machine_remove", "machine_reset", "pool_push_image",
-        "session_disconnect", "session_logoff", "task_cancel",
+        "remove_entitlement", "remove_vdi_machine", "reset_vdi_machine", "push_desktop_pool_image",
+        "disconnect_vdi_session", "logoff_vdi_session", "cancel_vdi_task",
     }),
     "vks": frozenset({"delete_namespace", "delete_tkc_cluster", "get_tkc_kubeconfig"}),
 }

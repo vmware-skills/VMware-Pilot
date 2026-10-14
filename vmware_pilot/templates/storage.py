@@ -34,7 +34,7 @@ def storage_expansion(
             index=0,
             action="check_iscsi_status",
             skill="storage",
-            tool="storage_iscsi_status",
+            tool="get_iscsi_status",
             params={"host_name": host_name, "target": target},
         ),
         WorkflowStep(
@@ -51,14 +51,14 @@ def storage_expansion(
             index=2,
             action="enable_iscsi",
             skill="storage",
-            tool="storage_iscsi_enable",
+            tool="enable_iscsi",
             params={"host_name": host_name, "target": target, "confirm": True},
         ),
         WorkflowStep(
             index=3,
             action="add_iscsi_target",
             skill="storage",
-            tool="storage_iscsi_add_target",
+            tool="add_iscsi_target",
             params={
                 "host_name": host_name,
                 "address": iscsi_address,
@@ -66,7 +66,7 @@ def storage_expansion(
                 "target": target,
                 "confirm": True,
             },
-            rollback_tool="storage_iscsi_remove_target",
+            rollback_tool="remove_iscsi_target",
             rollback_params={
                 "host_name": host_name,
                 "address": iscsi_address,
@@ -79,7 +79,7 @@ def storage_expansion(
             index=4,
             action="rescan_storage",
             skill="storage",
-            tool="storage_rescan",
+            tool="rescan_storage",
             params={"host_name": host_name, "target": target, "confirm": True},
         ),
         WorkflowStep(

@@ -21,7 +21,7 @@ class TestReviewVerdict:
         wf = _wf([
             WorkflowStep(0, "list_vms", "monitor", "list_vms", {"target": "vc1"}),
             WorkflowStep(1, "require_approval", "pilot", "approve", {"message": "ok?"}),
-            WorkflowStep(2, "power_on", "aiops", "vm_power_on", {"vm_name": "web-01"}),
+            WorkflowStep(2, "power_on", "aiops", "power_on_vm", {"vm_name": "web-01"}),
         ])
         result = review(wf)
         assert result["verdict"] == "approved"
@@ -30,7 +30,7 @@ class TestReviewVerdict:
 
     def test_destructive_without_approval_flagged(self):
         wf = _wf([
-            WorkflowStep(0, "delete_vm", "aiops", "vm_delete", {"vm_name": "old-01"}),
+            WorkflowStep(0, "delete_vm", "aiops", "delete_vm", {"vm_name": "old-01"}),
         ])
         result = review(wf)
         assert result["verdict"] == "needs_revision"
@@ -40,7 +40,7 @@ class TestReviewVerdict:
     def test_destructive_with_approval_passes(self):
         wf = _wf([
             WorkflowStep(0, "require_approval", "pilot", "approve", {"message": "delete?"}),
-            WorkflowStep(1, "delete_vm", "aiops", "vm_delete", {"vm_name": "old-01"}),
+            WorkflowStep(1, "delete_vm", "aiops", "delete_vm", {"vm_name": "old-01"}),
         ])
         result = review(wf)
         assert result["verdict"] == "approved"
@@ -84,8 +84,8 @@ class TestReviewGroups:
     def test_destructive_inside_parallel_group_flagged(self):
         steps = [
             WorkflowStep(0, "require_approval", "pilot", "approve", {"message": "ok"}),
-            WorkflowStep(1, "delete_a", "aiops", "vm_delete", {"vm_name": "a"}, group_id="parallel-cleanup"),
-            WorkflowStep(2, "delete_b", "aiops", "vm_delete", {"vm_name": "b"}, group_id="parallel-cleanup"),
+            WorkflowStep(1, "delete_a", "aiops", "delete_vm", {"vm_name": "a"}, group_id="parallel-cleanup"),
+            WorkflowStep(2, "delete_b", "aiops", "delete_vm", {"vm_name": "b"}, group_id="parallel-cleanup"),
         ]
         wf = _wf(steps)
         result = review(wf)
@@ -111,7 +111,7 @@ class TestReviewSummary:
         wf = _wf([
             WorkflowStep(0, "list_vms", "monitor", "list_vms", {}),
             WorkflowStep(1, "require_approval", "pilot", "approve", {"message": "ok"}),
-            WorkflowStep(2, "delete_vm", "aiops", "vm_delete", {"vm_name": "x"}),
+            WorkflowStep(2, "delete_vm", "aiops", "delete_vm", {"vm_name": "x"}),
         ])
         result = review(wf)
         assert result["summary"]["est_duration_min"] >= 0.5

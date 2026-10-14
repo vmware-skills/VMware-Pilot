@@ -295,7 +295,7 @@ def baseline_remediate(
     # companion tool that previews by default is sent confirm=True (_gated).
     for i, item in enumerate(drift_items):
         skill = item.get("skill", "aiops")
-        tool = item.get("tool", "vm_create_plan")
+        tool = item.get("tool", "create_vm_plan")
         rollback_tool = item.get("rollback_tool", "")
         params = item.get("params", {})
         rollback_params = item.get("rollback_params", {})

@@ -108,7 +108,7 @@ class TestFailClosed:
         so it cannot widen without a test going red.
 
         It is not closed here because closing it means either a whole-word rule —
-        which drops ``vs_status`` and ``ssl_expiry_check`` into ``unknown`` for no
+        which drops ``get_virtual_service_status`` and ``check_ssl_cert_expiry`` into ``unknown`` for no
         gain — or another hand-kept exception list, which is the thing this change
         removed.
         """
@@ -154,19 +154,19 @@ class TestCatalogRiskIsRead:
     """``SKILL_CATALOG``'s risk labels stop being decorative."""
 
     def test_catalog_high_risk_is_gated_even_with_an_innocuous_name(self):
-        """``vm_clean_slate`` reverts a VM to a baseline. No substring says so."""
-        assert "ungated_destructive" in _blocking_kinds(_ungated("aiops", "vm_clean_slate"))
+        """``restore_vm_clean_slate`` reverts a VM to a baseline. No substring says so."""
+        assert "ungated_destructive" in _blocking_kinds(_ungated("aiops", "restore_vm_clean_slate"))
 
     def test_catalog_low_risk_is_not_gated(self):
         """The read tier still passes clean — the gate did not become a blanket."""
-        assert _blocking_kinds(_ungated("monitor", "vm_info")) == set()
+        assert _blocking_kinds(_ungated("monitor", "get_vm_info")) == set()
 
     def test_every_high_risk_catalog_entry_is_gated(self):
         """Every one of them, not the handful whose names contain 'delete'.
 
         Thirteen carried the label before this change and none of them was read;
         more were added when the catalog was reconciled against the siblings'
-        own annotations (``aiops.vm_power_off``, the four guest tools, and both
+        own annotations (``aiops.power_off_vm``, the four guest tools, and both
         VKS kubeconfig tools).
         """
         from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
@@ -188,10 +188,10 @@ class TestLabelsAgreeWithWhatTheSiblingsPublish:
     snapshot in ``_family_write_surface`` (which predates both changes):
 
     * ``VMware-AIops/vmware_aiops/mcp_server/tools/guest.py`` publishes
-      ``vm_guest_exec``, ``vm_guest_exec_output``, ``vm_guest_upload`` and
-      ``vm_guest_provision`` with ``destructiveHint: True``. Pilot labelled all
+      ``run_vm_guest_command``, ``run_vm_guest_command_with_output``, ``upload_vm_guest_file`` and
+      ``provision_vm_guest`` with ``destructiveHint: True``. Pilot labelled all
       four ``medium``, so a custom workflow whose only step was
-      ``vm_guest_exec /bin/rm -rf /`` was saved and dispatched with no gate.
+      ``run_vm_guest_command /bin/rm -rf /`` was saved and dispatched with no gate.
     * ``VMware-VKS/vmware_vks/mcp_server/server.py`` publishes
       ``get_supervisor_kubeconfig`` with ``readOnlyHint: False`` — it returns a
       live Supervisor bearer token. It was absent from the catalog, so the
@@ -199,16 +199,16 @@ class TestLabelsAgreeWithWhatTheSiblingsPublish:
     """
 
     @pytest.mark.parametrize(
-        "tool", ["vm_guest_exec", "vm_guest_exec_output", "vm_guest_upload", "vm_guest_provision"]
+        "tool", ["run_vm_guest_command", "run_vm_guest_command_with_output", "upload_vm_guest_file", "provision_vm_guest"]
     )
     def test_guest_tools_are_gated(self, tool):
         assert "ungated_destructive" in _blocking_kinds(_ungated("aiops", tool))
 
     def test_guest_download_stays_ungated(self):
-        """Control: AIops keeps ``vm_guest_download`` at destructiveHint False."""
+        """Control: AIops keeps ``download_vm_guest_file`` at destructiveHint False."""
         from vmware_pilot.mcp_server._catalog import SKILL_CATALOG
 
-        assert SKILL_CATALOG["aiops"]["tools"].get("vm_guest_download", {}).get("risk") != "high"
+        assert SKILL_CATALOG["aiops"]["tools"].get("download_vm_guest_file", {}).get("risk") != "high"
 
     @pytest.mark.parametrize("tool", ["get_supervisor_kubeconfig", "get_tkc_kubeconfig"])
     def test_both_kubeconfig_tools_are_gated_as_credential_access(self, tool):
@@ -233,7 +233,7 @@ class TestCatalogLookup:
         """
         from vmware_pilot.review import TIER_DESTRUCTIVE, classify_step
 
-        tier, why = classify_step("some-skill-not-in-the-catalog", "vm_clean_slate")
+        tier, why = classify_step("some-skill-not-in-the-catalog", "restore_vm_clean_slate")
         assert tier == TIER_DESTRUCTIVE
         assert "catalog" in why
 

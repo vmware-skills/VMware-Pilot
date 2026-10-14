@@ -15,7 +15,7 @@ compatibility: >
   vmware-policy auto-installed as Python dependency (provides @vmware_tool decorator and audit logging). All workflow operations audited to ~/.vmware/audit.db.
   No direct vCenter/NSX credentials: Pilot is an orchestration layer that delegates to companion skills (aiops, monitor, nsx, etc.) which handle their own auth.
   Approval gates: Workflows pause for human review before destructive steps; a custom workflow (YAML, create_workflow, or AI-designed) with a destructive or unclassifiable step not preceded by a gate is rejected, and force=True cannot override that. Rollback is never automatic: a failed step stops the workflow, and undo happens only when rollback is called; it is best-effort, and on the MCP server the calling agent performs each rollback_tool call itself.
-  Pilot drives companion skills that change production (VM power, guest commands, network, storage, Kubernetes). Guest commands (vm_guest_exec, vm_guest_upload, …) and credential-returning steps (vks get_tkc_kubeconfig, get_supervisor_kubeconfig) are gated like destructive ones.
+  Pilot drives companion skills that change production (VM power, guest commands, network, storage, Kubernetes). Guest commands (run_vm_guest_command, upload_vm_guest_file, …) and credential-returning steps (vks get_tkc_kubeconfig, get_supervisor_kubeconfig) are gated like destructive ones.
   State persistence: SQLite-backed workflow state (~/.vmware/workflows.db, owner-only 0600 in a 0700 directory) survives restarts; secret-named params are masked before they are written. No webhooks, no outbound network calls.
   Transitive dependencies: Only vmware-policy (audit/policy). No post-install scripts or background services.
 ---
@@ -32,7 +32,7 @@ Multi-step workflow orchestration for VMware MCP skills — design, approve, exe
 
 | Capability | Description |
 |---|---|
-| Workflow Design | Natural language goal → AI designs steps from the `get_skill_catalog` building-block list (99 curated tools across 13 skills) |
+| Workflow Design | Natural language goal → AI designs steps from the `get_skill_catalog` building-block list (100 curated tools across 13 skills) |
 | Approval Gates | Pause execution for human review before destructive operations |
 | State Persistence | SQLite-backed, survives restarts, supports resume from checkpoint |
 | Rollback | Explicit, best-effort undo of completed steps in reverse order — never automatic (see Troubleshooting) |
@@ -114,7 +114,7 @@ AI calls: plan_workflow("plan_and_approve", {
 })
 → Create Plan → [Approval Gate] → Execute Plan
 → If the apply fails, nothing is undone automatically: ask the user, then call
-  vmware-aiops vm_rollback_plan(plan_id) yourself
+  vmware-aiops rollback_vm_plan(plan_id) yourself
 ```
 
 ### 4. Rolling Maintenance with AVI Drain
@@ -143,11 +143,11 @@ Deploy a backend VM, create a K8s namespace, and wire up AKO Ingress to the AVI 
 
 ## Dispatch Contract (Important)
 
-**Pilot is a Dispatcher, not an Executor.** It generates plans, tracks state, gates on approvals — it does NOT call companion skills' MCP tools itself. The calling AI agent is responsible for invoking `vmware-aiops::vm_clone` etc. when pilot's `run_workflow` returns a step description.
+**Pilot is a Dispatcher, not an Executor.** It generates plans, tracks state, gates on approvals — it does NOT call companion skills' MCP tools itself. The calling AI agent is responsible for invoking `vmware-aiops::clone_vm` etc. when pilot's `run_workflow` returns a step description.
 
 This is intentional v2-style architecture: pilot's context stays small, state is always on disk, and there are no persistent agent threads. Full contract details: see [`references/integration-patterns.md`](references/integration-patterns.md#the-dispatch-contract).
 
-**`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 99 hand-picked building blocks across 13 skills — a deliberate subset of what those skills expose (aiops alone has 60 tools; the catalog lists 19). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
+**`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 100 hand-picked building blocks across 13 skills — a deliberate subset of what those skills expose (aiops alone has 60 tools; the catalog lists 19). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
 
 ## MCP Tools (13 — 4 read, 9 write/control)
 
@@ -195,7 +195,7 @@ every step pilot cannot classify must have a `require_approval` step somewhere
 before it. Otherwise `plan_workflow`, `create_workflow` and `confirm_draft` refuse
 the workflow and name the offending steps, `run_workflow` refuses it even with
 `force=True`, and `scripts/validate_workflow.py` reports an error. Medium-risk
-writes (`create_segment`, `vm_power_on`, …) do not require a gate.
+writes (`create_segment`, `power_on_vm`, …) do not require a gate.
 
 ```yaml
 # ~/.vmware/workflows/restart_cluster.yaml
@@ -214,15 +214,15 @@ steps:
       message: "Cluster healthy. Stop replica {{replica_vm}}?"
   - action: stop_replica
     skill: aiops
-    tool: vm_power_off
+    tool: power_off_vm
     params:
       vm_name: "{{replica_vm}}"
-    rollback_tool: vm_power_on
+    rollback_tool: power_on_vm
     rollback_params:
       vm_name: "{{replica_vm}}"
   - action: restart_primary
     skill: aiops
-    tool: vm_power_off
+    tool: power_off_vm
     params:
       vm_name: "{{primary_vm}}"
 ```

@@ -18,16 +18,16 @@ before its first gate. Read-only checks may come first.
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
-| 0 | Clone VM to staging | aiops | `deploy_linked_clone` | `vm_power_off` (staging) |
+| 0 | Clone VM to staging | aiops | `deploy_linked_clone` | `power_off_vm` (staging) |
 | (1) | **APPROVAL GATE** — guest command only: run it in staging? | pilot | `approve` | -- |
-| 1 | Apply changes to staging | aiops | `vm_reconfigure` or `vm_guest_exec` | -- |
+| 1 | Apply changes to staging | aiops | `reconfigure_vm` or `run_vm_guest_command` | -- |
 | 2 | Monitor staging health | monitor | `get_alarms` | -- |
 | 3 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 4 | Apply changes to production | aiops | `vm_reconfigure` or `vm_guest_exec` | -- |
-| 5 | Power off staging VM | aiops | `vm_power_off` | -- |
+| 4 | Apply changes to production | aiops | `reconfigure_vm` or `run_vm_guest_command` | -- |
+| 5 | Power off staging VM | aiops | `power_off_vm` | -- |
 
 With a guest command the extra gate comes first, so the later steps shift by
-one. `vm_guest_exec` is destructive (vmware-aiops publishes it with
+one. `run_vm_guest_command` is destructive (vmware-aiops publishes it with
 `destructiveHint: true`), and the end-of-test gate would come after it had
 already run in staging.
 
@@ -43,10 +43,10 @@ already run in staging.
 `change_spec` is one of two shapes, and anything the aiops tool would reject is
 refused when the plan is made — before the staging clone exists:
 
-- **Resize** → aiops `vm_reconfigure`: `cpu` and/or `memory_mb`. `memory_gb` is
+- **Resize** → aiops `reconfigure_vm`: `cpu` and/or `memory_mb`. `memory_gb` is
   accepted and converted to `memory_mb` (it must come out a whole number of MB;
   do not pass both). No other keys.
-- **Guest command** → aiops `vm_guest_exec`: `command` (full path of the
+- **Guest command** → aiops `run_vm_guest_command`: `command` (full path of the
   program), `username` (**required** — the guest account to run as; there is no
   default, and pilot never assumes root), `password`, and optionally
   `arguments`, `working_directory`. No other keys.
@@ -109,15 +109,15 @@ plan_workflow("incident_response", {
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
-| 0 | Create batch plan | aiops | `vm_create_plan` | -- |
+| 0 | Create batch plan | aiops | `create_vm_plan` | -- |
 | 1 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 2 | Apply batch plan | aiops | `vm_apply_plan` | `vm_rollback_plan` |
+| 2 | Apply batch plan | aiops | `apply_vm_plan` | `rollback_vm_plan` |
 
 **Parameters**:
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `operations` | list[dict] | Yes | List of operations for vm_create_plan |
+| `operations` | list[dict] | Yes | List of operations for create_vm_plan |
 | `target` | str | No | vCenter target name |
 | `description` | str | No | Human-readable description |
 
@@ -146,7 +146,7 @@ plan_workflow("plan_and_approve", {
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
 | 0 | Check active alarms | monitor | `get_alarms` | -- |
-| 1 | Check capacity | aria / monitor | `get_capacity_overview` (with `cluster_id`) / `cluster_health_summary` (without) | -- |
+| 1 | Check capacity | aria / monitor | `get_capacity_overview` (with `cluster_id`) / `get_cluster_health_summary` (without) | -- |
 | 2 | Check anomalies | aria | `list_anomalies` | -- |
 
 Aria's `get_capacity_overview` requires a cluster id. Without one, the capacity step reads vmware-monitor's per-cluster CPU/memory rollup instead.
@@ -263,8 +263,8 @@ plan_workflow("vks_cluster_deploy", {
 |---|--------|-------|------|----------|
 | 0 | Pre-check health | monitor | `get_alarms` | -- |
 | 1 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 2 | Power off VM_1 | aiops | `vm_power_off` | `vm_power_on` |
-| 3 | Power on VM_1 | aiops | `vm_power_on` | -- |
+| 2 | Power off VM_1 | aiops | `power_off_vm` | `power_on_vm` |
+| 3 | Power on VM_1 | aiops | `power_on_vm` | -- |
 | 4 | Health check VM_1 | monitor | `get_alarms` | -- |
 | ... | (repeat for each VM) | | | |
 
@@ -296,7 +296,7 @@ plan_workflow("rolling_restart", {
 | 0 | Check remaining capacity | aria | `get_remaining_capacity` | -- |
 | 1 | Check rightsizing recommendations | aria | `list_rightsizing_recommendations` | -- |
 | 2 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 3 | Apply reconfiguration | aiops | `vm_create_plan` | -- |
+| 3 | Apply reconfiguration | aiops | `create_vm_plan` | -- |
 | 4 | Verify health | monitor | `get_alarms` | -- |
 
 **Parameters**:
@@ -331,8 +331,8 @@ plan_workflow("capacity_expansion", {
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
 | 0 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 1 | Revert VM to snapshot | aiops | `vm_clean_slate` | -- |
-| 2 | Verify VM is running | monitor | `vm_info` | -- |
+| 1 | Revert VM to snapshot | aiops | `restore_vm_clean_slate` | -- |
+| 2 | Verify VM is running | monitor | `get_vm_info` | -- |
 | 3 | Verify network segments | nsx | `list_segments` | -- |
 | 4 | Verify health (no new alarms) | monitor | `get_alarms` | -- |
 
@@ -364,8 +364,8 @@ plan_workflow("disaster_recovery", {
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
 | 0 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 1 | Upload patch to VM_1 | aiops | `vm_guest_upload` | -- |
-| 2 | Install patch on VM_1 | aiops | `vm_guest_exec_output` | -- |
+| 1 | Upload patch to VM_1 | aiops | `upload_vm_guest_file` | -- |
+| 2 | Install patch on VM_1 | aiops | `run_vm_guest_command_with_output` | -- |
 | 3 | Verify health VM_1 | monitor | `get_alarms` | -- |
 | ... | (repeat for each VM) | | | |
 
@@ -404,11 +404,11 @@ plan_workflow("patch_deployment", {
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
-| 0 | Check iSCSI status (read-only) | storage | `storage_iscsi_status` | -- |
+| 0 | Check iSCSI status (read-only) | storage | `get_iscsi_status` | -- |
 | 1 | **APPROVAL GATE** — enable the adapter and add the target? | pilot | `approve` | -- |
-| 2 | Enable iSCSI adapter | storage | `storage_iscsi_enable` | -- |
-| 3 | Add iSCSI target | storage | `storage_iscsi_add_target` | `storage_iscsi_remove_target` |
-| 4 | Rescan storage | storage | `storage_rescan` | -- |
+| 2 | Enable iSCSI adapter | storage | `enable_iscsi` | -- |
+| 3 | Add iSCSI target | storage | `add_iscsi_target` | `remove_iscsi_target` |
+| 4 | Rescan storage | storage | `rescan_storage` | -- |
 | 5 | Verify new datastores | storage | `list_all_datastores` | -- |
 
 **Parameters**:
@@ -557,7 +557,7 @@ plan_workflow("baseline_remediate", {
             resource: "web01",
             action: "fix_cpu",
             skill: "aiops",
-            tool: "vm_create_plan",
+            tool: "create_vm_plan",
             params: {operations: [{action: "reconfigure", vm_name: "web01", cpu: 4}]},
         },
         {
@@ -589,7 +589,7 @@ plan_workflow("baseline_remediate", {
 | 2 | Gather active Aria alerts | aria | `list_alerts` (`active_only: true`) | round1-gather |
 | 3 | **CHECKPOINT** — four criteria | pilot | `approve` | -- |
 | 4 | Gather anomalies | aria | `list_anomalies` | round2-gather |
-| 5 | Gather per-cluster capacity | monitor | `cluster_health_summary` | round2-gather |
+| 5 | Gather per-cluster capacity | monitor | `get_cluster_health_summary` | round2-gather |
 | 6 | Gather Aria alerts incl. cancelled | aria | `list_alerts` (`active_only: false`) | round2-gather |
 | 7 | **CHECKPOINT** — four criteria again | pilot | `approve` | -- |
 

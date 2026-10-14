@@ -23,10 +23,10 @@ from typing import Any
 #: skill → tools that act only with ``confirm=True``.
 GATED_TOOLS = MappingProxyType({
     "aiops": frozenset({
-        "vm_power_off", "vm_migrate", "vm_revert_snapshot", "vm_delete_snapshot",
-        "vm_guest_exec", "vm_guest_exec_output", "vm_guest_upload", "vm_guest_provision",
-        "cluster_delete", "cluster_remove_host", "vm_set_ttl", "vm_clean_slate",
-        "vm_rollback_plan", "vm_apply_plan", "vm_delete",
+        "power_off_vm", "migrate_vm", "revert_vm_snapshot", "delete_vm_snapshot",
+        "run_vm_guest_command", "run_vm_guest_command_with_output", "upload_vm_guest_file", "provision_vm_guest",
+        "delete_cluster", "remove_cluster_host", "set_vm_ttl", "restore_vm_clean_slate",
+        "rollback_vm_plan", "apply_vm_plan", "delete_vm",
         "create_dvs_portgroup", "add_host_vmk", "remove_host_vmk", "set_vmk_service",
         "create_drs_rule", "set_drs_rule_enabled", "delete_drs_rule",
     }),
@@ -36,8 +36,8 @@ GATED_TOOLS = MappingProxyType({
     }),
     "nsx-security": frozenset({"delete_dfw_policy", "delete_dfw_rule", "delete_group"}),
     "avi": frozenset({
-        "vs_toggle", "pool_member_disable", "ako_restart", "ako_sync_force",
-        "ako_config_upgrade",
+        "set_virtual_service_enabled", "disable_lb_pool_member", "restart_ako", "force_ako_sync",
+        "upgrade_ako_config",
     }),
     "aria": frozenset({
         "start_resource_maintenance", "end_resource_maintenance", "acknowledge_alert",
@@ -47,15 +47,15 @@ GATED_TOOLS = MappingProxyType({
         "create_namespace", "delete_namespace", "create_tkc_cluster", "delete_tkc_cluster",
     }),
     "storage": frozenset({
-        "storage_iscsi_enable", "storage_iscsi_add_target", "storage_iscsi_remove_target",
-        "storage_rescan",
+        "enable_iscsi", "add_iscsi_target", "remove_iscsi_target",
+        "rescan_storage",
     }),
     "vdi": frozenset({
-        "machine_reset", "machine_remove", "machine_maintenance", "session_logoff",
-        "session_disconnect", "task_cancel", "pool_push_image", "pool_set_enabled",
-        "entitlement_add", "entitlement_remove",
+        "reset_vdi_machine", "remove_vdi_machine", "set_vdi_machine_maintenance", "logoff_vdi_session",
+        "disconnect_vdi_session", "cancel_vdi_task", "push_desktop_pool_image", "set_desktop_pool_enabled",
+        "add_entitlement", "remove_entitlement",
     }),
-    "privateai": frozenset({"vgpu_assign"}),
+    "privateai": frozenset({"assign_vgpu"}),
 })
 
 #: Deprecated aliases for ``confirm`` on the gated tools.

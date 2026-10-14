@@ -116,7 +116,7 @@ If the task is a single, self-contained operation with no dependencies on other 
 
 ```
 # Correct: single operation, call aiops directly
-aiops.vm_power_on(vm_name="web-prod-01")
+aiops.power_on_vm(vm_name="web-prod-01")
 
 # Wrong: unnecessary pilot wrapper for a single step
 pilot.run_workflow(template="power_on", targets=["web-prod-01"])

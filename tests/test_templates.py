@@ -53,12 +53,12 @@ class TestCloneAndTest:
         assert len(approval_steps) == 1
 
     def test_an_empty_change_spec_is_refused_at_plan_time(self):
-        """It used to build a vm_guest_exec step with no command at all."""
+        """It used to build a run_vm_guest_command step with no command at all."""
         with pytest.raises(ValueError, match="change_spec"):
             clone_and_test(target_vm="app01", change_spec={})
 
 
-#: A guest change_spec as vmware-aiops vm_guest_exec takes it, minus vm_name/target.
+#: A guest change_spec as vmware-aiops run_vm_guest_command takes it, minus vm_name/target.
 _GUEST_SPEC = {"command": "/usr/bin/apt-get", "arguments": "-y upgrade",
                "username": "ops", "password": "pw"}
 
@@ -71,9 +71,9 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
     already been created — as a schema rejection from aiops.
     """
 
-    #: vmware-aiops vm_reconfigure(vm_name, cpu, memory_mb, target) — no memory_gb.
+    #: vmware-aiops reconfigure_vm(vm_name, cpu, memory_mb, target) — no memory_gb.
     RECONFIGURE_PARAMS = {"vm_name", "cpu", "memory_mb", "target"}
-    #: vmware-aiops vm_guest_exec(vm_name, command, username, arguments,
+    #: vmware-aiops run_vm_guest_command(vm_name, command, username, arguments,
     #: password, working_directory, target, confirm). confirm since 2026-09-19:
     #: the tool previews without it, and the step runs after Pilot's approval.
     GUEST_EXEC_PARAMS = {"vm_name", "command", "username", "arguments", "password",
@@ -85,7 +85,7 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
     def test_memory_gb_is_sent_as_memory_mb(self):
         wf = clone_and_test(target_vm="db01", change_spec={"memory_gb": 32, "cpu": 4})
         for step in self._apply_steps(wf):
-            assert step.tool == "vm_reconfigure"
+            assert step.tool == "reconfigure_vm"
             assert set(step.params) <= self.RECONFIGURE_PARAMS, step.params
             assert step.params["memory_mb"] == 32768
             assert step.params["cpu"] == 4
@@ -110,7 +110,7 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
     def test_a_guest_spec_builds_guest_steps_with_the_given_account(self):
         wf = clone_and_test(target_vm="db01", change_spec=_GUEST_SPEC)
         for step in self._apply_steps(wf):
-            assert step.tool == "vm_guest_exec"
+            assert step.tool == "run_vm_guest_command"
             assert set(step.params) <= self.GUEST_EXEC_PARAMS, step.params
             assert step.params["username"] == "ops"
 
@@ -135,9 +135,9 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
             clone_and_test(target_vm="db01", change_spec={**_GUEST_SPEC, "script": "x"})
 
     def test_the_staging_guest_command_is_behind_an_approval_gate(self):
-        """vm_guest_exec is destructive; the staging run needs its own gate."""
+        """run_vm_guest_command is destructive; the staging run needs its own gate."""
         wf = clone_and_test(target_vm="db01", change_spec=_GUEST_SPEC)
-        first_guest = next(s.index for s in wf.steps if s.tool == "vm_guest_exec")
+        first_guest = next(s.index for s in wf.steps if s.tool == "run_vm_guest_command")
         assert any(
             s.action == "require_approval" and s.index < first_guest for s in wf.steps
         )
@@ -206,7 +206,7 @@ class TestPlanAndApprove:
     def test_rollback_on_apply_step(self):
         wf = plan_and_approve(operations=[{"action": "power_on", "vm_name": "x"}])
         apply_step = wf.steps[2]
-        assert apply_step.rollback_tool == "vm_rollback_plan"
+        assert apply_step.rollback_tool == "rollback_vm_plan"
 
     def test_custom_description(self):
         wf = plan_and_approve(
@@ -264,7 +264,7 @@ class TestComplianceScan:
         assert (with_id.skill, with_id.tool) == ("aria", "get_capacity_overview")
         assert with_id.params["cluster_id"] == "c-1"
         without = [s for s in compliance_scan().steps if s.action == "check_capacity"][0]
-        assert (without.skill, without.tool) == ("monitor", "cluster_health_summary")
+        assert (without.skill, without.tool) == ("monitor", "get_cluster_health_summary")
 
 
 @pytest.mark.unit
@@ -327,7 +327,7 @@ class TestRollingRestart:
     def test_has_rollback_per_vm(self):
         wf = rolling_restart(vm_names=["vm1"])
         power_off_steps = [s for s in wf.steps if "power_off" in s.action]
-        assert all(s.rollback_tool == "vm_power_on" for s in power_off_steps)
+        assert all(s.rollback_tool == "power_on_vm" for s in power_off_steps)
 
     def test_scales_with_vm_count(self):
         wf2 = rolling_restart(vm_names=["a", "b"])
@@ -414,7 +414,7 @@ class TestPatchDeployment:
 
     def test_every_guest_step_carries_the_given_account(self):
         wf = patch_deployment(["a", "b"], "/p", "/p", "bash /p", username="ops")
-        guest = [s for s in wf.steps if s.tool.startswith("vm_guest_")]
+        guest = [s for s in wf.steps if "_vm_guest_" in s.tool]
         assert len(guest) == 4
         assert {s.params["username"] for s in guest} == {"ops"}
 
@@ -429,7 +429,7 @@ class TestStorageExpansion:
     def test_has_rollback_on_add(self):
         wf = storage_expansion(host_name="h1", iscsi_address="10.0.0.1")
         add_step = [s for s in wf.steps if s.action == "add_iscsi_target"][0]
-        assert add_step.rollback_tool == "storage_iscsi_remove_target"
+        assert add_step.rollback_tool == "remove_iscsi_target"
 
     def test_uses_storage_skill(self):
         wf = storage_expansion(host_name="h1", iscsi_address="10.0.0.1")
@@ -488,7 +488,7 @@ class TestBaselineAudit:
 class TestBaselineRemediate:
     def test_creates_workflow(self):
         drifts = [
-            {"resource": "vm-web01", "skill": "aiops", "tool": "vm_power_on", "params": {"vm_name": "vm-web01"}},
+            {"resource": "vm-web01", "skill": "aiops", "tool": "power_on_vm", "params": {"vm_name": "vm-web01"}},
             {"resource": "seg-app", "skill": "nsx", "tool": "create_segment", "params": {"segment_id": "seg-app"}},
         ]
         wf = baseline_remediate(drift_items=drifts)

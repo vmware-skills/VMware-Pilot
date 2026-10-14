@@ -97,7 +97,7 @@ def compliance_scan(
         check_capacity: Include capacity check (default True).
         cluster_id: Aria resource id of a cluster. Aria's ``get_capacity_overview``
             requires one; without it the capacity step reads monitor's
-            ``cluster_health_summary`` instead, which covers every cluster.
+            ``get_cluster_health_summary`` instead, which covers every cluster.
     """
     now = datetime.now(tz=timezone.utc).isoformat()
     steps = []
@@ -131,7 +131,7 @@ def compliance_scan(
                 index=idx,
                 action="check_capacity",
                 skill="monitor",
-                tool="cluster_health_summary",
+                tool="get_cluster_health_summary",
                 params={"target": target},
             )
         )
@@ -276,7 +276,7 @@ def investigate_alert(
                 index=5,
                 action="gather_capacity",
                 skill="monitor",
-                tool="cluster_health_summary",
+                tool="get_cluster_health_summary",
                 params={"target": target},
             ),
             WorkflowStep(

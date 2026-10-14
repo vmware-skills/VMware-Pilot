@@ -242,10 +242,10 @@ steps:
 
   - action: apply_change
     skill: aiops
-    tool: vm_power_off
+    tool: power_off_vm
     params:
       vm_name: "{{vm_name}}"
-    rollback_tool: vm_power_on
+    rollback_tool: power_on_vm
     rollback_params:
       vm_name: "{{vm_name}}"
 ```

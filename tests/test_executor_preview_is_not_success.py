@@ -46,7 +46,7 @@ def _wf(wid: str) -> Workflow:
         id=wid, workflow_type="test", state=WorkflowState.PENDING,
         steps=[
             WorkflowStep(index=0, action="ok", skill="monitor", tool="get_alarms", params={}),
-            WorkflowStep(index=1, action="off", skill="aiops", tool="vm_power_off",
+            WorkflowStep(index=1, action="off", skill="aiops", tool="power_off_vm",
                          params={"vm_name": "db01"}),
             WorkflowStep(index=2, action="after", skill="monitor", tool="get_alarms", params={}),
         ],
@@ -68,7 +68,7 @@ class TestPreviewIsAFailure:
         store.save(wf)
 
         def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
-            return dict(_PREVIEW) if tool == "vm_power_off" else {"ok": True}
+            return dict(_PREVIEW) if tool == "power_off_vm" else {"ok": True}
 
         result = WorkflowExecutor(store, dispatch=dispatch).run_until_checkpoint(wf)
 
@@ -137,7 +137,7 @@ class TestNestedPreviewIsData:
         store.save(wf)
 
         def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
-            if tool == "vm_power_off":
+            if tool == "power_off_vm":
                 return {"action": "powered_off", "blast_radius": {"action": "preview"}}
             return {"ok": True}
 

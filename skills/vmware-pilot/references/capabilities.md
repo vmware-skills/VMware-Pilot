@@ -63,13 +63,13 @@ numbers matter here, and they are not the same thing:
 | vmware-vks | `vmware-vks` | 23 | 8 | Tanzu Supervisor, Namespaces, TKC clusters |
 | vmware-storage | `vmware-storage` | 14 | 5 | Datastores, iSCSI, vSAN, FC multipath |
 | vmware-avi | `vmware-avi` | 28 | 13 | AVI load balancing, pool members, AKO K8s ops |
-| vmware-debug | `vmware-debug` | 14 | 4 | Incident correlation, evidence-graded cases |
+| vmware-debug | `vmware-debug` | 14 | 5 | Incident correlation, evidence-graded cases |
 | vmware-harden | `vmware-harden` | 8 | 5 | Compliance baselines, violations, drift |
 | vmware-log-insight | `vmware-log-insight` | 7 | 4 | Log search, aggregation, alerts |
 | vmware-privateai | `vmware-privateai` | 17 | 5 | GPU hosts, vGPU profiles, utilisation |
 | vmware-vdi | `vmware-vdi` | 27 | 9 | Horizon pools, sessions, machines, images |
 
-**Totals**: 329 tools across the 13 companion skills; the design catalog covers 99 of them
+**Totals**: 329 tools across the 13 companion skills; the design catalog covers 100 of them
 across all 13. Pilot adds 13 orchestration tools of its own. The counts are checked against
 the companion snapshot by `tests/eval/regression/test_catalog_covers_the_family.py`.
 
