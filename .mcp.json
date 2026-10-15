@@ -5,7 +5,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "vmware-pilot==2.0.0",
+        "vmware-pilot==2.1.0",
         "vmware-pilot-mcp"
       ]
     }

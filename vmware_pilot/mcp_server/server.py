@@ -15,6 +15,7 @@ Exposes 13 tools for AI agents to manage multi-step VMware workflows:
 
 from __future__ import annotations
 
+from typing import Optional
 import logging
 
 from vmware_policy import describe_tool_parameters
@@ -147,9 +148,11 @@ __all__ = [
 ]
 
 
-def main() -> None:
+def main(expose: Optional[str] = None, allow_write: Optional[str] = None) -> None:
     """Run the MCP server over stdio."""
     logging.basicConfig(level=logging.INFO)
+    from vmware_policy.exposure import apply_or_exit
+    apply_or_exit(mcp, skill="pilot", expose=expose, allow_write=allow_write)
     mcp.run(transport="stdio")
 
 # The docstrings above are the schema. `describe_tool_parameters` copies each

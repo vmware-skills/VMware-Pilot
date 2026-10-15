@@ -1,3 +1,20 @@
+## v2.1.0 — offer only read tools, plus chosen write tools
+
+`vmware-pilot mcp` can now offer a subset of this server's tools (HLD §17 D-16, via vmware-policy 1.20.0):
+
+```bash
+vmware-pilot mcp --expose read --allow-write cancel_workflow
+```
+
+* `--expose read` (or `VMWARE_PILOT_MCP_EXPOSE=read`) keeps only tools annotated `readOnlyHint: true`; `--allow-write a,b`
+  (or `VMWARE_PILOT_MCP_ALLOW_WRITE`) keeps chosen write tools on top. The default is unchanged: every tool.
+* A bad value, or a name that is not a write tool of this server, stops the server before it serves (exit 2).
+  Flags and environment variables are not mixed; a blank flag counts as not given. Pre-2.0 names are accepted.
+* This limits what clients are offered; it is not authorization. See "Limiting which tools are offered" in
+  `references/setup-guide.md`, which also notes that an agent with a shell can bypass MCP, so the account itself
+  must be least-privilege.
+* Requires `vmware-policy>=1.20.0`.
+
 ## v2.0.0 — create_workflow_from_template, and VKS kubeconfig tools at their new names
 
 **Breaking: one of Pilot's own MCP tools is renamed.** `plan_workflow` → `create_workflow_from_template`.

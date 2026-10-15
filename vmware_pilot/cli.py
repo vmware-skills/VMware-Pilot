@@ -13,6 +13,7 @@ convention — every sibling skill exposes the same ``<skill> mcp`` subcommand.
 
 from __future__ import annotations
 
+from typing import Optional
 import typer
 
 from vmware_pilot import __version__
@@ -69,7 +70,19 @@ def version_cmd() -> None:
 
 @app.command("mcp")
 @cli_local("starts the MCP server; its tools audit themselves")
-def mcp_cmd() -> None:
+def mcp_cmd(
+    expose: Optional[str] = typer.Option(
+        None,
+        "--expose",
+        help="Which tools to offer: all (default) or read. Limits what clients see; "
+        "not authorization: the account's permissions still decide.",
+    ),
+    allow_write: Optional[str] = typer.Option(
+        None,
+        "--allow-write",
+        help="With --expose read: comma-separated write tools to offer as well.",
+    ),
+) -> None:
     """Start the MCP server (stdio transport).
 
     Single-command entry point for MCP clients:
@@ -96,7 +109,7 @@ def mcp_cmd() -> None:
 
     from vmware_pilot.mcp_server.server import main as _mcp_main
 
-    _mcp_main()
+    _mcp_main(expose=expose, allow_write=allow_write)
 
 
 if __name__ == "__main__":  # pragma: no cover
