@@ -132,6 +132,34 @@ vmware-pilot mcp --expose read --allow-write cancel_workflow
 - This limits what clients are offered. It is **not** authorization. This server's write tools change workflow state on this machine; the steps it runs act through the other skills' accounts;
   deny rules in `~/.vmware/rules.yaml` still apply to every exposed tool.
 
+## Serving MCP over HTTPS
+
+By default the MCP server speaks stdio to one local client. To let clients on other machines reach it, serve it over
+HTTPS. Every caller then needs a bearer token.
+
+```bash
+vmware-audit token create alice                      # prints the token once; give it to alice
+vmware-pilot mcp --transport https --host 0.0.0.0 --port 8443 \
+    --cert /etc/vmware-mcp/server.pem --key /etc/vmware-mcp/server-key.pem \
+    --public-name mcp.example.com
+```
+
+- Clients connect to `https://mcp.example.com:8443/mcp` and send `Authorization: Bearer <token>`.
+- `--public-name` lists every host name clients use (comma-separated); requests for any other Host or Origin are
+  refused. Use a certificate your clients trust for those names.
+- Behind a reverse proxy that terminates TLS (Nginx, HAProxy) on the same machine, use
+  `--transport http --host 127.0.0.1 --public-name mcp.example.com` (the names the proxy forwards in `Host`), and
+  have the proxy pass the `Authorization` header through.
+- `vmware-audit token list` / `token revoke NAME` manage callers; a revoked token is refused from its next request.
+  Replace a leaked token under a new name.
+- The server will not start without at least one token, and checks before it binds that unauthenticated requests
+  are refused.
+- Each audit row records the caller as `token:<name>`. Calls naming different targets run in parallel; calls that
+  name no target run one at a time, so name the target when several people use one server.
+- **Everyone who can reach the endpoint acts with this server's account.** Tokens identify callers; they grant
+  nothing on the platform. Run one endpoint per privilege level (for example a read-only account behind
+  `--expose read`, and a separate endpoint for operators).
+
 ## Configuration
 
 Pilot itself requires **no vCenter/NSX/AVI credentials**. It is a pure orchestrator that delegates all infrastructure calls to companion skills.
