@@ -291,7 +291,9 @@ def approve(workflow_id: str, approver: str = "") -> dict:
 
     Args:
         workflow_id: The workflow ID to approve.
-        approver: Name of the person approving (for audit trail).
+        approver: Name of the person approving (for audit trail). Over an
+            authenticated network transport leave it empty: the approver is
+            the caller's token name, and a different name is refused.
 
     Note: this server has no dispatcher — after approval, remaining steps
     are recorded as 'not_executed' and the result carries
@@ -306,6 +308,21 @@ def approve(workflow_id: str, approver: str = "") -> dict:
         if not wf:
             return {"error": f"Workflow '{workflow_id}' not found"}
 
+        # Over HTTPS the approver is who authenticated, not a free-text claim
+        # (HLD §16 D-12): token "bob" must not record an approval as "alice".
+        from vmware_policy.caller import current_caller
+
+        caller = current_caller()
+        if caller is not None:
+            if approver and approver != caller:
+                return {
+                    "error": f"approver {approver!r} differs from the authenticated caller "
+                    f"{caller!r}; over a network transport the approval is recorded as the "
+                    "caller.",
+                    "hint": "Call approve again without 'approver', or have that person "
+                    "approve with their own token.",
+                }
+            approver = caller
         # Non-empty approver enforcement lives in the executor so embedders
         # cannot bypass the audit-trail requirement.
         return _get_executor().resume_after_approval(wf, approver=approver)
