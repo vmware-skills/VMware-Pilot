@@ -22,6 +22,9 @@ annotations are unchanged; the MCP `instructions` and the tool's description now
   both names); `vmware-audit policy` lists any rule that now matches more.
 * Requires vmware-policy ≥ 1.19.0, which carries these three pairs in
   `vmware_policy.renames`.
+* **Upgrade vmware-vks to 3.0.0 together with this release.** Pilot 2.0 calls the kubeconfig tools by
+  their new names, which vmware-vks 2.x does not register; Pilot does not depend on vmware-vks, so
+  upgrading Pilot alone leaves those steps pointing at tools that do not exist yet.
 
 ## v1.13.0 — companion tools at their 2.0 names
 
