@@ -36,7 +36,7 @@ These are structural, so it cannot.
 |---|---|
 | "Do not execute steps yourself — hand them back for a human to run" | **The dispatch contract.** Pilot never calls a companion skill's MCP tools; it returns a step description and the calling agent invokes the tool. This is architecture, not etiquette. |
 | "Check the plan makes sense before running it" | **`review_workflow`** performs a structural sanity check and returns `approved` or `needs_revision`. It is a read tool that inspects a definition without executing it. |
-| "Put an approval gate before anything destructive" | **Custom-workflow rejection.** In a custom workflow (YAML, `create_workflow`, or a draft), a destructive or unclassifiable step — or any step passing `confirm: True` — with no `require_approval` before it makes `create_workflow` / `confirm_draft` / `plan_workflow` refuse to save it and `run_workflow` refuse to run it — `force=True` does not override that. The refusal names the step and the gate to insert. |
+| "Put an approval gate before anything destructive" | **Custom-workflow rejection.** In a custom workflow (YAML, `create_workflow`, or a draft), a destructive or unclassifiable step — or any step passing `confirm: True` — with no `require_approval` before it makes `create_workflow` / `confirm_draft` / `create_workflow_from_template` refuse to save it and `run_workflow` refuse to run it — `force=True` does not override that. The refusal names the step and the gate to insert. |
 | "Log every state change you make" | **The `@vmware_tool` decorator.** Every workflow transition is recorded to `~/.vmware/audit.db`, and `get_workflow_status` returns the state plus its audit log. |
 
 The one guardrail this skill does not hand you: pilot's list tools return bare
@@ -98,7 +98,7 @@ your agent's instruction block.
   before undoing anything. On the MCP server the rollback tool cannot see the
   steps you performed (they stay not_executed), so undo them yourself: call each
   one's rollback_tool with its rollback_params, last step first.
-- get_tkc_kubeconfig and get_supervisor_kubeconfig return a live credential.
+- issue_tkc_kubeconfig and issue_supervisor_kubeconfig return a live credential.
   Only fetch one when the user asks, write it to a file, and never print the
   token.
 - Run review_workflow before executing. Treat needs_revision as a stop.
@@ -135,7 +135,7 @@ checklist when evaluating any local model against these skills:
 | Long tool responses: omits items, or reports "no data returned" when data was present | Ask for explicit limits so responses stay small. Pilot's lists have no truncation envelope, so verify long results rather than trusting the summary. |
 | Adds generic recommendations unsupported by results | The "analysis discipline" rules. |
 | Drops requested fields or reorders results | State the required fields and ordering in the request itself. In a workflow, reordering the steps changes what the plan does. |
-| Multi-tool workflows take 30–50s end to end | Start from a built-in template with `plan_workflow` rather than designing from scratch; `get_workflow_status` returns state and audit log together. |
+| Multi-tool workflows take 30–50s end to end | Start from a built-in template with `create_workflow_from_template` rather than designing from scratch; `get_workflow_status` returns state and audit log together. |
 
 ### Workflow design failures — the pattern to watch here
 

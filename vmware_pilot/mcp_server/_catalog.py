@@ -108,8 +108,8 @@ SKILL_CATALOG = {
             "upgrade_tkc_cluster": {"risk": "medium", "desc": "Upgrade K8s version"},
             "delete_tkc_cluster": {"risk": "high", "desc": "Delete TKC cluster"},
             # Both kubeconfig tools are listed so the gate stops reading them as
-            # inspections: each opens with "get_" and returns a live Supervisor
-            # bearer token. "high" here is pilot's gating decision for
+            # inspections: each opened with "get_" before 2.0 and returns a
+            # live Supervisor bearer token. "high" here is pilot's gating decision for
             # *credential access*, not a copy of vmware-vks's own label — VKS
             # publishes both with readOnlyHint=False, destructiveHint=False,
             # risk_level "medium" (they destroy nothing in the cluster). Pilot
@@ -117,11 +117,11 @@ SKILL_CATALOG = {
             # and the only tier that gates is the destructive one. Without an
             # entry, the read-only name heuristic placed them in the read tier:
             # confidently wrong rather than merely uninformed.
-            "get_tkc_kubeconfig": {
+            "issue_tkc_kubeconfig": {
                 "risk": "high",
                 "desc": "Fetch a TKC kubeconfig — returns a live session credential",
             },
-            "get_supervisor_kubeconfig": {
+            "issue_supervisor_kubeconfig": {
                 "risk": "high",
                 "desc": "Fetch the Supervisor kubeconfig — returns a live bearer token",
             },

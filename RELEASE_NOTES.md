@@ -1,3 +1,28 @@
+## v2.0.0 — create_workflow_from_template, and VKS kubeconfig tools at their new names
+
+**Breaking: one of Pilot's own MCP tools is renamed.** `plan_workflow` → `create_workflow_from_template`.
+It never produced a dry-run plan: it builds the steps a template (`workflow_type` + `params`, built-in or
+custom YAML) defines and saves the workflow in state `pending`, ready for `run_workflow` — a write.
+"plan" read as a look that changes nothing. The new name says what it does and sets it apart from
+`create_workflow`, which saves a step list you write yourself. Parameters, results, risk label and
+annotations are unchanged; the MCP `instructions` and the tool's description now say this.
+
+| Old | New |
+|---|---|
+| `plan_workflow` | `create_workflow_from_template` |
+
+* vmware-vks renamed `get_supervisor_kubeconfig` → `issue_supervisor_kubeconfig` and
+  `get_tkc_kubeconfig` → `issue_tkc_kubeconfig` (they hand out a live credential). The skill catalog
+  lists them under the new names, still at `high` (credential access is gated).
+* CLI commands are unchanged.
+* Saved workflows keep working: a stored workflow, YAML file, draft or undo descriptor whose step names
+  `pilot.plan_workflow` or a VKS `get_*_kubeconfig` tool is translated to the new name when Pilot builds
+  the step, like the other 2.0 renames.
+* Deny rules in `~/.vmware/rules.yaml` written with the old names keep working (vmware-policy matches
+  both names); `vmware-audit policy` lists any rule that now matches more.
+* Requires vmware-policy ≥ 1.19.0 (not yet published), which carries these three pairs in
+  `vmware_policy.renames`.
+
 ## v1.13.0 — companion tools at their 2.0 names
 
 * Ten companion skills renamed their MCP tools verb-first in 2.0 (`vm_power_off` → `power_off_vm`,

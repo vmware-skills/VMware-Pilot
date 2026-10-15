@@ -45,7 +45,7 @@ def require_guest_username(username: Any, where: str) -> str:
             f"{where}: a guest username is required. vmware-aiops runs guest "
             "commands as the account you name and has no default, so pilot will "
             "not assume root either. Pass the guest OS account "
-            "(e.g. username='ops') and its password, then call plan_workflow again."
+            "(e.g. username='ops') and its password, then call create_workflow_from_template again."
         )
     return username
 
@@ -60,7 +60,7 @@ def plan_change(change_spec: Any) -> tuple[str, dict[str, Any]]:
         raise ValueError(
             f"clone_and_test: change_spec must be a non-empty dict (got "
             f"{change_spec!r:.40}), or there is nothing to apply to the staging VM. "
-            f"{_CHANGE_SPEC_SHAPES} Then call plan_workflow again."
+            f"{_CHANGE_SPEC_SHAPES} Then call create_workflow_from_template again."
         )
     if set(change_spec) & RECONFIGURE_KEYS:
         return "reconfigure_vm", _reconfigure_params(change_spec)
@@ -74,13 +74,13 @@ def _reconfigure_params(change_spec: dict[str, Any]) -> dict[str, Any]:
             f"clone_and_test: change_spec mixes a resize with {foreign}, which "
             "vmware-aiops reconfigure_vm does not accept (it takes cpu and memory_mb "
             "only). Plan the resize and the guest command as two separate "
-            "plan_workflow('clone_and_test', ...) calls."
+            "create_workflow_from_template('clone_and_test', ...) calls."
         )
     if "memory_gb" in change_spec and "memory_mb" in change_spec:
         raise ValueError(
             "clone_and_test: change_spec sets both memory_gb and memory_mb. Keep one "
             "— reconfigure_vm takes memory_mb, and memory_gb is converted to it — "
-            "and call plan_workflow again."
+            "and call create_workflow_from_template again."
         )
     params = {k: v for k, v in change_spec.items() if k != "memory_gb"}
     if "memory_gb" in change_spec:
@@ -93,14 +93,14 @@ def _gb_to_mb(memory_gb: Any) -> int:
         raise ValueError(
             f"clone_and_test: memory_gb must be a number, got {memory_gb!r}. "
             "Pass e.g. {'memory_gb': 32}, or memory_mb as a whole number, to "
-            "plan_workflow."
+            "create_workflow_from_template."
         )
     memory_mb = memory_gb * _MB_PER_GB
     if memory_mb <= 0 or memory_mb != int(memory_mb):
         raise ValueError(
             f"clone_and_test: memory_gb={memory_gb!r} is {memory_mb!r} MB, and "
             "reconfigure_vm takes memory_mb as a positive whole number. Pass "
-            "memory_mb directly (e.g. {'memory_mb': 4096}) to plan_workflow."
+            "memory_mb directly (e.g. {'memory_mb': 4096}) to create_workflow_from_template."
         )
     return int(memory_mb)
 
@@ -112,14 +112,15 @@ def _guest_exec_params(change_spec: dict[str, Any]) -> dict[str, Any]:
             f"clone_and_test: change_spec has {foreign}, which is neither a resize "
             f"key nor a vmware-aiops run_vm_guest_command argument "
             f"({', '.join(sorted(GUEST_EXEC_KEYS))}). {_CHANGE_SPEC_SHAPES} Then call "
-            "plan_workflow again."
+            "create_workflow_from_template again."
         )
     command = change_spec.get("command")
     if not isinstance(command, str) or not command.strip():
         raise ValueError(
             "clone_and_test: a guest change_spec needs 'command' — the full path of "
             "the program to run in the guest (e.g. '/usr/bin/apt-get'); put its "
-            f"arguments in 'arguments', and call plan_workflow again. {_CHANGE_SPEC_SHAPES}"
+            f"arguments in 'arguments', and call create_workflow_from_template again. "
+            f"{_CHANGE_SPEC_SHAPES}"
         )
     require_guest_username(change_spec.get("username"), "clone_and_test change_spec")
     return dict(change_spec)

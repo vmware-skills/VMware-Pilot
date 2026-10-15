@@ -6,13 +6,13 @@ Checks:
   - Every step has action / skill / tool, and params is a mapping
   - Approval gates: every destructive or unclassifiable step has a
     ``require_approval`` step somewhere before it. This is an ERROR, not a
-    warning — ``plan_workflow`` refuses such a file, and so does this script.
+    warning — ``create_workflow_from_template`` refuses such a file, and so does this script.
   - Skill / tool names the skill catalog does not list (warning only — the
     catalog is a curated subset, not a whitelist)
 
 The classification is not kept here. It is vmware-pilot's own
 (``vmware_pilot.approval_gate`` over ``vmware_pilot.review``), run by building
-the workflow exactly as ``plan_workflow`` does, so this script cannot pass a
+the workflow exactly as ``create_workflow_from_template`` does, so this script cannot pass a
 file that pilot will refuse. It therefore needs vmware-pilot importable:
 
     # with vmware-pilot installed via `uv tool install vmware-pilot`
@@ -140,7 +140,7 @@ def validate(path: Path) -> tuple[list[str], list[str]]:
             "multiple workflows (recommended max: 15)"
         )
 
-    # Build it exactly the way plan_workflow will. Placeholders stay unfilled;
+    # Build it exactly the way create_workflow_from_template will. Placeholders stay unfilled;
     # the gate verdict does not depend on them (only params are substituted).
     try:
         _make_loader(spec, path)()

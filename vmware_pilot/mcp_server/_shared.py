@@ -64,11 +64,12 @@ def _safe_error(exc: Exception, tool: str) -> str:
 mcp = FastMCP(
     "vmware-pilot",
     instructions=(
-        "VMware workflow orchestration. Plan and execute multi-step operations "
+        "VMware workflow orchestration. Create and run multi-step operations "
         "(clone-test-approve-commit, incident response) with state persistence "
         "and approval gates. Nothing rolls back automatically: a failed step stops "
         "the workflow, and rollback is an explicit, best-effort call. "
-        "Use plan_workflow to create a plan, run_workflow to execute, "
+        "Use create_workflow_from_template to create and save a workflow from a "
+        "template (create_workflow for your own step list), run_workflow to execute, "
         "approve to continue past gates, rollback to undo."
     ),
 )
@@ -100,7 +101,7 @@ def _validate_template_name(name: str) -> str | None:
     template cannot be written outside the workflows dir. Built-in template
     names are reserved too: ``get_all_templates`` lets a custom template of the
     same name take precedence, so saving one would replace the vetted built-in
-    for every later ``plan_workflow`` call.
+    for every later ``create_workflow_from_template`` call.
     """
     from vmware_pilot.templates import BUILTIN_TEMPLATES
 
@@ -113,7 +114,7 @@ def _validate_template_name(name: str) -> str | None:
         return (
             f"Invalid workflow name {name!r}: it is a built-in template, and a custom "
             "template saved under that name would replace the built-in for every "
-            f"later plan_workflow('{name}') call. Choose a name of your own, e.g. "
+            f"later create_workflow_from_template('{name}') call. Choose a name of your own, e.g. "
             f"'{name}_custom' or one that says what this workflow does."
         )
     return None

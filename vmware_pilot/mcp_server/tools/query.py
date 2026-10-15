@@ -44,7 +44,7 @@ def review_workflow(workflow_id: str) -> dict:
     deliberately create in staging *before* asking for approval.
 
     Args:
-        workflow_id: The workflow ID returned by ``plan_workflow``.
+        workflow_id: The workflow ID returned by ``create_workflow_from_template``.
 
     Returns:
         Dict with keys:
@@ -120,7 +120,7 @@ def list_workflows() -> dict:
     """[READ] List all available workflow templates (built-in + custom).
 
     Use this first to see whether a template already covers the goal, then
-    pass its name to plan_workflow; if none fit, use create_workflow instead.
+    pass its name to create_workflow_from_template; if none fit, use create_workflow instead.
     Built-in templates are always available. Custom templates are loaded
     from ~/.vmware/workflows/*.yaml — drop a YAML file there to add
     your own workflows.
@@ -166,7 +166,7 @@ def list_workflows() -> dict:
             "also why a workflow you expected can be absent from the list. "
             "This failure comes from the workflow store or the built-in "
             "template registry; its traceback is in the MCP server log. "
-            "Built-in templates are unaffected, so plan_workflow with a "
+            "Built-in templates are unaffected, so create_workflow_from_template with a "
             "built-in name still works.",
         }
 

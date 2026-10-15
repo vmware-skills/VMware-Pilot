@@ -7,7 +7,7 @@ catalog risk tier, so a ``write``-tier step (which the tier rule deliberately
 leaves ungated) could carry ``confirm: True`` with no human decision ahead of it.
 The rule now lives in ``approval_gate.gate_violations``, which every custom door
 uses: ``create_workflow``, ``update_draft`` / ``confirm_draft``, the YAML loader
-and ``plan_workflow``, and ``run_workflow``.
+and ``create_workflow_from_template``, and ``run_workflow``.
 """
 
 from __future__ import annotations
@@ -169,6 +169,6 @@ class TestCustomYaml:
     def test_plan_workflow_refuses(self, store, tmp_path, monkeypatch):
         (tmp_path / "seg_now.yaml").write_text(_YAML, encoding="utf-8")
         monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path)
-        result = server.plan_workflow("seg_now", {"seg": "a"})
+        result = server.create_workflow_from_template("seg_now", {"seg": "a"})
         assert "seg_now.yaml" in result["error"] and "confirm=True" in result["error"]
         assert store.list_all() == []

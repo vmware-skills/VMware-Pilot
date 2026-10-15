@@ -39,7 +39,7 @@ def create_workflow(
     """[WRITE] Create a custom workflow dynamically from a step list.
 
     Use this when you already know the steps and no built-in template matches;
-    prefer plan_workflow when one does, and design_workflow when the user gave
+    prefer create_workflow_from_template when one does, and design_workflow when the user gave
     a goal rather than steps. Call get_skill_catalog first for the skill and
     tool names a step may target.
 

@@ -48,11 +48,11 @@ Example YAML (``~/.vmware/workflows/restart_db_cluster.yaml``)::
 
 Every step that could change the estate (``power_off_vm`` above) must have a
 ``require_approval`` step somewhere before it. A file that breaks that rule
-still lists, but building it — ``plan_workflow`` — is refused with the offending
+still lists, but building it — ``create_workflow_from_template`` — is refused with the offending
 step named; see ``vmware_pilot.approval_gate``.
 
 Usage:
-    plan_workflow("restart_db_cluster", {
+    create_workflow_from_template("restart_db_cluster", {
         "target": "vcenter1",
         "replica_vm": "db02",
         "primary_vm": "db01"
@@ -147,13 +147,13 @@ def _make_loader(spec: dict[str, Any], source: Path) -> Any:
             created_at=now,
             updated_at=now,
         )
-        # Refuse here, not only in plan_workflow, so an embedder calling the
+        # Refuse here, not only in create_workflow_from_template, so an embedder calling the
         # loader directly cannot get an ungated custom workflow either.
         enforce(
             wf,
             verb="plan",
             source=_display_path(source),
-            retry=f"call plan_workflow('{spec['name']}', ...) again",
+            retry=f"call create_workflow_from_template('{spec['name']}', ...) again",
         )
         return wf
 

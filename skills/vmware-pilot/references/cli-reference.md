@@ -19,12 +19,12 @@ client.
 
 ```bash
 # Recommended: installed entry point, never touches the network
-uv tool install vmware-pilot==1.13.0
+uv tool install vmware-pilot==2.0.0
 vmware-pilot mcp
 
 # Fallback: uvx re-resolves against PyPI each start and fails behind a
 # TLS-inspecting corporate proxy — set UV_NATIVE_TLS=true if you must use it
-uvx --from vmware-pilot==1.13.0 vmware-pilot-mcp
+uvx --from vmware-pilot==2.0.0 vmware-pilot-mcp
 ```
 
 The server runs on **stdio** transport and exposes 13 MCP tools (4 read, 9 write).
@@ -94,12 +94,12 @@ confirm_draft(
 
 ### Execution Tools
 
-#### plan_workflow
+#### create_workflow_from_template
 
 Create a workflow from a built-in or custom template.
 
 ```
-plan_workflow(
+create_workflow_from_template(
     workflow_type="clone_and_test",
     params={target_vm: "db01", change_spec: {memory_mb: 32768}}
 )
@@ -197,7 +197,7 @@ approval-gate check, so use the Python vmware-pilot is installed in:
 
 Checks:
 - Step structure has required fields
-- **Error** (exit 1): a destructive or unclassifiable step with no `require_approval` before it — `plan_workflow` would refuse the file
+- **Error** (exit 1): a destructive or unclassifiable step with no `require_approval` before it — `create_workflow_from_template` would refuse the file
 - Warning: skills or tools not in the catalog
 
 ### list_available_tools.py

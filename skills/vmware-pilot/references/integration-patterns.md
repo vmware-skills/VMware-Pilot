@@ -14,7 +14,7 @@ Pilot is a **Dispatcher**, not an **Executor**. This is a deliberate v2-style ar
 
 The contract:
 
-1. **Pilot generates a plan** via `plan_workflow` or `design_workflow`. The plan is a sequence of `(skill, tool, params)` tuples plus approval gates and rollback metadata. State is persisted to SQLite.
+1. **Pilot generates a plan** via `create_workflow_from_template` or `design_workflow`. The plan is a sequence of `(skill, tool, params)` tuples plus approval gates and rollback metadata. State is persisted to SQLite.
 2. **Pilot tracks state** via `run_workflow`, `approve`, `rollback`. Each call returns immediately on the next checkpoint — running, awaiting approval, completed, or failed.
 3. **The calling AI agent dispatches each step**. After `run_workflow` returns a step description, the agent invokes the corresponding MCP tool on the target skill (e.g., `vmware-aiops::clone_vm`) and captures the result. Pilot has no call for reporting a step's result back, so on the MCP server those steps stay `not_executed` in pilot's record — which is why `rollback` there cannot undo them (see Error Handling).
 
@@ -31,7 +31,7 @@ In other words: pilot is the brain, the AI agent is the hands. Pilot never reach
 
 | Agent action | Correct pilot interaction |
 |---|---|
-| Start a multi-step task | Call `plan_workflow`; read returned plan; show to user |
+| Start a multi-step task | Call `create_workflow_from_template`; read returned plan; show to user |
 | Execute the plan | Call `run_workflow`; for each pending step in the response, invoke the named skill+tool yourself; report progress to the user |
 | Hit an approval gate | Tell the user; wait for explicit approval; call `approve` |
 | Encounter a failure | Surface the error; ask the user whether to undo; if yes, call each performed step's `rollback_tool` yourself, last first (pilot's `rollback` cannot see steps you performed) |
@@ -221,8 +221,8 @@ vks.create_namespace            -> Create Supervisor Namespace with storage poli
     [APPROVAL GATE]             -> Human approves the TKC cluster
 vks.create_tkc_cluster          -> Deploy TKC cluster
 vks.get_tkc_cluster             -> Verify cluster is ready
-    [APPROVAL GATE]             -> get_tkc_kubeconfig returns a live credential
-vks.get_tkc_kubeconfig          -> Write it to a file (0600); never print the token
+    [APPROVAL GATE]             -> issue_tkc_kubeconfig returns a live credential
+vks.issue_tkc_kubeconfig          -> Write it to a file (0600); never print the token
 ```
 
 **Built-in template**: `vks_cluster_deploy`

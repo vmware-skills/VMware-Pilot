@@ -68,7 +68,7 @@ pip install --no-index --find-links dist vmware-pilot
 | `design_workflow` | Natural language goal → draft workflow |
 | `update_draft` | Edit draft workflow steps |
 | `confirm_draft` | Finalize draft → ready to execute |
-| `plan_workflow` | Generate execution plan from template, returns workflow_id |
+| `create_workflow_from_template` | Create and save a workflow from a template (not a dry run), returns workflow_id |
 | `create_workflow` | Create custom workflow from step list (refused if a destructive step has no approval gate before it) |
 | `run_workflow` | Execute workflow, pauses at approval gates |
 | `get_workflow_status` | Query state + diff report + audit log |
@@ -100,6 +100,16 @@ See `skills/vmware-pilot/references/templates.md` for parameters and steps.
 | `baseline_capture` | 1-5 | No | monitor, nsx, storage |
 | `baseline_audit` | 1-5 | No | monitor, nsx, storage, aria |
 | `baseline_remediate` | 3+n | Yes | varies |
+
+## Upgrading to 2.0
+
+2.0 renames one MCP tool: `plan_workflow` → `create_workflow_from_template`. It always created and saved a
+workflow from a template (it is a write, not a dry run); the new name says so and sets it apart from
+`create_workflow`, which saves your own step list. Parameters and results are unchanged, and so are the CLI
+commands. The skill catalog also follows vmware-vks's renames (`get_supervisor_kubeconfig` →
+`issue_supervisor_kubeconfig`, `get_tkc_kubeconfig` → `issue_tkc_kubeconfig`). Workflows saved with the old
+names are translated when loaded. If an agent prompt, script or `~/.vmware/rules.yaml` names `plan_workflow`,
+update it. Requires vmware-policy ≥ 1.19.0. Details: [RELEASE_NOTES.md](RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names).
 
 ## MCP Configuration
 

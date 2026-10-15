@@ -73,7 +73,7 @@ FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
     }),
     "pilot": frozenset({
         "approve", "cancel_workflow", "confirm_draft", "create_workflow", "design_workflow",
-        "plan_workflow", "rollback", "run_workflow", "update_draft",
+        "create_workflow_from_template", "rollback", "run_workflow", "update_draft",
     }),
     "privateai": frozenset({"assign_vgpu"}),
     "storage": frozenset({
@@ -87,7 +87,7 @@ FAMILY_WRITE_TOOLS: dict[str, frozenset[str]] = {
     }),
     "vks": frozenset({
         "create_namespace", "create_tkc_cluster", "delete_namespace", "delete_tkc_cluster",
-        "get_tkc_kubeconfig", "scale_tkc_cluster", "update_namespace", "upgrade_tkc_cluster",
+        "issue_tkc_kubeconfig", "scale_tkc_cluster", "update_namespace", "upgrade_tkc_cluster",
     }),
 }
 
@@ -114,7 +114,7 @@ FAMILY_SELF_DECLARED_DESTRUCTIVE: dict[str, frozenset[str]] = {
         "remove_entitlement", "remove_vdi_machine", "reset_vdi_machine", "push_desktop_pool_image",
         "disconnect_vdi_session", "logoff_vdi_session", "cancel_vdi_task",
     }),
-    "vks": frozenset({"delete_namespace", "delete_tkc_cluster", "get_tkc_kubeconfig"}),
+    "vks": frozenset({"delete_namespace", "delete_tkc_cluster", "issue_tkc_kubeconfig"}),
 }
 
 

@@ -157,7 +157,7 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
         monkeypatch.setattr(server, "_store", store)
         monkeypatch.setattr(server, "_executor", WorkflowExecutor(store))
         spec = {k: v for k, v in _GUEST_SPEC.items() if k != "username"}
-        result = server.plan_workflow(
+        result = server.create_workflow_from_template(
             "clone_and_test", {"target_vm": "db01", "change_spec": spec}
         )
         assert "username" in result["error"]
@@ -405,7 +405,7 @@ class TestPatchDeployment:
         store = WorkflowStore(tmp_path / "wf.db")
         monkeypatch.setattr(server, "_store", store)
         monkeypatch.setattr(server, "_executor", WorkflowExecutor(store))
-        result = server.plan_workflow("patch_deployment", {
+        result = server.create_workflow_from_template("patch_deployment", {
             "vm_names": ["a"], "patch_local_path": "/p", "patch_guest_path": "/p",
             "install_command": "bash /p",
         })

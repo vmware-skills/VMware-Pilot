@@ -53,13 +53,13 @@ refused when the plan is made — before the staging clone exists:
 
 **Example**:
 ```
-plan_workflow("clone_and_test", {
+create_workflow_from_template("clone_and_test", {
     target_vm: "db01",
     change_spec: {memory_mb: 32768},
     target: "vcenter-prod"
 })
 
-plan_workflow("clone_and_test", {
+create_workflow_from_template("clone_and_test", {
     target_vm: "web01",
     change_spec: {command: "/usr/bin/apt-get", arguments: "-y upgrade",
                   username: "ops", password: "..."},
@@ -92,7 +92,7 @@ plan_workflow("clone_and_test", {
 
 **Example**:
 ```
-plan_workflow("incident_response", {
+create_workflow_from_template("incident_response", {
     alert_entity: "esxi-host-03",
     alert_name: "Host memory usage",
     target: "vcenter-prod"
@@ -125,7 +125,7 @@ plan_workflow("incident_response", {
 
 **Example**:
 ```
-plan_workflow("plan_and_approve", {
+create_workflow_from_template("plan_and_approve", {
     operations: [
         {action: "power_off", vm_name: "db01"},
         {action: "revert_snapshot", vm_name: "db01", snapshot_name: "baseline"},
@@ -162,7 +162,7 @@ Aria's `get_capacity_overview` requires a cluster id. Without one, the capacity 
 
 **Example**:
 ```
-plan_workflow("compliance_scan", {target: "vcenter-prod"})
+create_workflow_from_template("compliance_scan", {target: "vcenter-prod"})
 ```
 
 ---
@@ -199,7 +199,7 @@ plan_workflow("compliance_scan", {target: "vcenter-prod"})
 
 **Example**:
 ```
-plan_workflow("network_segment_setup", {
+create_workflow_from_template("network_segment_setup", {
     segment_id: "app-frontend",
     display_name: "App Frontend Network",
     subnet: "10.10.1.0/24",
@@ -241,7 +241,7 @@ plan_workflow("network_segment_setup", {
 
 **Example**:
 ```
-plan_workflow("vks_cluster_deploy", {
+create_workflow_from_template("vks_cluster_deploy", {
     namespace_name: "dev-team-a",
     cluster_id: "domain-c8",
     storage_policy: "vsan-default",
@@ -277,7 +277,7 @@ plan_workflow("vks_cluster_deploy", {
 
 **Example**:
 ```
-plan_workflow("rolling_restart", {
+create_workflow_from_template("rolling_restart", {
     vm_names: ["web01", "web02", "web03"],
     target: "vcenter-prod"
 })
@@ -312,7 +312,7 @@ At least one of `cpu` or `memory_mb` must be provided.
 
 **Example**:
 ```
-plan_workflow("capacity_expansion", {
+create_workflow_from_template("capacity_expansion", {
     vm_name: "db01",
     cpu: 8,
     memory_mb: 65536,
@@ -346,7 +346,7 @@ plan_workflow("capacity_expansion", {
 
 **Example**:
 ```
-plan_workflow("disaster_recovery", {
+create_workflow_from_template("disaster_recovery", {
     vm_name: "app-server-01",
     snapshot_name: "pre-upgrade",
     target: "vcenter-prod"
@@ -383,7 +383,7 @@ plan_workflow("disaster_recovery", {
 
 **Example**:
 ```
-plan_workflow("patch_deployment", {
+create_workflow_from_template("patch_deployment", {
     vm_names: ["web01", "web02"],
     patch_local_path: "/tmp/security-patch-2026q1.rpm",
     patch_guest_path: "/tmp/security-patch-2026q1.rpm",
@@ -422,7 +422,7 @@ plan_workflow("patch_deployment", {
 
 **Example**:
 ```
-plan_workflow("storage_expansion", {
+create_workflow_from_template("storage_expansion", {
     host_name: "esxi-04",
     iscsi_address: "10.0.1.100",
     iscsi_port: 3260,
@@ -470,7 +470,7 @@ or shared drives, and delete baselines you no longer need.
 
 **Example**:
 ```
-plan_workflow("baseline_capture", {
+create_workflow_from_template("baseline_capture", {
     target: "vcenter-prod",
     baseline_name: "pre-maintenance-2026q1"
 })
@@ -509,7 +509,7 @@ All steps are read-only. No approval gate.
 
 **Example**:
 ```
-plan_workflow("baseline_audit", {
+create_workflow_from_template("baseline_audit", {
     baseline_name: "pre-maintenance-2026q1",
     target: "vcenter-prod"
 })
@@ -551,7 +551,7 @@ Each drift item dict:
 
 **Example**:
 ```
-plan_workflow("baseline_remediate", {
+create_workflow_from_template("baseline_remediate", {
     drift_items: [
         {
             resource: "web01",
@@ -607,7 +607,7 @@ Steps 4–7 exist only with `deep_dive: true`. None of these tools filters by ob
 
 **Example**:
 ```
-plan_workflow("investigate_alert", {
+create_workflow_from_template("investigate_alert", {
     alert_entity: "192.168.60.15",
     alert_name: "Host connection and power state",
     target: "home-vcenter",

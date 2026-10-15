@@ -193,9 +193,10 @@ class TestLabelsAgreeWithWhatTheSiblingsPublish:
       four ``medium``, so a custom workflow whose only step was
       ``run_vm_guest_command /bin/rm -rf /`` was saved and dispatched with no gate.
     * ``VMware-VKS/vmware_vks/mcp_server/server.py`` publishes
-      ``get_supervisor_kubeconfig`` with ``readOnlyHint: False`` — it returns a
+      ``issue_supervisor_kubeconfig`` with ``readOnlyHint: False`` — it returns a
       live Supervisor bearer token. It was absent from the catalog, so the
-      ``get`` read-hint placed it in the read tier: confidently wrong.
+      ``get`` read-hint (its pre-2.0 name opened with it) placed it in the read
+      tier: confidently wrong.
     """
 
     @pytest.mark.parametrize(
@@ -210,7 +211,7 @@ class TestLabelsAgreeWithWhatTheSiblingsPublish:
 
         assert SKILL_CATALOG["aiops"]["tools"].get("download_vm_guest_file", {}).get("risk") != "high"
 
-    @pytest.mark.parametrize("tool", ["get_supervisor_kubeconfig", "get_tkc_kubeconfig"])
+    @pytest.mark.parametrize("tool", ["issue_supervisor_kubeconfig", "issue_tkc_kubeconfig"])
     def test_both_kubeconfig_tools_are_gated_as_credential_access(self, tool):
         from vmware_pilot.review import classify_step
 
@@ -282,10 +283,11 @@ class TestMeasuredFamilySurface:
     def test_no_write_tool_is_positively_classified_as_read_only(self):
         """The worse failure: not 'unknown', but confidently wrong.
 
-        ``get_tkc_kubeconfig`` hands back a live Supervisor credential, yet it
-        opens with ``get_`` — the read-only name heuristic claimed it. A tool
-        pilot mislabels safe is invisible; a tool pilot cannot label is at least
-        loud. (``get_supervisor_kubeconfig`` is the same shape; it became a
+        ``issue_tkc_kubeconfig`` hands back a live Supervisor credential, yet under
+        its pre-2.0 name it opened with ``get_`` — the read-only name heuristic
+        claimed it. A tool pilot mislabels safe is invisible; a tool pilot
+        cannot label is at least loud. (``issue_supervisor_kubeconfig`` is the
+        same shape; it became a
         write after this snapshot was taken and is pinned in
         ``TestLabelsAgreeWithWhatTheSiblingsPublish``.)
         """

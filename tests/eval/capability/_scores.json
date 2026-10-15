@@ -7,7 +7,7 @@
         "entry_points": [
           "create_workflow",
           "design_workflow",
-          "plan_workflow",
+          "create_workflow_from_template",
           "list_workflows",
           "get_skill_catalog"
         ],

@@ -8,7 +8,7 @@ store/executor singletons + accessors live here because the test-suite patches
 so those patches are honoured.
 
 Exposes 13 tools for AI agents to manage multi-step VMware workflows:
-  plan_workflow / run_workflow / approve / rollback / cancel_workflow
+  create_workflow_from_template / run_workflow / approve / rollback / cancel_workflow
   review_workflow / get_workflow_status / list_workflows / get_skill_catalog
   create_workflow / design_workflow / update_draft / confirm_draft
 """
@@ -55,7 +55,7 @@ from vmware_pilot.mcp_server.tools.authoring import (  # noqa: E402
 from vmware_pilot.mcp_server.tools.lifecycle import (  # noqa: E402
     approve,
     cancel_workflow,
-    plan_workflow,
+    create_workflow_from_template,
     rollback,
     run_workflow,
 )
@@ -131,7 +131,7 @@ __all__ = [
     "_get_executor",
     "_validate_template_name",
     "_save_as_yaml",
-    "plan_workflow",
+    "create_workflow_from_template",
     "run_workflow",
     "approve",
     "rollback",

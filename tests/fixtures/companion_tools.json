@@ -3151,16 +3151,6 @@
     "name"
    ]
   },
-  "get_supervisor_kubeconfig": {
-   "properties": [
-    "namespace",
-    "output_path",
-    "target"
-   ],
-   "required": [
-    "namespace"
-   ]
-  },
   "get_supervisor_status": {
    "properties": [
     "cluster_id",
@@ -3190,7 +3180,17 @@
     "namespace"
    ]
   },
-  "get_tkc_kubeconfig": {
+  "issue_supervisor_kubeconfig": {
+   "properties": [
+    "namespace",
+    "output_path",
+    "target"
+   ],
+   "required": [
+    "namespace"
+   ]
+  },
+  "issue_tkc_kubeconfig": {
    "properties": [
     "name",
     "namespace",

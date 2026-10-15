@@ -9,7 +9,7 @@
 | 3 | `design_workflow` | low | Design | Natural language goal → draft workflow for review |
 | 4 | `update_draft` | medium | Design | Edit draft workflow steps, name, or description |
 | 5 | `confirm_draft` | medium | Design | Finalize draft → state changes to PENDING |
-| 6 | `plan_workflow` | medium | Execute | Create workflow from built-in/custom template |
+| 6 | `create_workflow_from_template` | medium | Execute | Create workflow from built-in/custom template |
 | 7 | `create_workflow` | medium | Execute | Create custom workflow from step list (refused if a destructive step has no approval gate before it) |
 | 8 | `run_workflow` | medium | Execute | Execute workflow, pauses at approval gates |
 | 9 | `approve` | high | Control | Human approval to continue past approval gate |

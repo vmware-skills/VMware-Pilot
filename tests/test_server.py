@@ -194,7 +194,7 @@ class TestToolParity:
         names = {t.name for t in asyncio.run(server.mcp.list_tools())}
         expected = {
             "get_skill_catalog", "list_workflows", "design_workflow",
-            "update_draft", "confirm_draft", "plan_workflow", "create_workflow",
+            "update_draft", "confirm_draft", "create_workflow_from_template", "create_workflow",
             "review_workflow", "run_workflow", "approve", "cancel_workflow",
             "rollback", "get_workflow_status",
         }

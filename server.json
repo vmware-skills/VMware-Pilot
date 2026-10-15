@@ -7,12 +7,12 @@
     "url": "https://github.com/vmware-skills/VMware-Pilot",
     "source": "github"
   },
-  "version": "1.13.0",
+  "version": "2.0.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "vmware-pilot",
-      "version": "1.13.0",
+      "version": "2.0.0",
       "runtimeHint": "uvx",
       "packageArguments": [
         {

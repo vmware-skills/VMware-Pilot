@@ -94,6 +94,10 @@ class TestStepTranslation:
         ("vks", "list_vm_snapshots", "list_vm_service_snapshots"),
         ("aiops", "scan_datastore_images", "scan_all_datastore_images"),
         ("log-insight", "log_search", "search_logs"),
+        # Pilot's own 2.0 rename, and the VKS credential tools.
+        ("pilot", "plan_workflow", "create_workflow_from_template"),
+        ("vks", "get_supervisor_kubeconfig", "issue_supervisor_kubeconfig"),
+        ("vks", "get_tkc_kubeconfig", "issue_tkc_kubeconfig"),
         # The skill spelled as its package name, or with an underscore.
         ("vmware-aiops", "vm_delete", "delete_vm"),
         ("log_insight", "log_search", "search_logs"),
@@ -156,6 +160,26 @@ class TestSavedWorkflow:
         assert "error" not in result, result
         assert calls == [("aiops", "power_on_vm")]
 
+    @pytest.mark.parametrize("old,new", [
+        ("get_tkc_kubeconfig", "issue_tkc_kubeconfig"),
+        ("get_supervisor_kubeconfig", "issue_supervisor_kubeconfig"),
+    ])
+    def test_saved_kubeconfig_step_is_gated_and_runs_with_the_new_name(self, store, calls,
+                                                                       old, new):
+        """A credential step saved under its ``get_`` name keeps its approval gate."""
+        _write_raw(store, _row("wf-old-kc", [_step(0, "vks", old, params={"name": "t"})],
+                               {"custom": True}))
+        refused = server.run_workflow("wf-old-kc", force=True)
+        assert "error" in refused
+        assert f"step 0 (vks.{new}" in refused["error"], "classified by its catalog entry"
+        assert calls == []
+
+        _write_raw(store, _row("wf-old-kc2", [GATE, _step(1, "vks", old, params={"name": "t"})],
+                               {"custom": True}))
+        server.run_workflow("wf-old-kc2")
+        server.approve("wf-old-kc2", approver="ops")
+        assert calls == [("vks", new)]
+
     def test_an_unknown_name_is_still_refused(self, store, calls):
         _write_raw(store, _row("wf-old-4", [_step(0, "aiops", "quiesce_appliance")],
                                {"custom": True}))
@@ -203,7 +227,7 @@ class TestOtherDoors:
                                                             monkeypatch):
         (tmp_path / "restart_db.yaml").write_text(_OLD_YAML, encoding="utf-8")
         monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path)
-        result = server.plan_workflow("restart_db", {"replica_vm": "db02"})
+        result = server.create_workflow_from_template("restart_db", {"replica_vm": "db02"})
         assert "error" not in result, result
         wf = store.load(result["workflow_id"])
         assert [(s.tool, s.rollback_tool) for s in wf.steps] == [

@@ -12,7 +12,7 @@ So for custom workflows the rule is now reject, at every door:
 
 * ``create_workflow`` refuses to persist the workflow (and to write its YAML);
 * ``confirm_draft`` refuses to move the draft to PENDING (and to write its YAML);
-* ``plan_workflow`` refuses to plan a custom YAML template, and the YAML loader
+* ``create_workflow_from_template`` refuses to plan a custom YAML template, and the YAML loader
   itself refuses to build the workflow, so an embedder cannot get one either;
 * ``run_workflow`` refuses a custom workflow with an ungated step even with
   ``force=True`` — the fix is one inserted step, and that step *is* the human
@@ -217,7 +217,8 @@ class TestBuiltinNamesAreReserved:
         server.create_workflow(
             name="patch_deployment", description="d", steps=[READ], save_as_template=True,
         )
-        planned = server.plan_workflow("patch_deployment", _BUILTIN_ARGS["patch_deployment"][0])
+        planned = server.create_workflow_from_template(
+            "patch_deployment", _BUILTIN_ARGS["patch_deployment"][0])
         assert "error" not in planned
         assert len(planned["steps"]) == 7
 
@@ -295,7 +296,8 @@ class TestCustomYamlRejects:
         (tmp_path / "restart_db.yaml").write_text(_UNGATED_YAML, encoding="utf-8")
         monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path)
 
-        result = server.plan_workflow("restart_db", {"target": "vc", "replica_vm": "db02"})
+        result = server.create_workflow_from_template(
+            "restart_db", {"target": "vc", "replica_vm": "db02"})
         assert "error" in result
         assert "restart_db.yaml" in result["error"], "must name the file to edit"
         assert "step 1 (aiops.power_off_vm" in result["error"]
@@ -320,13 +322,14 @@ class TestCustomYamlRejects:
             encoding="utf-8",
         )
         monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path)
-        result = server.plan_workflow("compliance_scan", {"replica_vm": "db02"})
+        result = server.create_workflow_from_template("compliance_scan", {"replica_vm": "db02"})
         assert "error" in result
 
     def test_gated_yaml_plans(self, store, tmp_path, monkeypatch):
         (tmp_path / "restart_db.yaml").write_text(_GATED_YAML, encoding="utf-8")
         monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path)
-        result = server.plan_workflow("restart_db", {"target": "vc", "replica_vm": "db02"})
+        result = server.create_workflow_from_template(
+            "restart_db", {"target": "vc", "replica_vm": "db02"})
         assert "error" not in result
 
 
@@ -445,7 +448,7 @@ def test_every_builtin_template_plans_and_runs_without_force(store, name, kwargs
     custom rule does not look at, so a built-in can pass the check above and
     still be refused here.
     """
-    planned = server.plan_workflow(name, kwargs)
+    planned = server.create_workflow_from_template(name, kwargs)
     assert "error" not in planned, planned
     ran = server.run_workflow(planned["workflow_id"])
     assert "error" not in ran, ran
@@ -481,15 +484,15 @@ class TestValidateScriptRejects:
         assert _load_script().main() == 1
 
     def test_it_uses_the_package_classification_not_its_own_list(self, tmp_path):
-        """``get_tkc_kubeconfig`` returns a live credential; the catalog gates it."""
+        """``issue_tkc_kubeconfig`` returns a live credential; the catalog gates it."""
         path = tmp_path / "kc.yaml"
         path.write_text(
             "name: kc\nsteps:\n  - action: fetch\n    skill: vks\n"
-            "    tool: get_tkc_kubeconfig\n    params: {name: t}\n",
+            "    tool: issue_tkc_kubeconfig\n    params: {name: t}\n",
             encoding="utf-8",
         )
         errors, _ = _load_script().validate(path)
-        assert any("get_tkc_kubeconfig" in e for e in errors), errors
+        assert any("issue_tkc_kubeconfig" in e for e in errors), errors
 
     def test_a_catalog_skill_is_not_an_unknown_skill(self, tmp_path):
         path = tmp_path / "avi.yaml"

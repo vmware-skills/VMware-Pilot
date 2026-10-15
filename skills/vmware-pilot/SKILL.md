@@ -15,7 +15,7 @@ compatibility: >
   vmware-policy auto-installed as Python dependency (provides @vmware_tool decorator and audit logging). All workflow operations audited to ~/.vmware/audit.db.
   No direct vCenter/NSX credentials: Pilot is an orchestration layer that delegates to companion skills (aiops, monitor, nsx, etc.) which handle their own auth.
   Approval gates: Workflows pause for human review before destructive steps; a custom workflow (YAML, create_workflow, or AI-designed) with a destructive or unclassifiable step not preceded by a gate is rejected, and force=True cannot override that. Rollback is never automatic: a failed step stops the workflow, and undo happens only when rollback is called; it is best-effort, and on the MCP server the calling agent performs each rollback_tool call itself.
-  Pilot drives companion skills that change production (VM power, guest commands, network, storage, Kubernetes). Guest commands (run_vm_guest_command, upload_vm_guest_file, …) and credential-returning steps (vks get_tkc_kubeconfig, get_supervisor_kubeconfig) are gated like destructive ones.
+  Pilot drives companion skills that change production (VM power, guest commands, network, storage, Kubernetes). Guest commands (run_vm_guest_command, upload_vm_guest_file, …) and credential-returning steps (vks issue_tkc_kubeconfig, issue_supervisor_kubeconfig) are gated like destructive ones.
   State persistence: SQLite-backed workflow state (~/.vmware/workflows.db, owner-only 0600 in a 0700 directory) survives restarts; secret-named params are masked before they are written. No webhooks, no outbound network calls.
   Transitive dependencies: Only vmware-policy (audit/policy). No post-install scripts or background services.
 ---
@@ -42,7 +42,7 @@ Multi-step workflow orchestration for VMware MCP skills — design, approve, exe
 ## Quick Install
 
 ```bash
-uv tool install vmware-pilot==1.13.0
+uv tool install vmware-pilot==2.0.0
 vmware-pilot mcp          # start the MCP server (stdio)
 ```
 
@@ -93,7 +93,7 @@ AI calls: run_workflow(id)             → execute with approval gates
 ### 2. Clone-and-Test (Built-in Template)
 
 ```
-AI calls: plan_workflow("clone_and_test", {
+AI calls: create_workflow_from_template("clone_and_test", {
     target_vm: "db01",
     change_spec: {memory_mb: 32768},
     target: "vcenter-prod"
@@ -105,7 +105,7 @@ AI calls: run_workflow(workflow_id)
 ### 3. Batch Operations with Approval
 
 ```
-AI calls: plan_workflow("plan_and_approve", {
+AI calls: create_workflow_from_template("plan_and_approve", {
     operations: [
         {action: "power_off", vm_name: "db01"},
         {action: "revert_snapshot", vm_name: "db01", snapshot_name: "baseline"},
@@ -158,7 +158,7 @@ This is intentional v2-style architecture: pilot's context stays small, state is
 | **Design** | `design_workflow` | low | Natural language → draft |
 | | `update_draft` | medium | Edit draft steps |
 | | `confirm_draft` | medium | Finalize draft → ready to execute |
-| **Execute** | `plan_workflow` | medium | Create from template |
+| **Execute** | `create_workflow_from_template` | medium | Create from template |
 | | `create_workflow` | medium | One-step custom creation (rejected if a destructive step has no gate before it) |
 | | `review_workflow` | low | Structural sanity check before execution (approved \| needs_revision) |
 | | `run_workflow` | medium | Execute next checkpoint (agent dispatches each step) |
@@ -192,7 +192,7 @@ Drop YAML files in `~/.vmware/workflows/` — pilot auto-loads them.
 **Approval gates are mandatory in custom workflows.** Every destructive step (the
 skill catalog marks it high/critical risk, or its name says delete/remove/…) and
 every step pilot cannot classify must have a `require_approval` step somewhere
-before it. Otherwise `plan_workflow`, `create_workflow` and `confirm_draft` refuse
+before it. Otherwise `create_workflow_from_template`, `create_workflow` and `confirm_draft` refuse
 the workflow and name the offending steps, `run_workflow` refuses it even with
 `force=True`, and `scripts/validate_workflow.py` reports an error. Medium-risk
 writes (`create_segment`, `power_on_vm`, …) do not require a gate.
@@ -270,14 +270,14 @@ vmware-audit log --status denied
 ### Workflow stuck in "awaiting_approval"
 Call `approve(workflow_id, approver=...)` with the correct workflow ID to continue, or `cancel_workflow(workflow_id)` if the approval is rejected (it previews first; call again with `confirm=True` once the user has seen it). If the MCP session was lost, reconnect and call `get_workflow_status(workflow_id)` to see the current state -- workflows persist in SQLite and survive restarts.
 
-### "Unknown workflow type" error from plan_workflow
+### "Unknown workflow type" error from create_workflow_from_template
 The template name is case-sensitive. Use `list_workflows()` to see all available built-in and custom template names. Custom templates must be valid YAML in `~/.vmware/workflows/`.
 
 ### Custom YAML template not appearing
 1. Verify the file is in `~/.vmware/workflows/` with a `.yaml` extension
 2. Check YAML syntax -- run `scripts/validate_workflow.py <path>` with pilot's Python (see CLI Quick Reference)
 3. A YAML file you drop in whose name matches a built-in replaces it (a warning is logged) -- rename it if that is not what you want. `create_workflow` and `confirm_draft` refuse to save a template under a built-in name
-4. A file that lists but will not plan is missing an approval gate -- the `plan_workflow` error names the step and the file
+4. A file that lists but will not plan is missing an approval gate -- the `create_workflow_from_template` error names the step and the file
 
 ### Rollback did nothing, or fails on some steps
 Rollback never happens on its own: a failed step leaves the workflow `failed` and stops. A bare `rollback(workflow_id)` only previews; `confirm=True` acts. It only reverses steps pilot recorded as `success`, and on the MCP server (no dispatcher) the steps you performed from `pending_dispatch` stay `not_executed` — so `rollback` there reverses nothing but approval gates. Undo them yourself: call each performed step's `rollback_tool` with its `rollback_params`, last step first, after confirming with the user. Steps without a `rollback_tool` cannot be undone. When pilot does dispatch (an embedder supplied a dispatcher), rollback is best-effort: a failed undo does not stop the rest, and the result reports each one.
@@ -303,7 +303,7 @@ No vCenter credentials needed — pilot orchestrates other skills that handle co
 }
 ```
 
-> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==1.13.0", "vmware-pilot-mcp"]}` also
+> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==2.0.0", "vmware-pilot-mcp"]}` also
 > works, but `uvx` re-resolves the package against PyPI on every start and fails behind a
 > TLS-inspecting corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed
 > entry point above touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.
@@ -317,7 +317,7 @@ All operations are automatically audited via vmware-policy (`@vmware_tool` decor
 - Environment scoping: policy rules can scope by environment (an optional label an opt-in `deny` rule may match), and skills with a config may declare `environment:` per target. Pilot has no targets of its own and registers no environment resolver, so its own calls are unlabeled (they match no environment-scoped rule) — its writes go to the local workflow DB, never to a VMware estate. Pilot's approval gate is a step in its own workflow: it pauses before the agent dispatches a destructive step, and the target skill then applies its own policy rules when the step runs
 - View recent operations: `vmware-audit log --last 20`
 - View denied operations: `vmware-audit log --status denied`
-- Credential steps: `vks get_tkc_kubeconfig` and `get_supervisor_kubeconfig` return a live Supervisor token. Treat them as credential access, not read-only queries — never run one on your own initiative, keep it behind an approval gate (pilot gates both like a delete), write the kubeconfig to an owner-only file, and never print the token into chat or logs
+- Credential steps: `vks issue_tkc_kubeconfig` and `issue_supervisor_kubeconfig` return a live Supervisor token. Treat them as credential access, not read-only queries — never run one on your own initiative, keep it behind an approval gate (pilot gates both like a delete), write the kubeconfig to an owner-only file, and never print the token into chat or logs
 - Local data is sensitive: `~/.vmware/workflows.db` (pilot keeps `~/.vmware` 0700 and the DB 0600) holds step params and companion-skill results, with secret-named params masked. Pilot never writes `~/.vmware/baselines/`; a baseline the agent saves there is an inventory of VMs, hosts, network segments, datastores and alarms — keep it owner-only and out of chat
 
 vmware-policy is automatically installed as a dependency — no manual setup needed.

@@ -96,8 +96,8 @@ SKILLS: dict[str, dict[str, Any]] = {
             "create_tkc_cluster": {"risk": "medium", "desc": "Deploy TKC cluster"},
             "scale_tkc_cluster":  {"risk": "medium", "desc": "Scale TKC worker nodes"},
             "delete_tkc_cluster": {"risk": "high",   "desc": "Delete TKC cluster"},
-            "get_tkc_kubeconfig": {"risk": "high",   "desc": "Live credential - gate it"},
-            "get_supervisor_kubeconfig": {"risk": "high", "desc": "Live credential - gate it"},
+            "issue_tkc_kubeconfig": {"risk": "high",   "desc": "Live credential - gate it"},
+            "issue_supervisor_kubeconfig": {"risk": "high", "desc": "Live credential - gate it"},
         },
     },
     "storage": {

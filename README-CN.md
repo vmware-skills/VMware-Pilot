@@ -39,7 +39,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `design_workflow` | 自然语言目标 → 草稿工作流 |
 | `update_draft` | 编辑草稿工作流的步骤 |
 | `confirm_draft` | 确认草稿 → 可执行状态 |
-| `plan_workflow` | 从模板创建执行计划，返回 workflow_id |
+| `create_workflow_from_template` | 从模板创建并保存工作流（不是预演），返回 workflow_id |
 | `create_workflow` | 从步骤列表直接创建自定义工作流（若破坏性步骤之前没有审批门控则拒绝） |
 | `run_workflow` | 执行工作流，在审批门控处暂停 |
 | `get_workflow_status` | 查询状态 + 差异报告 + 审计日志 |
@@ -70,6 +70,14 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `baseline_capture` | 1-5 | 否 | monitor, nsx, storage |
 | `baseline_audit` | 1-5 | 否 | monitor, nsx, storage, aria |
 | `baseline_remediate` | 3+n | 是 | 按需 |
+
+## 升级到 2.0
+
+2.0 改了一个 MCP 工具的名字：`plan_workflow` → `create_workflow_from_template`。它一直是从模板创建并保存工作流
+（是写操作，不是预演）；新名字把这一点说清楚，也和 `create_workflow`（保存你自己写的步骤列表）区分开。参数和返回值不变，
+CLI 命令也不变。技能目录同时跟随 vmware-vks 的改名（`get_supervisor_kubeconfig` → `issue_supervisor_kubeconfig`，
+`get_tkc_kubeconfig` → `issue_tkc_kubeconfig`）。用旧名保存的工作流在加载时会自动转换。如果 agent 提示词、脚本或
+`~/.vmware/rules.yaml` 里写了 `plan_workflow`，请改成新名。需要 vmware-policy ≥ 1.19.0。详见 [RELEASE_NOTES.md](RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names)。
 
 ## MCP 配置
 

@@ -101,6 +101,7 @@ def refuse_caller_decision(skill: str, tool: str, params: dict[str, Any], where:
         raise ValueError(
             f"{where}: {skill}:{tool} params carry {decided}. Pilot passes confirm=True "
             "itself for this tool, after its approval step — that step is the human "
-            "decision. Remove those keys and call plan_workflow again; to only look at "
+            "decision. Remove those keys and call create_workflow_from_template again; "
+            "to only look at "
             f"what {tool} would change, call it directly without confirm."
         )

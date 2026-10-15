@@ -166,8 +166,8 @@ custom workflow, or pilot refuses the workflow. `medium` writes need no gate.
 | `create_tkc_cluster` | medium | Deploy TKC cluster |
 | `scale_tkc_cluster` | medium | Scale worker nodes |
 | `delete_tkc_cluster` | high | Delete TKC cluster |
-| `get_tkc_kubeconfig` | high | Returns a live Supervisor credential — gate it, write it to a file, never print it |
-| `get_supervisor_kubeconfig` | high | Same: a live Supervisor bearer token — gate it, write it to a file, never print it |
+| `issue_tkc_kubeconfig` | high | Returns a live Supervisor credential — gate it, write it to a file, never print it |
+| `issue_supervisor_kubeconfig` | high | Same: a live Supervisor bearer token — gate it, write it to a file, never print it |
 
 ### storage (Datastores, iSCSI, vSAN)
 
@@ -253,7 +253,7 @@ steps:
 
 Invoke it:
 ```
-plan_workflow("restart_db_cluster", {
+create_workflow_from_template("restart_db_cluster", {
     target: "vcenter1",
     replica_vm: "db02",
     primary_vm: "db01"
@@ -371,6 +371,6 @@ installed in:
 This checks:
 - Step structure is valid (action / skill / tool present, params a mapping)
 - **Approval gates (error)**: every destructive or unclassifiable step has a
-  `require_approval` step before it — the same check `plan_workflow`,
+  `require_approval` step before it — the same check `create_workflow_from_template`,
   `create_workflow`, `confirm_draft` and `run_workflow` enforce
 - Skills and tools not in the catalog (warning — the catalog is a curated subset)

@@ -40,16 +40,20 @@ logger = logging.getLogger(__name__)
     }
 )
 @vmware_tool(risk_level="medium")
-def plan_workflow(
+def create_workflow_from_template(
     workflow_type: str,
     params: dict[str, Any],
 ) -> dict:
-    """[WRITE] Create an execution plan for a multi-step workflow.
+    """[WRITE] Create and save a workflow from a template, ready for run_workflow.
 
-    Use this when the goal matches one of the built-in types below; use
-    create_workflow instead when none of them fit. A custom YAML template whose
-    destructive or unclassifiable step (or step passing confirm=True) has no
-    require_approval gate before it is refused, naming the step and the file to fix.
+    Takes a template name (workflow_type) plus its params, builds the steps the
+    template defines, and persists the workflow in state "pending" — it is not a
+    dry run. Templates are the built-in types below plus custom YAML templates
+    (list_workflows shows both). Use this when the goal matches a template; use
+    create_workflow instead to save your own step list when none of them fit.
+    A custom YAML template whose destructive or unclassifiable step (or step
+    passing confirm=True) has no require_approval gate before it is refused,
+    naming the step and the file to fix.
 
     Available workflow types:
       - clone_and_test: Clone VM → apply changes → monitor → approve → commit
@@ -90,9 +94,9 @@ def plan_workflow(
             signature.bind(**params)
         except TypeError as e:
             return {
-                "error": f"plan_workflow('{workflow_type}'): {e}.",
+                "error": f"create_workflow_from_template('{workflow_type}'): {e}.",
                 "hint": f"{workflow_type} takes {signature}. Supply the missing or "
-                "misspelt params and call plan_workflow again.",
+                "misspelt params and call create_workflow_from_template again.",
             }
 
         wf = template_fn(**params)  # custom YAML loaders raise ApprovalGateError
@@ -107,7 +111,7 @@ def plan_workflow(
                 for s in wf.steps
             ],
             "params": wf.params,
-            "message": f"Plan created. Call run_workflow('{wf.id}') to execute.",
+            "message": f"Workflow created and saved. Call run_workflow('{wf.id}') to execute.",
         }
     except ApprovalGateError as e:
         # Returned whole: the refusal names the file and the step to insert,
@@ -115,7 +119,7 @@ def plan_workflow(
         return e.payload
     except Exception as e:
         return {
-            "error": _safe_error(e, "plan_workflow"),
+            "error": _safe_error(e, "create_workflow_from_template"),
             "hint": "Check workflow_type and params. "
             "Use list_workflows() to see available templates.",
         }
@@ -153,7 +157,7 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
     'awaiting_approval'. Call approve() to continue.
 
     Args:
-        workflow_id: The workflow ID from plan_workflow.
+        workflow_id: The workflow ID from create_workflow_from_template.
         force: Bypass blocking review findings on a built-in template. Use
             only with explicit human consent; the bypass is audited. Has no
             effect on a custom workflow's missing approval gate.

@@ -77,10 +77,10 @@ _DESTRUCTIVE_HINTS = (
 # here is a tool moved out of the gated set on the strength of a substring. The
 # measured cost of leaving it short is 54 sibling read tools that land in
 # ``unknown`` and draw a finding; the cost of lengthening it is a write tool that
-# never draws one. ``vks.get_tkc_kubeconfig`` and ``get_supervisor_kubeconfig``
-# — which hand back a live Supervisor credential — are what "``get`` means
-# read" looks like when it is wrong, and they are in the catalog for exactly
-# that reason.
+# never draws one. ``vks.issue_tkc_kubeconfig`` and ``issue_supervisor_kubeconfig``
+# (``get_*_kubeconfig`` before 2.0), which hand back a live Supervisor
+# credential, are what "``get`` means read" looks like when it is wrong, and
+# they are in the catalog for exactly that reason.
 _READONLY_HINTS = (
     "list",
     "get",
