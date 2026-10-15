@@ -20,7 +20,7 @@ annotations are unchanged; the MCP `instructions` and the tool's description now
   the step, like the other 2.0 renames.
 * Deny rules in `~/.vmware/rules.yaml` written with the old names keep working (vmware-policy matches
   both names); `vmware-audit policy` lists any rule that now matches more.
-* Requires vmware-policy ≥ 1.19.0 (not yet published), which carries these three pairs in
+* Requires vmware-policy ≥ 1.19.0, which carries these three pairs in
   `vmware_policy.renames`.
 
 ## v1.13.0 — companion tools at their 2.0 names
