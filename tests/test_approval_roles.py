@@ -104,10 +104,52 @@ def test_approve_itself_applies_the_role_mode(monkeypatch):
     monkeypatch.setattr(lifecycle, "_get_executor", lambda: _Executor())
     monkeypatch.setattr(caller_mod, "current_caller", lambda: "token:alice")
     _as_role(monkeypatch, "token:alice", "others")
+    from vmware_policy.policy import PolicyDenied
+
     approve = getattr(lifecycle.approve, "__wrapped__", lifecycle.approve)
-    result = approve(workflow_id="wf-1")
-    assert "error" in result and "its own token created" in result["error"]
+    with pytest.raises(PolicyDenied, match="its own token created") as refused:
+        approve(workflow_id="wf-1")
+    assert refused.value.result.rule == "role:r"  # filters with the other role refusals
     assert resumed == []
     monkeypatch.setattr(caller_mod, "current_caller", lambda: "token:bob")
     assert "error" not in approve(workflow_id="wf-1")
     assert resumed == ["token:bob"]
+
+
+@pytest.mark.unit
+def test_editing_or_confirming_a_draft_counts_as_authoring(monkeypatch):
+    """Review M3: take Bob's draft, edit it, then approve it yourself under 'others'."""
+    wf = _wf("token:bob")
+    wf.with_author("token:alice")
+    wf.with_author("token:alice")
+    wf.with_author("token:bob")  # the creator is not repeated
+    assert wf.authors == ["token:alice"]
+    assert _from_dict(wf.to_dict()).authors == ["token:alice"]
+    check = _as_role(monkeypatch, "token:alice", "others")
+    assert "edited or confirmed" in check(wf, "token:alice")
+    assert check(wf, "token:carol") == ""
+
+
+@pytest.mark.unit
+def test_update_draft_records_the_editor(monkeypatch, tmp_path):
+    import vmware_policy.caller as caller_mod
+
+    from vmware_pilot.mcp_server.tools import authoring
+
+    saved = []
+    draft = _wf("token:bob")
+    draft.state = WorkflowState.DRAFT
+
+    class _Store:
+        def load(self, workflow_id):
+            return draft
+
+        def save(self, wf):
+            saved.append(list(wf.authors))
+
+    monkeypatch.setattr(authoring, "_get_store", lambda: _Store())
+    monkeypatch.setattr(caller_mod, "current_caller", lambda: "token:alice")
+    monkeypatch.setattr(caller_mod, "audit_user", lambda: "token:alice")
+    update = getattr(authoring.update_draft, "__wrapped__", authoring.update_draft)
+    update(workflow_id="wf-1", description="mine now")
+    assert saved and saved[0] == ["token:alice"]

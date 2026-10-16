@@ -267,6 +267,7 @@ def update_draft(
         ]
         wf.log("steps_updated", f"{len(steps)} steps")
 
+    wf.with_author(_current_user())
     _get_store().save(wf)
 
     violations = gate_violations(wf)
@@ -364,6 +365,7 @@ def confirm_draft(
 
         wf.state = WorkflowState.PENDING
         wf.log("draft_confirmed", f"Confirmed with {len(wf.steps)} steps")
+        wf.with_author(_current_user())
         _get_store().save(wf)
 
         if will_save_template:
@@ -397,3 +399,10 @@ def confirm_draft(
             "hint": f"Failed to confirm draft '{workflow_id}'. "
             f"Use get_workflow_status() to inspect it.",
         }
+
+
+def _current_user() -> str:
+    """Who is editing: the network caller (token:<name>) or the OS user (HLD §18 D-23)."""
+    from vmware_pilot.models import _creator
+
+    return _creator()

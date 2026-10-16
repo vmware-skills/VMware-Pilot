@@ -325,14 +325,23 @@ def approve(workflow_id: str, approver: str = "") -> dict:
             approver = caller
             refused = _approval_refused(wf, caller)
             if refused:
-                return {
-                    "error": refused,
-                    "hint": "Have someone whose role allows approving (approve: any, or "
-                    "approve: others for a workflow they did not create) approve it.",
-                }
+                raise _ApprovalRefusedError(refused)
         # Non-empty approver enforcement lives in the executor so embedders
         # cannot bypass the audit-trail requirement.
         return _get_executor().resume_after_approval(wf, approver=approver)
+    except _ApprovalRefusedError as refusal:
+        # A role refusal, audited as one (denied, rule role:<name>) so it can be
+        # filtered with the other role refusals (integration review).
+        from vmware_policy.policy import PolicyDenied, PolicyResult
+
+        raise PolicyDenied(
+            PolicyResult(
+                False,
+                refusal.rule,
+                f"{refusal}. Have someone whose role allows approving (approve: any, or "
+                "approve: others for a workflow they did not create or edit) approve it.",
+            )
+        ) from None
     except Exception as e:
         return {
             "error": _safe_error(e, "approve"),
@@ -508,6 +517,20 @@ def cancel_workflow(
         }
 
 
+class _ApprovalRefusedError(Exception):
+    """Raised inside ``approve`` so the refusal leaves through PolicyDenied."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        try:
+            from vmware_policy import roles
+
+            _role, name, _why = roles.caller_role()
+        except Exception:  # noqa: BLE001 — the rule name is a label only
+            name = ""
+        self.rule = f"role:{name}" if name else "role:invalid"
+
+
 def _approval_refused(wf, caller: str) -> str:
     """Why the caller's role may not approve ``wf`` (HLD §18 D-23), or "".
 
@@ -533,4 +556,9 @@ def _approval_refused(wf, caller: str) -> str:
             )
         if wf.created_by == caller:
             return f"role {name!r} may not approve a workflow its own token created ({caller})"
+        if caller in getattr(wf, "authors", ()):
+            return (
+                f"role {name!r} may not approve a workflow its own token edited or confirmed "
+                f"as a draft ({caller})"
+            )
     return ""

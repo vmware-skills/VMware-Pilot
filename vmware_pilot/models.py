@@ -83,6 +83,15 @@ class Workflow:
     blocked_reason: str = ""
     rollback_results: list[dict[str, Any]] = field(default_factory=list)
     created_by: str = field(default_factory=_creator)
+    #: Everyone else who changed or confirmed it while it was a draft. For
+    #: ``approve: others`` they count as creators: editing someone's draft and then
+    #: approving it would otherwise pass as separation of duties (review M3).
+    authors: list[str] = field(default_factory=list)
+
+    def with_author(self, who: str) -> None:
+        """Record ``who`` among the authors (no-op when empty or already there)."""
+        if who and who != self.created_by and who not in self.authors:
+            self.authors = [*self.authors, who]
 
     def log(self, action: str, detail: str = "") -> None:
         self.audit_log.append(
@@ -297,4 +306,5 @@ def _from_dict(d: dict[str, Any]) -> Workflow:
         rollback_results=d.get("rollback_results", []),
         # "" for workflows saved before creators were recorded (HLD §18 D-23).
         created_by=d.get("created_by", ""),
+        authors=list(d.get("authors", [])),
     )
