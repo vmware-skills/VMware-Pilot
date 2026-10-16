@@ -1,3 +1,14 @@
+## v2.3.0 — roles for network callers (HLD §18)
+
+* Workflows record their creator (`created_by`: the network caller `token:<name>`, or the OS user). Workflows saved
+  before this release have none.
+* With vmware-policy ≥ 1.24.0 and roles enabled, `approve` follows the caller's role: `approve: none` cannot
+  approve, `approve: others` cannot approve a workflow its own token created (nor one with no recorded creator),
+  `approve: any` can. The token also needs a role that allows the `approve` tool itself.
+* Approval is an audited attestation, not a gate on execution: this server does not run other skills' steps, it
+  returns them (`pending_dispatch`) and each skill's server checks the caller's own role there.
+* Declares role metadata (no tool takes a target). README and setup guide: one endpoint for several people or roles.
+
 ## v2.2.0 — serve MCP over HTTPS
 
 `vmware-pilot mcp` can now serve the network as well as stdio (HLD §16, via vmware-policy 1.21.0):

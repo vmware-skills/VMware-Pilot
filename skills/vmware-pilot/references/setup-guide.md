@@ -11,16 +11,16 @@
 ### Via uv (Recommended)
 
 ```bash
-uv tool install vmware-pilot==2.2.0
+uv tool install vmware-pilot==2.3.0
 ```
 
 ### Via pip
 
 ```bash
-uv tool install vmware-pilot==2.2.0
+uv tool install vmware-pilot==2.3.0
 
 # China mainland mirror
-pip install vmware-pilot==2.2.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install vmware-pilot==2.3.0 -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ### Verify Installation
@@ -84,7 +84,7 @@ The `uvx` form still works and needs no prior install:
   "mcpServers": {
     "vmware-pilot": {
       "command": "uvx",
-      "args": ["--from", "vmware-pilot==2.2.0", "vmware-pilot-mcp"]
+      "args": ["--from", "vmware-pilot==2.3.0", "vmware-pilot-mcp"]
     }
   }
 }
@@ -100,7 +100,7 @@ invalid peer certificate: UnknownIssuer
 
 `uv` ships its own certificate bundle and ignores the system trust store, which is what breaks.
 Either set `UV_NATIVE_TLS=true` so it honours your corporate CA, or install the tool once
-(`uv tool install vmware-pilot==2.2.0`) and launch `vmware-pilot mcp`, which touches the network
+(`uv tool install vmware-pilot==2.3.0`) and launch `vmware-pilot mcp`, which touches the network
 zero times.
 
 ---
@@ -166,6 +166,7 @@ vmware-pilot mcp --transport https --host 0.0.0.0 --port 8443 \
 - **Everyone who can reach the endpoint acts with this server's account.** Tokens identify callers; they grant
   nothing on the platform. Run one endpoint per privilege level (for example a read-only account behind
   `--expose read`, and a separate endpoint for operators).
+- **Several people or roles on one endpoint:** give each token a role (`vmware-audit token create NAME --role reader`, or a role in `roles.yaml` naming tools and targets; vmware-policy ≥ 1.24.0). A role limits what the token may call on this endpoint; it cannot grant more than the account has. See vmware-policy's README, "Roles for network callers".
 
 ## Configuration
 
