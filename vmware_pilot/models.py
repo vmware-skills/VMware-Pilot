@@ -54,6 +54,20 @@ class WorkflowStep:
         self.rollback_tool = current_tool_name(self.skill, self.rollback_tool)
 
 
+def _creator() -> str:
+    """Who is creating a workflow: the network caller (token:<name>) or the OS user.
+
+    HLD §18 D-23: recorded so an ``approve: others`` role can refuse approving a
+    workflow you created. A workflow loaded from storage keeps what was stored.
+    """
+    try:
+        from vmware_policy.caller import audit_user
+
+        return audit_user()
+    except Exception:  # noqa: BLE001 — never block creating a workflow
+        return ""
+
+
 @dataclass
 class Workflow:
     id: str
@@ -68,6 +82,7 @@ class Workflow:
     audit_log: list[dict[str, Any]] = field(default_factory=list)
     blocked_reason: str = ""
     rollback_results: list[dict[str, Any]] = field(default_factory=list)
+    created_by: str = field(default_factory=_creator)
 
     def log(self, action: str, detail: str = "") -> None:
         self.audit_log.append(
@@ -280,4 +295,6 @@ def _from_dict(d: dict[str, Any]) -> Workflow:
         audit_log=d.get("audit_log", []),
         blocked_reason=d.get("blocked_reason", ""),
         rollback_results=d.get("rollback_results", []),
+        # "" for workflows saved before creators were recorded (HLD §18 D-23).
+        created_by=d.get("created_by", ""),
     )

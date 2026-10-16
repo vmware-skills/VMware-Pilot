@@ -323,6 +323,13 @@ def approve(workflow_id: str, approver: str = "") -> dict:
                     "approve with their own token.",
                 }
             approver = caller
+            refused = _approval_refused(wf, caller)
+            if refused:
+                return {
+                    "error": refused,
+                    "hint": "Have someone whose role allows approving (approve: any, or "
+                    "approve: others for a workflow they did not create) approve it.",
+                }
         # Non-empty approver enforcement lives in the executor so embedders
         # cannot bypass the audit-trail requirement.
         return _get_executor().resume_after_approval(wf, approver=approver)
@@ -499,3 +506,31 @@ def cancel_workflow(
             "error": _safe_error(e, "cancel_workflow"),
             "hint": f"Cancel failed for '{workflow_id}'. Use get_workflow_status() to check state.",
         }
+
+
+def _approval_refused(wf, caller: str) -> str:
+    """Why the caller's role may not approve ``wf`` (HLD §18 D-23), or "".
+
+    Applies only when roles are enabled. ``none`` never approves; ``others``
+    refuses a workflow the caller created, and one with no recorded creator.
+    """
+    try:
+        from vmware_policy import roles
+    except ImportError:  # vmware-policy without roles
+        return ""
+    if not roles.roles_enabled():
+        return ""
+    role, name, why = roles.caller_role()
+    if role is None:
+        return f"role {name!r} cannot be used: {why}"
+    if role.approve == "none":
+        return f"role {name!r} may not approve workflows (approve: none)"
+    if role.approve == "others":
+        if not wf.created_by:
+            return (
+                f"role {name!r} approves only workflows created by someone else, and this "
+                "one was created before vmware-pilot recorded creators"
+            )
+        if wf.created_by == caller:
+            return f"role {name!r} may not approve a workflow its own token created ({caller})"
+    return ""
