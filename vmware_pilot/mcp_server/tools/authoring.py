@@ -118,7 +118,7 @@ def create_workflow(
 
         # Optionally save as YAML template for reuse
         if save_as_template:
-            _save_as_yaml(name, description, steps)
+            _save_as_yaml(name, description, steps, [wf.created_by])
 
         return {
             "workflow_id": wf.id,
@@ -383,7 +383,12 @@ def confirm_draft(
                 }
                 for s in wf.steps
             ]
-            _save_as_yaml(wf.workflow_type, wf.params.get("description", ""), steps_for_yaml)
+            _save_as_yaml(
+                wf.workflow_type,
+                wf.params.get("description", ""),
+                steps_for_yaml,
+                [wf.created_by, *wf.authors],
+            )
 
         return {
             "workflow_id": wf.id,

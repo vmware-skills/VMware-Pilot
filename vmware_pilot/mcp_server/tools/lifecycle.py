@@ -543,9 +543,13 @@ def _approval_refused(wf, caller: str) -> str:
         return ""
     if not roles.roles_enabled():
         return ""
-    role, name, why = roles.caller_role()
+    role, name, _why = roles.caller_role()
     if role is None:
-        return f"role {name!r} cannot be used: {why}"
+        # The detail names server paths: policy logs it, the caller is pointed there.
+        return (
+            f"role {name!r} cannot be used on this server; an operator can run "
+            "'vmware-audit roles check' there to see why"
+        )
     if role.approve == "none":
         return f"role {name!r} may not approve workflows (approve: none)"
     if role.approve == "others":
@@ -558,7 +562,7 @@ def _approval_refused(wf, caller: str) -> str:
             return f"role {name!r} may not approve a workflow its own token created ({caller})"
         if caller in getattr(wf, "authors", ()):
             return (
-                f"role {name!r} may not approve a workflow its own token edited or confirmed "
-                f"as a draft ({caller})"
+                f"role {name!r} may not approve a workflow whose steps its own token wrote "
+                f"(a draft it edited or confirmed, or a template it saved) ({caller})"
             )
     return ""

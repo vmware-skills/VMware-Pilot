@@ -10,6 +10,7 @@ that ``monkeypatch.setattr(server, "_store", ...)`` is observed.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -60,6 +61,7 @@ def _safe_error(exc: Exception, tool: str) -> str:
     if isinstance(exc, _TEACHING_ERRORS):
         return sanitize(str(exc), 500)
     return f"{type(exc).__name__}: operation failed."
+
 
 mcp = FastMCP(
     "vmware-pilot",
@@ -120,8 +122,14 @@ def _validate_template_name(name: str) -> str | None:
     return None
 
 
-def _save_as_yaml(name: str, description: str, steps: list[dict[str, Any]]) -> None:
-    """Save a dynamic workflow as YAML for future reuse."""
+def _save_as_yaml(
+    name: str, description: str, steps: list[dict[str, Any]], authors: Sequence[str] = ()
+) -> None:
+    """Save a dynamic workflow as YAML for future reuse.
+
+    ``authors``: who wrote these steps. A workflow made from the template carries them,
+    so under ``approve: others`` they cannot approve it (HLD §18 D-23, review M-2).
+    """
     import os
     from pathlib import Path
 
@@ -146,6 +154,8 @@ def _save_as_yaml(name: str, description: str, steps: list[dict[str, Any]]) -> N
             for s in steps
         ],
     }
+    if any(authors):
+        spec["authors"] = sorted({a for a in authors if a})
 
     path = workflows_dir / f"{name}.yaml"
     with open(path, "w", encoding="utf-8") as fh:

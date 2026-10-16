@@ -153,3 +153,28 @@ def test_update_draft_records_the_editor(monkeypatch, tmp_path):
     update = getattr(authoring.update_draft, "__wrapped__", authoring.update_draft)
     update(workflow_id="wf-1", description="mine now")
     assert saved and saved[0] == ["token:alice"]
+
+
+@pytest.mark.unit
+def test_a_template_carries_its_author_into_workflows_made_from_it(monkeypatch, tmp_path):
+    """Review M-2: alice saves a template, bob instantiates it, alice approves it."""
+    from vmware_pilot import custom_loader
+    from vmware_pilot.mcp_server._shared import _save_as_yaml
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(custom_loader, "_WORKFLOWS_DIR", tmp_path / ".vmware" / "workflows")
+    _save_as_yaml(
+        "alices-check",
+        "read only",
+        [{"action": "look", "skill": "monitor", "tool": "list_virtual_machines"}],
+        ["token:alice", ""],
+    )
+    loader = custom_loader.load_custom_templates()["alices-check"]
+    import vmware_policy.caller as caller_mod
+
+    monkeypatch.setattr(caller_mod, "audit_user", lambda: "token:bob")
+    wf = loader()
+    assert wf.created_by == "token:bob" and wf.authors == ["token:alice"]
+    check = _as_role(monkeypatch, "token:alice", "others")
+    assert "edited or confirmed" in check(wf, "token:alice")
+    assert check(wf, "token:carol") == ""

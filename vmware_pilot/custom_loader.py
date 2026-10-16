@@ -147,6 +147,10 @@ def _make_loader(spec: dict[str, Any], source: Path) -> Any:
             created_at=now,
             updated_at=now,
         )
+        # Whoever wrote the template wrote these steps: under approve: others they
+        # may not approve a workflow made from it (review M-2).
+        for author in spec.get("authors") or ():
+            wf.with_author(str(author))
         # Refuse here, not only in create_workflow_from_template, so an embedder calling the
         # loader directly cannot get an ungated custom workflow either.
         enforce(
