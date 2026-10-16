@@ -6,7 +6,8 @@
   approve, `approve: others` cannot approve a workflow its own token created (nor one with no recorded creator),
   `approve: any` can. The token also needs a role that allows the `approve` tool itself. Whoever edits a draft
   (`update_draft`) or confirms it (`confirm_draft`) is recorded in `authors` and counts as its creator for
-  `others`. A refusal is audited as `denied` with `rule=role:<name>`.
+  `others`; so is whoever saved a custom template, for workflows made from it (the YAML records `authors`).
+  A refusal is audited as `denied` with `rule=role:<name>`.
 * Approval is an audited attestation, not a gate on execution: this server does not run other skills' steps, it
   returns them (`pending_dispatch`) and each skill's server checks the caller's own role there.
 * Declares role metadata (no tool takes a target). README and setup guide: one endpoint for several people or roles.
