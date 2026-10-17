@@ -45,6 +45,16 @@ _FAKE_SERVER = textwrap.dedent('''\
         raise RuntimeError("VM 'nope' not found")
 
     @mcp.tool()
+    def list_all_clusters(target: str = "") -> dict:
+        _log("list_all_clusters", {{"target": target}})
+        return {{"plan_id": "plan-42", "items": []}}
+
+    @mcp.tool()
+    def get_events(plan_id: str = "", target: str = "") -> str:
+        _log("get_events", {{"plan_id": plan_id}})
+        return "events for " + plan_id
+
+    @mcp.tool()
     def get_vm_info(vm_name: str, target: str = "") -> dict:
         _log("get_vm_info", {{"vm_name": vm_name}})
         time.sleep(30)
@@ -243,3 +253,44 @@ def test_the_mcp_tools_run_steps_when_dispatch_is_on(tmp_path, fake_bin, monkeyp
     assert out["outcome"] == "completed", out
     assert "pending_dispatch" not in out
     assert "get_alarms" in _calls(fake_bin)
+
+
+@pytest.mark.unit
+def test_a_step_reference_reads_the_tools_own_result(tmp_path, fake_bin):
+    """Live run 2026-10-18: results were stored as raw MCP frames, so
+    __from_step_N__:key (plan_and_approve's plan_id) could not find the key."""
+    import json
+
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-d6", [
+        WorkflowStep(index=0, action="plan", skill="monitor", tool="list_all_clusters",
+                     params={}),
+        WorkflowStep(index=1, action="use", skill="monitor", tool="get_events",
+                     params={"plan_id": "__from_step_0__:plan_id"}),
+    ])
+    out = WorkflowExecutor(store, dispatch=StdioDispatcher()).run_until_checkpoint(wf)
+    assert out["outcome"] == "completed", out
+    args = [json.loads(line)["args"] for line in fake_bin.read_text().splitlines()]
+    assert args[1] == {"plan_id": "plan-42"}
+    assert wf.steps[0].result == {"plan_id": "plan-42", "items": []}
+    assert wf.steps[1].result == "events for plan-42"
+
+
+@pytest.mark.unit
+def test_rollback_does_not_list_read_only_steps(tmp_path):
+    """Live run 2026-10-18: get_vm_info was reported 'not_reversible … stays applied'."""
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-d7", [
+        WorkflowStep(index=0, action="look", skill="monitor", tool="get_vm_info",
+                     params={"vm_name": "a"}),
+        WorkflowStep(index=1, action="resize", skill="aiops", tool="reconfigure_vm",
+                     params={"vm_name": "a", "cpu": 2}),
+        WorkflowStep(index=2, action="fail", skill="aiops", tool="failing_tool", params={}),
+    ])
+    ex = WorkflowExecutor(store, dispatch=lambda s, t, p: {"error": "x"} if t == "failing_tool"
+                          else {"ok": True})
+    ex.run_until_checkpoint(wf)
+    radius = rollback_blast_radius(wf)
+    assert [e["index"] for e in radius["left_in_place"]] == [1]
+    result = ex.rollback(wf)
+    assert [r["step"] for r in result["rollback_results"]] == [1]

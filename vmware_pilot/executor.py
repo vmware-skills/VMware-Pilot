@@ -29,7 +29,7 @@ from vmware_pilot.models import (
     is_sensitive_key,
 )
 from vmware_pilot.renames import _server
-from vmware_pilot.reversibility import leaves_behind
+from vmware_pilot.reversibility import is_read_only, leaves_behind
 
 _log = logging.getLogger("vmware-pilot.executor")
 
@@ -519,8 +519,9 @@ class WorkflowExecutor:
                 })
         for step in reversed(wf.completed_steps()):
             if not step.rollback_tool:
-                # Approval gates record a decision; there is nothing to reverse.
-                if step.action != "require_approval":
+                # Approval gates record a decision and catalog read-only tools
+                # change nothing: there is nothing to reverse.
+                if step.action != "require_approval" and not is_read_only(step):
                     rollback_results.append(
                         {
                             "step": step.index,

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import json
 import os
 import re
 import shutil
@@ -139,6 +140,31 @@ class StdioDispatcher:
             return future.result()
 
 
+def _payload(result: Any) -> Any:
+    """The tool's own data, as the workflow stores it and step references read it.
+
+    A raw MCP frame would be stored instead, and ``__from_step_N__:plan_id``
+    would look for ``plan_id`` on the frame (live run, 2026-10-18). FastMCP puts
+    a dict return in ``structuredContent`` and wraps anything else as
+    ``{"result": ...}``; a frame with ``isError`` becomes the family's error
+    envelope so the executor records a failure.
+    """
+    texts = [t for t in (getattr(c, "text", None) for c in result.content or []) if t]
+    if result.isError:
+        return {"error": " ".join(texts) or "the tool reported isError with no message"}
+    structured = result.structuredContent
+    if isinstance(structured, dict):
+        if set(structured) == {"result"}:
+            return structured["result"]
+        return structured
+    if len(texts) == 1:
+        try:
+            return json.loads(texts[0])
+        except ValueError:
+            return texts[0]
+    return texts
+
+
 async def _call(command: str, tool: str, params: dict[str, Any], timeout: float) -> Any:
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
@@ -154,7 +180,7 @@ async def _call(command: str, tool: str, params: dict[str, Any], timeout: float)
                 return await session.call_tool(tool, params)
 
     try:
-        return await asyncio.wait_for(run(), timeout)
+        return _payload(await asyncio.wait_for(run(), timeout))
     except asyncio.TimeoutError:
         raise DispatchTimeoutError(
             f"{Path(command).name} did not answer {tool} within {timeout:g} s; the call was "

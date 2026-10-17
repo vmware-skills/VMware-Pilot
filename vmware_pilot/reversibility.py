@@ -42,6 +42,16 @@ NOT_REVERSIBLE_NOTE = (
 )
 
 
+def is_read_only(step: WorkflowStep) -> bool:
+    """True when the catalog marks the step's tool low risk (a read).
+
+    Only the catalog decides: the name heuristic reads ``retarget_vm`` as a read.
+    """
+    from vmware_pilot.review import _catalog_risk
+
+    return _catalog_risk(step.skill, step.tool) == "low"
+
+
 def leaves_behind(step: WorkflowStep) -> str:
     """What stays after ``step``'s rollback runs, or "" when it is a full undo."""
     # Same spellings the rest of Pilot accepts: aiops / vmware-aiops / vmware_aiops / AIops.
