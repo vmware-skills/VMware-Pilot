@@ -24,7 +24,7 @@
 
 | # | Template | Steps | Approval | Skills Used | Risk |
 |---|----------|-------|----------|-------------|------|
-| 1 | `clone_and_test` | 6-7 | Yes | aiops, monitor | Medium |
+| 1 | `clone_and_test` | 7-8 | Yes | aiops, monitor | Medium |
 | 2 | `incident_response` | 4 | Yes | monitor, aiops | Medium |
 | 3 | `plan_and_approve` | 3 | Yes | aiops | High |
 | 4 | `compliance_scan` | 1-3 | No | monitor, aria | Low |
@@ -56,7 +56,7 @@ numbers matter here, and they are not the same thing:
 | Skill | Package | Skill tools | In design catalog | Domain |
 |-------|---------|:-----------:|:-----------------:|--------|
 | vmware-aiops | `vmware-aiops` | 61 | 19 | VM lifecycle, deployment, guest ops, clusters |
-| vmware-monitor | `vmware-monitor` | 33 | 5 | Read-only inventory, alarms, events |
+| vmware-monitor | `vmware-monitor` | 33 | 6 | Read-only inventory, alarms, events |
 | vmware-nsx | `vmware-nsx-mgmt` | 33 | 8 | NSX segments, gateways, NAT, routing, IPAM |
 | vmware-nsx-security | `vmware-nsx-security` | 22 | 7 | DFW policies/rules, security groups, traceflow |
 | vmware-aria | `vmware-aria` | 46 | 7 | Aria Ops metrics, alerts, capacity, anomalies |
@@ -69,7 +69,7 @@ numbers matter here, and they are not the same thing:
 | vmware-privateai | `vmware-privateai` | 18 | 5 | GPU hosts, vGPU profiles, utilisation |
 | vmware-vdi | `vmware-vdi` | 27 | 9 | Horizon pools, sessions, machines, images |
 
-**Totals**: 336 tools across the 13 companion skills; the design catalog covers 100 of them
+**Totals**: 336 tools across the 13 companion skills; the design catalog covers 101 of them
 across all 13. Pilot adds 13 orchestration tools of its own. The counts are checked against
 the companion snapshot by `tests/eval/regression/test_catalog_covers_the_family.py`.
 
@@ -111,7 +111,7 @@ Pause execution for human review before destructive operations. Workflows can ha
 A failed step stops the workflow; nothing is reversed until someone calls `rollback`. It undoes, last first, only steps pilot recorded as `success` — on the MCP server (no dispatcher) that is none of the steps the agent performed, so the agent calls each step's `rollback_tool` itself. Best-effort: if one undo fails, the rest still run. Steps without a `rollback_tool` cannot be undone.
 
 ### Preview first: rollback and cancel_workflow
-Both take `confirm: bool = False`. A bare call returns `{"action": "preview", "blast_radius": ...}` and changes nothing. `blast_radius` names the workflow (id, type, state), `state_after`, and — each as a count plus up to 16 steps — `would_roll_back` / `would_skip` (rollback entries carry each step's `rollback_tool` and `rollback_params`, secrets redacted), `left_in_place` (executed steps that stay applied: cancelling part-way leaves a half-applied change), `not_reversed_by_pilot` (rollback: steps the agent performed from `pending_dispatch`), `unknown_effects` (steps interrupted mid-dispatch), plus `blockers` and `unmeasured`. `confirm=True` refuses when either list is non-empty: a state the transition is not allowed from, a step status Pilot does not recognise, a workflow record that cannot be read, or a step in `unknown_effects` (left `running`/`interrupted` by a Pilot process that stopped mid-dispatch). For the last, the refusal says what to check; after the user has checked in the target system whether each such step took effect, re-run with `acknowledge_unknown_effects=True` (default `False`). That acknowledgement covers only those steps — it lifts no blocker and no other unmeasured item.
+Both take `confirm: bool = False`. A bare call returns `{"action": "preview", "blast_radius": ...}` and changes nothing. `blast_radius` names the workflow (id, type, state), `state_after`, and — each as a count plus up to 16 steps — `would_roll_back` / `would_skip` (rollback entries carry each step's `rollback_tool` and `rollback_params`, secrets redacted), `left_in_place` (executed steps that stay applied: cancelling part-way leaves a half-applied change), `not_reversed_by_pilot` (rollback: steps the agent performed from `pending_dispatch` that have an undo to call), `not_reversible_outside_pilot` (rollback: handed-out steps with no undo — a clone, a production resize; read-only catalog tools left out), `handed_out_to_caller` (cancel: steps already in `pending_dispatch`, which cancel can neither stop nor undo), `unknown_effects` (steps interrupted mid-dispatch), plus `blockers` and `unmeasured`. `confirm=True` refuses when either list is non-empty: a state the transition is not allowed from, a step status Pilot does not recognise, a workflow record that cannot be read, or a step in `unknown_effects` (left `running`/`interrupted` by a Pilot process that stopped mid-dispatch). For the last, the refusal says what to check; after the user has checked in the target system whether each such step took effect, re-run with `acknowledge_unknown_effects=True` (default `False`). That acknowledgement covers only those steps — it lifts no blocker and no other unmeasured item.
 
 ### Companion tools that preview by default
 Destructive companion tools take `confirm: bool = False` and return `action: preview` on a bare call. Built-in template steps (and their `rollback_params`) pass `confirm=True`, because in every built-in template they come after an `approve` gate (a test enforces it). `rollback_params` with `confirm: True` in any workflow, built-in or custom, run on a `rollback(confirm=True)` call without an approval step of their own: `rollback` is itself gated, and that `confirm=True` is the human decision taken after its preview listed every rollback step's tool and parameters; they no longer pass the deprecated `confirmed` / `dry_run`. A step or rollback whose result is a top-level `action: preview` is recorded `failed` ("step only previewed"), never `success`. `baseline_remediate` adds `confirm=True` to caller-supplied drift items for those tools and refuses items that already carry `confirm`, `confirmed` or `dry_run`.

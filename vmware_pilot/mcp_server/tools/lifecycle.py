@@ -64,8 +64,10 @@ def create_workflow_from_template(
     Args:
         workflow_type: One of the available workflow types.
         params: Workflow-specific parameters.
-            clone_and_test: target_vm (str), change_spec (dict), monitor_minutes (int),
-                target (str). change_spec is a resize ({"cpu": 4} and/or
+            clone_and_test: target_vm (str), change_spec (dict), snapshot_name (str,
+                required: the snapshot to clone from — vmware-monitor list_vm_snapshots),
+                monitor_minutes (int: how long the approver should let staging run;
+                pilot does not wait), target (str). change_spec is a resize ({"cpu": 4} and/or
                 {"memory_mb": 32768}; memory_gb is converted) or one guest command
                 ({"command": "/usr/bin/apt-get", "arguments": "...", "username":
                 "<guest account>", "password": "..."}) — username is required,
@@ -281,7 +283,9 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
     }
 )
 @vmware_tool(risk_level="high")
-def approve(workflow_id: str, approver: str = "") -> dict:
+def approve(
+    workflow_id: str, approver: str = "", acknowledge_not_executed: bool = False
+) -> dict:
     """[WRITE] Approve a workflow that is waiting for human confirmation.
 
     Use this only after showing the user the pending step and getting explicit
@@ -289,16 +293,25 @@ def approve(workflow_id: str, approver: str = "") -> dict:
     Only works when workflow state is 'awaiting_approval'.
     After approval, execution continues to the next steps.
 
+    This server has no dispatcher, so the steps before the gate are
+    'not_executed': Pilot has no record that they ran, whatever the gate's
+    message says. approve refuses (listing them in not_executed_before_gate)
+    until acknowledge_not_executed=True — set it only after you performed each
+    of those steps yourself and showed the user their results. They are then
+    recorded as 'reported_done' and not handed out again.
+
     Args:
         workflow_id: The workflow ID to approve.
         approver: Name of the person approving (for audit trail). Over an
             authenticated network transport leave it empty: the approver is
             the caller's token name, and a different name is refused.
+        acknowledge_not_executed: True says the steps before this gate were
+            performed outside Pilot and their results were checked.
 
-    Note: this server has no dispatcher — after approval, remaining steps
-    are recorded as 'not_executed' and the result carries
-    outcome='dispatch_required' with a 'pending_dispatch' list for the
-    calling agent to perform (see run_workflow).
+    Note: after approval the remaining steps are recorded as 'not_executed'
+    and the result carries outcome='dispatch_required' with a
+    'pending_dispatch' list for the calling agent to perform (see
+    run_workflow). Through this server a workflow never reaches 'completed'.
 
     Returns:
         Updated workflow state after resuming.
@@ -328,7 +341,9 @@ def approve(workflow_id: str, approver: str = "") -> dict:
                 raise _ApprovalRefusedError(refused)
         # Non-empty approver enforcement lives in the executor so embedders
         # cannot bypass the audit-trail requirement.
-        return _get_executor().resume_after_approval(wf, approver=approver)
+        return _get_executor().resume_after_approval(
+            wf, approver=approver, acknowledge_not_executed=acknowledge_not_executed
+        )
     except _ApprovalRefusedError as refusal:
         # A role refusal, audited as one (denied, rule role:<name>) so it can be
         # filtered with the other role refusals (integration review).
@@ -370,7 +385,10 @@ def rollback(
     often carry confirm=True, and this call's confirm=True is the decision to
     run them), the executed steps that have none and stay applied
     (left_in_place), steps you performed from pending_dispatch that Pilot will
-    not reverse (not_reversed_by_pilot), steps with unknown effects, and
+    not reverse (not_reversed_by_pilot: they have an undo you must call;
+    not_reversible_outside_pilot: they have none — a clone, a production
+    resize), undos that would leave something behind (leaves_behind on a
+    would_roll_back entry), steps with unknown effects, and
     blockers — and changes nothing. Show that to the user and get their
     explicit decision. Do not set confirm=True on your own because the user
     asked for a rollback earlier — the user has not seen the preview yet.
@@ -379,11 +397,14 @@ def rollback(
     'failed' and stops. This tool is the explicit, best-effort undo, and it
     only reverses steps pilot itself recorded as 'success' — which, on this
     server (no dispatcher), are approval gates only. Steps YOU performed from
-    pending_dispatch are still 'not_executed' here, so to undo them call each
+    pending_dispatch are 'not_executed' (or 'reported_done' once acknowledged at
+    a gate) here, so to undo them call each
     one's rollback_tool with its rollback_params yourself, last step first.
     Embedders that pass a dispatcher to WorkflowExecutor get those calls made
-    for them. Steps without a rollback_tool are skipped; a failed undo does not
-    stop the rest. The workflow state is set to 'failed' afterwards.
+    for them. Steps without a rollback_tool are reported 'not_reversible' and
+    stay applied; an undo that does not remove what the step created is
+    'partial' (a clone powered off stays). A failed undo does not stop the
+    rest. The workflow state is set to 'failed' afterwards.
 
     Refused with confirm=True: a workflow in draft, completed, rolling_back or
     cancelled state, a step whose status Pilot does not recognise, a workflow
@@ -459,8 +480,11 @@ def cancel_workflow(
 
     Without confirm=True this only previews: it returns blast_radius — the
     workflow's id, type and state, the executed steps that stay applied
-    (left_in_place: cancelling part-way leaves a half-applied change), the
-    steps that would be skipped (would_skip), steps with unknown effects, and
+    (left_in_place: cancelling part-way leaves a half-applied change), steps
+    performed outside Pilot (performed_outside_pilot), steps already handed to
+    you in pending_dispatch that cancel can neither stop nor undo
+    (handed_out_to_caller), the steps that would be skipped (would_skip),
+    steps with unknown effects, and
     blockers — and changes nothing. Show that to the user and get their
     explicit decision. Do not set confirm=True on your own because the user
     asked to cancel earlier — the user has not seen the preview yet.

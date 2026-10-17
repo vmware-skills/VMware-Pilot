@@ -389,9 +389,11 @@ class TestRunWorkflowRejectsCustomEvenWithForce:
 #: ``clone_and_test`` raise and be *skipped* — the very template this pin is about.
 _BUILTIN_ARGS = {
     "clone_and_test": [
-        {"target_vm": "db01", "change_spec": {"memory_mb": 32768}, "target": "vc"},
-        {"target_vm": "db01", "change_spec": {"memory_gb": 32, "cpu": 4}, "target": "vc"},
-        {"target_vm": "db01", "target": "vc",
+        {"target_vm": "db01", "change_spec": {"memory_mb": 32768}, "target": "vc",
+         "snapshot_name": "s1"},
+        {"target_vm": "db01", "change_spec": {"memory_gb": 32, "cpu": 4}, "target": "vc",
+         "snapshot_name": "s1"},
+        {"target_vm": "db01", "target": "vc", "snapshot_name": "s1",
          "change_spec": {"command": "/usr/bin/apt-get", "arguments": "-y upgrade",
                          "username": "ops", "password": "pw"}},
     ],

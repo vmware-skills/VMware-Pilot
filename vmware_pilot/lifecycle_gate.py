@@ -34,6 +34,8 @@ from typing import Any
 
 from vmware_pilot.executor import _ROLLBACK_FORBIDDEN_STATES, _TERMINAL_STATES
 from vmware_pilot.models import Workflow, WorkflowStep, WorkflowStore, _redact_for_persistence
+from vmware_pilot.reversibility import NOT_REVERSIBLE_NOTE, OUTSIDE_PILOT_NOTE, leaves_behind
+from vmware_pilot.review import _catalog_risk
 
 _log = logging.getLogger("vmware-pilot.lifecycle_gate")
 
@@ -45,6 +47,10 @@ CAP = 16
 KNOWN_STEP_STATUSES = frozenset({
     "pending", "running", "success", "failed", "skipped",
     "rolled_back", "not_executed", "interrupted",
+    # The caller performed it outside Pilot and the approver acknowledged that.
+    "reported_done",
+    # Its rollback ran but does not remove what it created (``reversibility``).
+    "partially_rolled_back",
 })
 
 #: Statuses whose side effects are unknown (a process died mid-dispatch).
@@ -104,8 +110,12 @@ def _rollback_ref(step: WorkflowStep) -> dict[str, Any]:
     ``rollback`` call alone, so the preview must show them for the human
     deciding ``confirm=True`` to see what they are approving.
     """
-    return {**_ref(step), "rollback_tool": step.rollback_tool,
-            "rollback_params": _redact_preview(_redact_for_persistence(step.rollback_params or {}))}
+    params = _redact_preview(_redact_for_persistence(step.rollback_params or {}))
+    entry = {**_ref(step), "rollback_tool": step.rollback_tool, "rollback_params": params}
+    left = leaves_behind(step)
+    if left:
+        entry["leaves_behind"] = left
+    return entry
 
 
 def _listed(steps: list[WorkflowStep], key: str, entry=_ref) -> dict[str, Any]:
@@ -156,8 +166,19 @@ def rollback_blast_radius(
     undo = [s for s in reversed(executed) if s.rollback_tool]
     left = [s for s in executed if not s.rollback_tool]
     # Steps the calling agent may have performed from pending_dispatch: Pilot
-    # recorded them as not_executed and will not reverse them.
-    agent_side = [s for s in wf.steps if s.status == "not_executed" and s.rollback_tool]
+    # recorded them as not_executed (or reported_done) and will not reverse them.
+    agent_side = [
+        s for s in wf.steps if s.status in ("not_executed", "reported_done") and s.rollback_tool
+    ]
+    # Handed to the caller with no undo at all: listed nowhere else, so the human
+    # confirming the rollback would not see the clone or production change stay.
+    outside = [
+        s for s in wf.steps
+        if s.status in ("not_executed", "reported_done") and not s.rollback_tool
+        # Only the catalog may call a step read-only here; the name heuristic
+        # reads "retarget_vm" as a read because it contains "get".
+        and _catalog_risk(s.skill, s.tool) != "low"
+    ]
     blockers = []
     if wf.state in _ROLLBACK_FORBIDDEN_STATES:
         blockers.append(
@@ -169,7 +190,10 @@ def rollback_blast_radius(
         **_common(wf, "failed", acknowledge_unknown_effects),
         **_listed(undo, "would_roll_back", _rollback_ref),
         **_listed(left, "left_in_place"),
+        "left_in_place_note": NOT_REVERSIBLE_NOTE if left else "",
         **_listed(agent_side, "not_reversed_by_pilot", _rollback_ref),
+        **_listed(outside, "not_reversible_outside_pilot"),
+        "not_reversible_outside_pilot_note": OUTSIDE_PILOT_NOTE if outside else "",
         "blockers": blockers,
         "unmeasured": _unmeasured(wf, acknowledge_unknown_effects),
     }
@@ -179,7 +203,11 @@ def cancel_blast_radius(
     wf: Workflow, acknowledge_unknown_effects: bool = False
 ) -> dict[str, Any]:
     """What ``cancel_workflow`` would leave half-applied and what it would skip."""
-    skipped = [s for s in wf.steps if s.status in ("pending", "not_executed")]
+    # Never handed out: cancelling really does stop these.
+    skipped = [s for s in wf.steps if s.status == "pending"]
+    # Handed to the caller in pending_dispatch: they may already have run, and
+    # cancel cannot stop or undo what already ran.
+    handed_out = [s for s in wf.steps if s.status == "not_executed"]
     blockers = []
     if wf.state in _TERMINAL_STATES:
         blockers.append(
@@ -189,7 +217,15 @@ def cancel_blast_radius(
     return {
         **_common(wf, "cancelled", acknowledge_unknown_effects),
         **_listed(_executed(wf), "left_in_place"),
+        # Performed by the caller, acknowledged at a gate: also stays applied.
+        **_listed([s for s in wf.steps if s.status == "reported_done"],
+                  "performed_outside_pilot"),
         **_listed(skipped, "would_skip"),
+        **_listed(handed_out, "handed_out_to_caller"),
+        "handed_out_to_caller_note": (
+            "these steps were handed to the caller (pending_dispatch) and may already have "
+            "been performed; cancel neither stops nor undoes them — check before deciding"
+        ) if handed_out else "",
         "blockers": blockers,
         "unmeasured": _unmeasured(wf, acknowledge_unknown_effects),
     }

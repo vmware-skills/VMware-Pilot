@@ -1,3 +1,44 @@
+## Unreleased (proposed v2.4.0) — first run against real vSphere (2026-10-17)
+
+Found running Pilot workflows on vCenter 8.0.3 for the first time, through the MCP server and through an embedder
+that dispatched steps to the 2.4.0 skill servers.
+
+* **`clone_and_test` works on real vSphere.** It cloned from a snapshot literally named `current` (almost no VM
+  has one) and resized the clone after powering it on, which vCenter refuses (`MemoryHotPlugNotSupported`) on any
+  VM without hot-add. Now `snapshot_name` is **required** (no default; the error names `list_vm_snapshots`), the
+  clone is made powered off, staging is resized while off and then powered on, and the check is vmware-monitor
+  `investigate_vm` on the staging VM instead of `get_alarms` for the whole vCenter. A guest command runs after
+  power-on. 7 steps (8 for a guest command). Pilot still does not wait `monitor_minutes`: the approval message
+  asks the approver to, says a running production VM is resized in place (needs hot-add), and that the production
+  change is not rolled back. The clone step no longer claims a rollback (powering a clone off does not remove it).
+* **`approve` refuses a gate whose earlier steps nobody ran.** Through the MCP server (no dispatcher) every step
+  before the gate is `not_executed`, and the gate used to pass under "Staging VM … tested". It now refuses and
+  lists them in `not_executed_before_gate`; `acknowledge_not_executed=True` records them as `reported_done`
+  (performed outside Pilot) and they are not handed out again. Pilot never saw their results: through MCP a later
+  step that references one is handed out with the reference unresolved (fill it from that step's result), and
+  an embedder that dispatches it refuses it. An embedder with a dispatcher is unaffected unless it resumes a workflow
+  that was first run without one — then the same refusal applies. The acknowledgement is the caller's
+  statement, not a check: Pilot records who sent it, not what the steps returned.
+  SKILL.md now says plainly who executes steps: through MCP the agent does, and a workflow never reaches
+  `completed` that way.
+* **Rollback says what it cannot undo.** A step with no rollback is reported `not_reversible` (it was `skipped`,
+  "no rollback defined"); a rollback that does not remove what the step created — a clone powered off — is
+  `partial` with `left_behind`, and the step is `partially_rolled_back`. The preview carries the same:
+  `leaves_behind` on such entries and `left_in_place_note`. Approval gates are no longer listed as skipped.
+* **Failure is read from the frame, not from prose.** Besides `isError` and a top-level `error` on a plain
+  dict, a top-level `error` in an MCP result's structured content and a one-row `[{"error": ...}]` list now fail
+  the step, the last step included. A string is never read as failure, even one starting `Error: ` — decided,
+  as in vmware-policy, because tools return console text that can start that way. A skill must set `isError`;
+  AIops's linked clone returned its failure as prose in 2.4.0 and is fixed there (it now raises).
+* `investigate_vm` added to the design catalog (101 tools).
+* Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
+  workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.
+* The rollback preview gains `not_reversible_outside_pilot` (steps handed to the caller with no undo — a clone,
+  a production resize; tools the catalog marks read-only left out) with a note; through MCP those used to appear nowhere in the
+  preview. The cancel preview gains `handed_out_to_caller`: steps already in `pending_dispatch`, which cancel
+  can neither stop nor undo — they used to be listed as `would_skip`, and cancel now keeps them `not_executed`
+  on the record instead of rewriting them to `skipped`.
+
 ## v2.3.0 — roles for network callers (HLD §18)
 
 * Workflows record their creator (`created_by`: the network caller `token:<name>`, or the OS user). Workflows saved

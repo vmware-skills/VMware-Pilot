@@ -72,20 +72,21 @@ pip install --no-index --find-links dist vmware-pilot
 | `create_workflow` | Create custom workflow from step list (refused if a destructive step has no approval gate before it) |
 | `run_workflow` | Execute workflow, pauses at approval gates |
 | `get_workflow_status` | Query state + diff report + audit log |
-| `approve` | Human approval, continue execution |
+| `approve` | Human approval, continue execution. Refused while steps before the gate are `not_executed`, until `acknowledge_not_executed=True` says you ran them |
 | `rollback` | Explicit, best-effort undo of steps pilot recorded as succeeded — never automatic. Previews (`blast_radius`) unless `confirm=True` |
 | `cancel_workflow` | Cancel a workflow — move it to the terminal CANCELLED state. Previews (`blast_radius`) unless `confirm=True` |
 
 ## Built-in Templates (15)
 
 `n` is the number of VMs (or drift items); ranges depend on which optional parameters are set.
-`clone_and_test` has 7 steps when `change_spec` is a guest command (an extra gate before it runs
+`clone_and_test` needs `snapshot_name` (the snapshot to clone from), resizes staging while it is
+powered off, and has 8 steps when `change_spec` is a guest command (an extra gate before it runs
 in staging). `investigate_alert`'s approvals are synthesis checkpoints; its steps are all reads.
 See `skills/vmware-pilot/references/templates.md` for parameters and steps.
 
 | Template | Steps | Approval | Skills Used |
 |----------|:-----:|:--------:|-------------|
-| `clone_and_test` | 6-7 | Yes | aiops, monitor |
+| `clone_and_test` | 7-8 | Yes | aiops, monitor |
 | `incident_response` | 4 | Yes | monitor, aiops |
 | `investigate_alert` | 4 (8 with `deep_dive`) | Yes | monitor, aria |
 | `plan_and_approve` | 3 | Yes | aiops |

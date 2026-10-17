@@ -1,7 +1,7 @@
 # Cross-Skill Integration Patterns
 
 vmware-pilot orchestrates the VMware skill family into coherent workflows. Its
-design catalog (`get_skill_catalog`) offers 100 curated building blocks across 13
+design catalog (`get_skill_catalog`) offers 101 curated building blocks across 13
 skills; a dispatched step may name any companion skill, catalogued or not.
 This reference documents the most common integration patterns and when to use
 Pilot vs. calling a skill directly.
@@ -167,8 +167,9 @@ Safe change deployment using a staging clone.
 
 ```
 aiops.deploy_linked_clone       -> Clone production VM to staging
-aiops.reconfigure_vm            -> Apply changes to staging clone
-monitor.get_alarms              -> Monitor staging for issues
+aiops.reconfigure_vm            -> Apply changes to the staging clone (powered off)
+aiops.power_on_vm               -> Start staging
+monitor.investigate_vm          -> Check the staging VM's alarms and events
     [APPROVAL GATE]             -> Human verifies staging is healthy
 aiops.reconfigure_vm            -> Apply same changes to production
 aiops.power_off_vm              -> Cleanup staging clone

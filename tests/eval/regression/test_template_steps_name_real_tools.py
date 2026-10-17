@@ -35,8 +35,9 @@ FIXTURE = pathlib.Path(__file__).parents[2] / "fixtures" / "companion_tools.json
 #: its required parameters, so a failure here is always the template's own.
 _ARGS = {
     "clone_and_test": [
-        {"target_vm": "db01", "change_spec": {"memory_mb": 32768}, "target": "vc"},
-        {"target_vm": "db01", "target": "vc",
+        {"target_vm": "db01", "change_spec": {"memory_mb": 32768}, "target": "vc",
+         "snapshot_name": "s1"},
+        {"target_vm": "db01", "target": "vc", "snapshot_name": "s1",
          "change_spec": {"command": "/usr/bin/apt-get", "arguments": "-y upgrade",
                          "username": "ops", "password": "pw"}},
     ],

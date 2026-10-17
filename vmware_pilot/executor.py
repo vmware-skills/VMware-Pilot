@@ -28,6 +28,7 @@ from vmware_pilot.models import (
     WorkflowStore,
     is_sensitive_key,
 )
+from vmware_pilot.reversibility import leaves_behind
 
 _log = logging.getLogger("vmware-pilot.executor")
 
@@ -96,13 +97,24 @@ def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
     return payloads
 
 
+#: Prose is never read as failure (decided 2026-10-17, after the first real-
+#: vSphere run). A string result starting "Error: " without ``isError`` is
+#: success here, as in vmware-policy (``report_tool_failure`` does not sniff
+#: strings): a tool may legitimately return console text that starts that way.
+#: A skill that fails must say so in the frame — AIops's linked clone returned
+#: its failure as prose in 2.4.0 and now raises, which sets ``isError``. Do not
+#: add a text heuristic here; tests/test_last_step_clone_failure.py pins it.
+
+
 def _returned_failure(result: Any) -> str | None:
     """Return the failure message if this dispatch result reports failure.
 
     Only a TOP-LEVEL, non-empty ``error`` counts: ``{"error": None}`` is an
     explicit "no error", and an ``error`` nested inside a row (an alarm's
     ``error_count``, say) is data, not a failed call. A TOP-LEVEL
-    ``"action": "preview"`` is a failure too: the tool changed nothing.
+    ``"action": "preview"`` is a failure too: the tool changed nothing. So is a
+    ``-> list`` tool's error shape, a list holding exactly one ``{"error": ...}``
+    row. A string is never read as failure (see the note above).
     """
     if any(p.get("action") == "preview" for p in _top_level_payloads(result)):
         return _PREVIEW_ONLY
@@ -113,8 +125,12 @@ def _returned_failure(result: Any) -> str | None:
         if isinstance(content, list) and content and getattr(content[0], "text", None):
             return str(content[0].text)
         return str(content or "the tool reported isError")
-    if isinstance(result, dict):
-        err = result.get("error")
+    for payload in _top_level_payloads(result):
+        err = payload.get("error")
+        if err not in (None, "", [], {}):
+            return str(err)
+    if isinstance(result, list) and len(result) == 1 and isinstance(result[0], dict):
+        err = result[0].get("error")
         if err not in (None, "", [], {}):
             return str(err)
     return None
@@ -354,10 +370,18 @@ class WorkflowExecutor:
             )
         return result
 
-    def resume_after_approval(self, wf: Workflow, approver: str = "") -> dict[str, Any]:
+    def resume_after_approval(
+        self, wf: Workflow, approver: str = "", acknowledge_not_executed: bool = False
+    ) -> dict[str, Any]:
         """Continue execution after human approval.
 
         ``approver`` is mandatory — the audit trail must name a human.
+
+        A gate whose earlier steps Pilot recorded as ``not_executed`` (no
+        dispatcher) is refused unless ``acknowledge_not_executed`` is True: the
+        gate's message describes those steps' outcome, and Pilot has no record
+        that they ran. Acknowledged, they become ``reported_done`` — performed
+        by the caller, not by Pilot — and are not handed out again.
         """
         if wf.state != WorkflowState.AWAITING_APPROVAL:
             return {"error": f"Workflow {wf.id} is not awaiting approval (state: {wf.state.value})"}
@@ -373,16 +397,40 @@ class WorkflowExecutor:
             }
         approver = approver.strip()
 
+        gate = next(
+            (s for s in wf.steps if s.action == "require_approval" and s.status == "pending"),
+            None,
+        )
+        unrun = [
+            s for s in wf.steps
+            if gate is not None and s.index < gate.index and s.status == "not_executed"
+        ]
+        if unrun and not acknowledge_not_executed:
+            return _unrun_refusal(wf, unrun)
+
         wf.approved_by = approver
         wf.log("approved", f"Approved by {approver}")
+        for step in unrun:
+            step.status = "reported_done"
+            step.result = {
+                "reason": "Pilot did not execute this step and has no record of its "
+                "result; approve(acknowledge_not_executed=True) from "
+                f"{approver} stated it was performed outside Pilot."
+            }
+        if unrun:
+            wf.log(
+                "approved_over_unexecuted_steps",
+                f"{approver} acknowledged steps {[s.index for s in unrun]} as performed "
+                "outside Pilot",
+            )
 
         # Mark the approval step as done
-        for step in wf.steps:
-            if step.action == "require_approval" and step.status == "pending":
-                step.status = "success"
-                step.result = {"approved_by": approver}
-                step.completed_at = _now()
-                break
+        if gate is not None:
+            gate.status = "success"
+            gate.result = {"approved_by": approver}
+            if unrun:
+                gate.result["acknowledged_not_executed"] = [s.index for s in unrun]
+            gate.completed_at = _now()
 
         # Continue executing remaining steps
         return self.run_until_checkpoint(wf)
@@ -417,14 +465,17 @@ class WorkflowExecutor:
         wf.rollback_results = rollback_results
         for step in reversed(wf.completed_steps()):
             if not step.rollback_tool:
-                rollback_results.append(
-                    {
-                        "step": step.index,
-                        "tool": step.tool,
-                        "status": "skipped",
-                        "reason": "no rollback defined",
-                    }
-                )
+                # Approval gates record a decision; there is nothing to reverse.
+                if step.action != "require_approval":
+                    rollback_results.append(
+                        {
+                            "step": step.index,
+                            "tool": step.tool,
+                            "status": "not_reversible",
+                            "reason": f"no rollback defined: {step.tool} stays applied — "
+                            "reverse it by hand (or with an explicit new plan) if needed",
+                        }
+                    )
                 continue
 
             try:
@@ -438,16 +489,21 @@ class WorkflowExecutor:
                 returned_failure = _returned_failure(result)
                 if returned_failure is not None:
                     raise _StepReturnedFailure(returned_failure, result)
-                step.status = "rolled_back"
-                rollback_results.append(
-                    {
-                        "step": step.index,
-                        "tool": step.rollback_tool,
-                        "status": "success",
-                        "result": result,
-                    }
+                left = leaves_behind(step)
+                step.status = "partially_rolled_back" if left else "rolled_back"
+                entry = {
+                    "step": step.index,
+                    "tool": step.rollback_tool,
+                    "status": "partial" if left else "success",
+                    "result": result,
+                }
+                if left:
+                    entry["left_behind"] = left
+                rollback_results.append(entry)
+                wf.log(
+                    "rollback_step",
+                    f"Step {step.index}: {step.rollback_tool} → {entry['status']}",
                 )
-                wf.log("rollback_step", f"Step {step.index}: {step.rollback_tool} → success")
             except Exception as exc:
                 rollback_results.append(
                     {
@@ -504,9 +560,11 @@ class WorkflowExecutor:
         wf.state = WorkflowState.CANCELLED
         wf.blocked_reason = reason or "cancelled"
         wf.log("cancelled", reason or "no reason given")
-        # Steps not yet executed are dead — mark them so status reflects reality.
+        # Steps never handed out are dead. A not_executed step was handed to the
+        # caller and may have run: keep that on the record (cancel_blast_radius
+        # lists it under handed_out_to_caller).
         for step in wf.steps:
-            if step.status in ("pending", "not_executed"):
+            if step.status == "pending":
                 step.status = "skipped"
         self._store.save(wf)
 
@@ -577,15 +635,24 @@ class WorkflowExecutor:
                 )
 
             source = steps[idx]
+            if source.status == "reported_done":
+                raise ValueError(
+                    f"Step reference '{v}' points to step {idx} ({source.tool}), which "
+                    "was performed outside Pilot (acknowledged at an approval gate) — "
+                    "Pilot never saw its result, so it cannot fill this reference. Do "
+                    f"not run step {idx} again. Make the call that needs this value "
+                    f"yourself, filling it from step {idx}'s own result, or create a "
+                    "new workflow."
+                )
             if source.status != "success":
                 raise ValueError(
                     f"Step reference '{v}' points to step {idx} "
                     f"({source.tool}) which has status '{source.status}', "
                     "not 'success' — its result cannot be used. Run "
                     f"get_workflow_status to see why step {idx} did not "
-                    "succeed, resolve that cause and re-run the workflow; if "
-                    "it cannot succeed, use cancel_workflow and re-author "
-                    "without the reference."
+                    "succeed and resolve that cause; a failed workflow cannot "
+                    "be re-run or cancelled, so create a new workflow (without "
+                    "the reference if the step cannot succeed)."
                 )
 
             if result_key is not None:
@@ -627,6 +694,28 @@ def _first_redacted_sensitive_key(params: Any) -> str | None:
             if nested is not None:
                 return nested
     return None
+
+
+def _unrun_refusal(wf: Workflow, unrun: list[WorkflowStep]) -> dict[str, Any]:
+    """Teaching refusal: the gate would approve steps Pilot never ran."""
+    listed = ", ".join(f"step {s.index} ({s.skill}.{s.tool})" for s in unrun)
+    return {
+        "error": (
+            f"Refusing to approve workflow '{wf.id}': {len(unrun)} step(s) before this "
+            f"gate — {listed} — were recorded but NOT executed: there is no dispatcher, so "
+            "Pilot has no record that they ran or what they returned, whatever the "
+            "approval message says. If you performed each of them yourself and checked "
+            "its result, show those results to the approver and call approve again with "
+            "acknowledge_not_executed=True; do not perform them again. Only if nobody "
+            "performed them may an embedder with a dispatcher call run_until_checkpoint "
+            "again, which executes them first."
+        ),
+        "workflow_id": wf.id,
+        "state": wf.state.value,
+        "not_executed_before_gate": [
+            {"index": s.index, "skill": s.skill, "tool": s.tool} for s in unrun
+        ],
+    }
 
 
 def _now() -> str:

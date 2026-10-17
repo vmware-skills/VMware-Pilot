@@ -54,6 +54,9 @@ SKILL_CATALOG = {
             "list_virtual_machines": {"risk": "low", "desc": "List all VMs"},
             "list_esxi_hosts": {"risk": "low", "desc": "List ESXi hosts"},
             "get_alarms": {"risk": "low", "desc": "Get active alarms with remediation hints"},
+            # clone_and_test checks its staging VM with this (alarms + events for
+            # that one VM), not get_alarms for the whole vCenter.
+            "investigate_vm": {"risk": "low", "desc": "One VM's alarms, events and surroundings"},
             "get_events": {"risk": "low", "desc": "Recent events by severity"},
             "get_vm_info": {"risk": "low", "desc": "Detailed VM info (CPU/mem/disk/NIC)"},
         },
