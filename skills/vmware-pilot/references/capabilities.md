@@ -24,7 +24,7 @@
 
 | # | Template | Steps | Approval | Skills Used | Risk |
 |---|----------|-------|----------|-------------|------|
-| 1 | `clone_and_test` | 6-7 | Yes | aiops, monitor | Medium |
+| 1 | `clone_and_test` | 7-8 | Yes | aiops, monitor | Medium |
 | 2 | `incident_response` | 4 | Yes | monitor, aiops | Medium |
 | 3 | `plan_and_approve` | 3 | Yes | aiops | High |
 | 4 | `compliance_scan` | 1-3 | No | monitor, aria | Low |
@@ -56,7 +56,7 @@ numbers matter here, and they are not the same thing:
 | Skill | Package | Skill tools | In design catalog | Domain |
 |-------|---------|:-----------:|:-----------------:|--------|
 | vmware-aiops | `vmware-aiops` | 61 | 19 | VM lifecycle, deployment, guest ops, clusters |
-| vmware-monitor | `vmware-monitor` | 33 | 5 | Read-only inventory, alarms, events |
+| vmware-monitor | `vmware-monitor` | 33 | 6 | Read-only inventory, alarms, events |
 | vmware-nsx | `vmware-nsx-mgmt` | 33 | 8 | NSX segments, gateways, NAT, routing, IPAM |
 | vmware-nsx-security | `vmware-nsx-security` | 22 | 7 | DFW policies/rules, security groups, traceflow |
 | vmware-aria | `vmware-aria` | 46 | 7 | Aria Ops metrics, alerts, capacity, anomalies |
@@ -69,7 +69,7 @@ numbers matter here, and they are not the same thing:
 | vmware-privateai | `vmware-privateai` | 18 | 5 | GPU hosts, vGPU profiles, utilisation |
 | vmware-vdi | `vmware-vdi` | 27 | 9 | Horizon pools, sessions, machines, images |
 
-**Totals**: 336 tools across the 13 companion skills; the design catalog covers 100 of them
+**Totals**: 336 tools across the 13 companion skills; the design catalog covers 101 of them
 across all 13. Pilot adds 13 orchestration tools of its own. The counts are checked against
 the companion snapshot by `tests/eval/regression/test_catalog_covers_the_family.py`.
 

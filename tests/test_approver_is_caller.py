@@ -20,7 +20,7 @@ class _Executor:
     def __init__(self):
         self.approvers = []
 
-    def resume_after_approval(self, wf, approver):
+    def resume_after_approval(self, wf, approver, acknowledge_not_executed=False):
         self.approvers.append(approver)
         return {"state": "running"}
 

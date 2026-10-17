@@ -131,7 +131,9 @@ class TestExecutor:
         result = executor.rollback(wf)
         assert result["state"] == "failed"
         assert len(result["rollback_results"]) == 1
-        assert result["rollback_results"][0]["status"] == "success"
+        # Powering a clone off does not remove it: a partial rollback, not a
+        # success (real vSphere run, 2026-10-17; see test_real_run_2026_10_17).
+        assert result["rollback_results"][0]["status"] == "partial"
 
 
 @pytest.mark.unit
@@ -607,7 +609,11 @@ class _CallToolResult:
 
 
 def _is_error_object_dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
-    return _CallToolResult(is_error=(tool == "failing_tool"))
+    # Only the failing call carries the error text: since 2026-10-17 a result
+    # whose text starts "Error: " is a failure even without isError.
+    if tool == "failing_tool":
+        return _CallToolResult(is_error=True)
+    return {"ok": True}
 
 
 @pytest.mark.unit

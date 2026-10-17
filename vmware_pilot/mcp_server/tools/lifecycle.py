@@ -64,8 +64,10 @@ def create_workflow_from_template(
     Args:
         workflow_type: One of the available workflow types.
         params: Workflow-specific parameters.
-            clone_and_test: target_vm (str), change_spec (dict), monitor_minutes (int),
-                target (str). change_spec is a resize ({"cpu": 4} and/or
+            clone_and_test: target_vm (str), change_spec (dict), snapshot_name (str,
+                required: the snapshot to clone from — vmware-monitor list_vm_snapshots),
+                monitor_minutes (int: how long the approver should let staging run;
+                pilot does not wait), target (str). change_spec is a resize ({"cpu": 4} and/or
                 {"memory_mb": 32768}; memory_gb is converted) or one guest command
                 ({"command": "/usr/bin/apt-get", "arguments": "...", "username":
                 "<guest account>", "password": "..."}) — username is required,
@@ -281,7 +283,9 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
     }
 )
 @vmware_tool(risk_level="high")
-def approve(workflow_id: str, approver: str = "") -> dict:
+def approve(
+    workflow_id: str, approver: str = "", acknowledge_not_executed: bool = False
+) -> dict:
     """[WRITE] Approve a workflow that is waiting for human confirmation.
 
     Use this only after showing the user the pending step and getting explicit
@@ -289,16 +293,25 @@ def approve(workflow_id: str, approver: str = "") -> dict:
     Only works when workflow state is 'awaiting_approval'.
     After approval, execution continues to the next steps.
 
+    This server has no dispatcher, so the steps before the gate are
+    'not_executed': Pilot has no record that they ran, whatever the gate's
+    message says. approve refuses (listing them in not_executed_before_gate)
+    until acknowledge_not_executed=True — set it only after you performed each
+    of those steps yourself and showed the user their results. They are then
+    recorded as 'reported_done' and not handed out again.
+
     Args:
         workflow_id: The workflow ID to approve.
         approver: Name of the person approving (for audit trail). Over an
             authenticated network transport leave it empty: the approver is
             the caller's token name, and a different name is refused.
+        acknowledge_not_executed: True says the steps before this gate were
+            performed outside Pilot and their results were checked.
 
-    Note: this server has no dispatcher — after approval, remaining steps
-    are recorded as 'not_executed' and the result carries
-    outcome='dispatch_required' with a 'pending_dispatch' list for the
-    calling agent to perform (see run_workflow).
+    Note: after approval the remaining steps are recorded as 'not_executed'
+    and the result carries outcome='dispatch_required' with a
+    'pending_dispatch' list for the calling agent to perform (see
+    run_workflow). Through this server a workflow never reaches 'completed'.
 
     Returns:
         Updated workflow state after resuming.
@@ -328,7 +341,9 @@ def approve(workflow_id: str, approver: str = "") -> dict:
                 raise _ApprovalRefusedError(refused)
         # Non-empty approver enforcement lives in the executor so embedders
         # cannot bypass the audit-trail requirement.
-        return _get_executor().resume_after_approval(wf, approver=approver)
+        return _get_executor().resume_after_approval(
+            wf, approver=approver, acknowledge_not_executed=acknowledge_not_executed
+        )
     except _ApprovalRefusedError as refusal:
         # A role refusal, audited as one (denied, rule role:<name>) so it can be
         # filtered with the other role refusals (integration review).

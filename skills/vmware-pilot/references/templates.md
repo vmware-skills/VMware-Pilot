@@ -12,24 +12,36 @@ before its first gate. Read-only checks may come first.
 
 ## 1. clone_and_test
 
-**Purpose**: Clone a VM, apply changes in staging, monitor, then await approval before applying to production. The safest way to test changes.
+**Purpose**: Clone a VM from a snapshot, apply a change in staging, then await approval before applying to production.
 
-**Steps** (6 for a resize, 7 for a guest command):
+**Steps** (7 for a resize, 8 for a guest command):
 
 | # | Action | Skill | Tool | Rollback |
 |---|--------|-------|------|----------|
-| 0 | Clone VM to staging | aiops | `deploy_linked_clone` | `power_off_vm` (staging) |
-| (1) | **APPROVAL GATE** — guest command only: run it in staging? | pilot | `approve` | -- |
-| 1 | Apply changes to staging | aiops | `reconfigure_vm` or `run_vm_guest_command` | -- |
-| 2 | Monitor staging health | monitor | `get_alarms` | -- |
-| 3 | **APPROVAL GATE** | pilot | `approve` | -- |
-| 4 | Apply changes to production | aiops | `reconfigure_vm` or `run_vm_guest_command` | -- |
-| 5 | Power off staging VM | aiops | `power_off_vm` | -- |
+| 0 | Linked-clone VM @ `snapshot_name` → staging, **powered off** | aiops | `deploy_linked_clone` | none — the clone stays (see below) |
+| 1 | Resize staging while it is off | aiops | `reconfigure_vm` | -- |
+| 2 | Power staging on | aiops | `power_on_vm` | `power_off_vm` (staging) |
+| 3 | Check staging (its alarms and events) | monitor | `investigate_vm` | -- |
+| 4 | **APPROVAL GATE** | pilot | `approve` | -- |
+| 5 | Apply the change to production | aiops | `reconfigure_vm` or `run_vm_guest_command` | none — not reversible |
+| 6 | Power off staging VM | aiops | `power_off_vm` | -- |
 
-With a guest command the extra gate comes first, so the later steps shift by
-one. `run_vm_guest_command` is destructive (vmware-aiops publishes it with
-`destructiveHint: true`), and the end-of-test gate would come after it had
-already run in staging.
+With a guest command the order after the clone is: power on → **APPROVAL GATE**
+(run it in staging?) → `run_vm_guest_command` in staging → check → gate → production
+→ cleanup. A guest command needs a running guest with VMware Tools up; if Tools is not
+ready yet the step fails and the workflow stops. `run_vm_guest_command` is destructive
+(vmware-aiops publishes it with `destructiveHint: true`), so it gets its own gate.
+
+Why this order (first real-vSphere run, 2026-10-17): the template used to clone from a
+snapshot literally named `current`, power the clone on, and then resize it — vCenter
+refuses that with `MemoryHotPlugNotSupported` on any VM without hot-add. Staging is now
+resized while off. **Production is still resized while it runs**: that needs CPU/memory
+hot-add enabled on the production VM, and the approval message says so.
+
+What Pilot does not do: it does not wait `monitor_minutes` (the check is one call right
+after power-on; the gate asks the approver to give staging that long), it does not delete
+the staging clone (rollback and cleanup only power it off — delete it by hand when done),
+and it does not reverse the production change.
 
 **Parameters**:
 
@@ -37,7 +49,8 @@ already run in staging.
 |-------|------|----------|-------------|
 | `target_vm` | str | Yes | Production VM name to clone |
 | `change_spec` | dict | Yes | What to apply — see below |
-| `monitor_minutes` | int | No | How long to monitor staging (default: 5) |
+| `snapshot_name` | str | Yes | Snapshot of `target_vm` to clone from — vmware-monitor `list_vm_snapshots` lists them. No default |
+| `monitor_minutes` | int | No | How long the approver should let staging run before approving (default: 5); Pilot does not wait |
 | `target` | str | No | vCenter target name |
 
 `change_spec` is one of two shapes, and anything the aiops tool would reject is
@@ -56,6 +69,7 @@ refused when the plan is made — before the staging clone exists:
 create_workflow_from_template("clone_and_test", {
     target_vm: "db01",
     change_spec: {memory_mb: 32768},
+    snapshot_name: "pre-change",
     target: "vcenter-prod"
 })
 
@@ -63,6 +77,7 @@ create_workflow_from_template("clone_and_test", {
     target_vm: "web01",
     change_spec: {command: "/usr/bin/apt-get", arguments: "-y upgrade",
                   username: "ops", password: "..."},
+    snapshot_name: "pre-change",
     target: "vcenter-prod"
 })
 ```
@@ -622,7 +637,7 @@ create_workflow_from_template("investigate_alert", {
 
 | Template | Steps | Approval | Skills Used | Risk Level |
 |----------|-------|----------|-------------|------------|
-| `clone_and_test` | 6-7 | Yes | aiops, monitor | Medium |
+| `clone_and_test` | 7-8 | Yes | aiops, monitor | Medium |
 | `incident_response` | 4 | Yes | monitor, aiops | Medium |
 | `plan_and_approve` | 3 | Yes | aiops | High |
 | `compliance_scan` | 1-3 | No | monitor, aria | Low |

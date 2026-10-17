@@ -101,7 +101,7 @@ Create a workflow from a built-in or custom template.
 ```
 create_workflow_from_template(
     workflow_type="clone_and_test",
-    params={target_vm: "db01", change_spec: {memory_mb: 32768}}
+    params={target_vm: "db01", change_spec: {memory_mb: 32768}, snapshot_name: "pre-change"}
 )
 → {workflow_id: "wf-...", steps: [...]}
 ```

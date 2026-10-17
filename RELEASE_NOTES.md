@@ -1,3 +1,33 @@
+## Unreleased (proposed v2.4.0) — first run against real vSphere (2026-10-17)
+
+Found running Pilot workflows on vCenter 8.0.3 for the first time, through the MCP server and through an embedder
+that dispatched steps to the 2.4.0 skill servers.
+
+* **`clone_and_test` works on real vSphere.** It cloned from a snapshot literally named `current` (almost no VM
+  has one) and resized the clone after powering it on, which vCenter refuses (`MemoryHotPlugNotSupported`) on any
+  VM without hot-add. Now `snapshot_name` is **required** (no default; the error names `list_vm_snapshots`), the
+  clone is made powered off, staging is resized while off and then powered on, and the check is vmware-monitor
+  `investigate_vm` on the staging VM instead of `get_alarms` for the whole vCenter. A guest command runs after
+  power-on. 7 steps (8 for a guest command). Pilot still does not wait `monitor_minutes`: the approval message
+  asks the approver to, says a running production VM is resized in place (needs hot-add), and that the production
+  change is not rolled back. The clone step no longer claims a rollback (powering a clone off does not remove it).
+* **`approve` refuses a gate whose earlier steps nobody ran.** Through the MCP server (no dispatcher) every step
+  before the gate is `not_executed`, and the gate used to pass under "Staging VM … tested". It now refuses and
+  lists them in `not_executed_before_gate`; `acknowledge_not_executed=True` records them as `reported_done`
+  (performed outside Pilot) and they are not handed out again. Embedders with a dispatcher are unaffected.
+  SKILL.md now says plainly who executes steps: through MCP the agent does, and a workflow never reaches
+  `completed` that way.
+* **Rollback says what it cannot undo.** A step with no rollback is reported `not_reversible` (it was `skipped`,
+  "no rollback defined"); a rollback that does not remove what the step created — a clone powered off — is
+  `partial` with `left_behind`, and the step is `partially_rolled_back`. The preview carries the same:
+  `leaves_behind` on such entries and `left_in_place_note`. Approval gates are no longer listed as skipped.
+* **A failure returned as text is a failure.** Besides `isError` and a top-level `error`, a result that is (or
+  whose single text block / FastMCP `{"result": ...}` is) a string starting `Error: ` — the family's string error
+  shape — or a one-row `[{"error": ...}]` list now fails the step, including when it is the last step. A skill
+  that returns failure as free prose with neither marker still cannot be told from success; AIops's linked clone
+  did, and is fixed there (it now raises).
+* `investigate_vm` added to the design catalog (101 tools).
+
 ## v2.3.0 — roles for network callers (HLD §18)
 
 * Workflows record their creator (`created_by`: the network caller `token:<name>`, or the OS user). Workflows saved

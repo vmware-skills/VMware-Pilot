@@ -32,30 +32,32 @@ class TestCloneAndTest:
             change_spec={"memory_mb": 32768},
             monitor_minutes=5,
             target="vcenter1",
+            snapshot_name="s1",
         )
         assert wf.workflow_type == "clone_and_test"
         assert wf.state.value == "pending"
-        assert len(wf.steps) == 6
+        assert len(wf.steps) == 7
         assert wf.params["target_vm"] == "db01"
         assert wf.params["staging_vm"] == "db01-staging"
 
     def test_step_actions(self):
-        wf = clone_and_test(target_vm="web01", change_spec={"cpu": 4})
+        wf = clone_and_test(target_vm="web01", snapshot_name="s1", change_spec={"cpu": 4})
         actions = [s.action for s in wf.steps]
+        # Resize while off, then power on (2026-10-17: a running VM needs hot-add).
         assert actions == [
-            "clone", "apply_changes", "monitor",
+            "clone", "apply_changes", "power_on_staging", "monitor",
             "require_approval", "apply_to_production", "cleanup",
         ]
 
     def test_has_approval_gate(self):
-        wf = clone_and_test(target_vm="app01", change_spec={"cpu": 4})
+        wf = clone_and_test(target_vm="app01", snapshot_name="s1", change_spec={"cpu": 4})
         approval_steps = [s for s in wf.steps if s.action == "require_approval"]
         assert len(approval_steps) == 1
 
     def test_an_empty_change_spec_is_refused_at_plan_time(self):
         """It used to build a run_vm_guest_command step with no command at all."""
         with pytest.raises(ValueError, match="change_spec"):
-            clone_and_test(target_vm="app01", change_spec={})
+            clone_and_test(target_vm="app01", snapshot_name="s1", change_spec={})
 
 
 #: A guest change_spec as vmware-aiops run_vm_guest_command takes it, minus vm_name/target.
@@ -83,7 +85,8 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
         return [s for s in wf.steps if s.action in ("apply_changes", "apply_to_production")]
 
     def test_memory_gb_is_sent_as_memory_mb(self):
-        wf = clone_and_test(target_vm="db01", change_spec={"memory_gb": 32, "cpu": 4})
+        wf = clone_and_test(target_vm="db01", snapshot_name="s1",
+                             change_spec={"memory_gb": 32, "cpu": 4})
         for step in self._apply_steps(wf):
             assert step.tool == "reconfigure_vm"
             assert set(step.params) <= self.RECONFIGURE_PARAMS, step.params
@@ -92,23 +95,25 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
 
     def test_memory_gb_and_memory_mb_together_is_refused(self):
         with pytest.raises(ValueError, match="memory_gb"):
-            clone_and_test(target_vm="db01", change_spec={"memory_gb": 32, "memory_mb": 1024})
+            clone_and_test(target_vm="db01", snapshot_name="s1",
+                            change_spec={"memory_gb": 32, "memory_mb": 1024})
 
     def test_a_fractional_megabyte_is_refused(self):
         with pytest.raises(ValueError, match="memory_mb"):
-            clone_and_test(target_vm="db01", change_spec={"memory_gb": 0.0001})
+            clone_and_test(target_vm="db01", snapshot_name="s1", change_spec={"memory_gb": 0.0001})
 
     def test_a_reconfigure_spec_with_a_foreign_key_is_refused(self):
         with pytest.raises(ValueError, match="command"):
-            clone_and_test(target_vm="db01", change_spec={"cpu": 4, "command": "/bin/true"})
+            clone_and_test(target_vm="db01", snapshot_name="s1",
+                            change_spec={"cpu": 4, "command": "/bin/true"})
 
     def test_the_callers_change_spec_is_not_mutated(self):
         spec = {"memory_gb": 8}
-        clone_and_test(target_vm="db01", change_spec=spec)
+        clone_and_test(target_vm="db01", snapshot_name="s1", change_spec=spec)
         assert spec == {"memory_gb": 8}
 
     def test_a_guest_spec_builds_guest_steps_with_the_given_account(self):
-        wf = clone_and_test(target_vm="db01", change_spec=_GUEST_SPEC)
+        wf = clone_and_test(target_vm="db01", snapshot_name="s1", change_spec=_GUEST_SPEC)
         for step in self._apply_steps(wf):
             assert step.tool == "run_vm_guest_command"
             assert set(step.params) <= self.GUEST_EXEC_PARAMS, step.params
@@ -118,34 +123,36 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
         """vmware-aiops has no root default any more; neither may pilot."""
         spec = {k: v for k, v in _GUEST_SPEC.items() if k != "username"}
         with pytest.raises(ValueError, match="username") as err:
-            clone_and_test(target_vm="db01", change_spec=spec)
+            clone_and_test(target_vm="db01", snapshot_name="s1", change_spec=spec)
         assert "root" in str(err.value), "say that there is no default account"
 
     def test_a_guest_spec_with_a_blank_username_is_refused(self):
         with pytest.raises(ValueError, match="username"):
-            clone_and_test(target_vm="db01", change_spec={**_GUEST_SPEC, "username": " "})
+            clone_and_test(target_vm="db01", snapshot_name="s1",
+                            change_spec={**_GUEST_SPEC, "username": " "})
 
     def test_a_guest_spec_without_a_command_is_refused(self):
         spec = {k: v for k, v in _GUEST_SPEC.items() if k != "command"}
         with pytest.raises(ValueError, match="command"):
-            clone_and_test(target_vm="db01", change_spec=spec)
+            clone_and_test(target_vm="db01", snapshot_name="s1", change_spec=spec)
 
     def test_a_guest_spec_with_an_unknown_key_is_refused(self):
         with pytest.raises(ValueError, match="script"):
-            clone_and_test(target_vm="db01", change_spec={**_GUEST_SPEC, "script": "x"})
+            clone_and_test(target_vm="db01", snapshot_name="s1",
+                            change_spec={**_GUEST_SPEC, "script": "x"})
 
     def test_the_staging_guest_command_is_behind_an_approval_gate(self):
         """run_vm_guest_command is destructive; the staging run needs its own gate."""
-        wf = clone_and_test(target_vm="db01", change_spec=_GUEST_SPEC)
+        wf = clone_and_test(target_vm="db01", snapshot_name="s1", change_spec=_GUEST_SPEC)
         first_guest = next(s.index for s in wf.steps if s.tool == "run_vm_guest_command")
         assert any(
             s.action == "require_approval" and s.index < first_guest for s in wf.steps
         )
 
-    def test_the_reconfigure_path_keeps_its_six_steps(self):
+    def test_the_reconfigure_path_has_seven_steps(self):
         """Control: only the guest path grew a gate."""
-        wf = clone_and_test(target_vm="db01", change_spec={"cpu": 4})
-        assert len(wf.steps) == 6
+        wf = clone_and_test(target_vm="db01", snapshot_name="s1", change_spec={"cpu": 4})
+        assert len(wf.steps) == 7
 
     def test_plan_workflow_returns_the_teaching_error(self, tmp_path, monkeypatch):
         """Refused at plan time: nothing is persisted, so no clone ever exists."""
@@ -158,7 +165,7 @@ class TestCloneAndTestMapsOntoTheRealAiopsTools:
         monkeypatch.setattr(server, "_executor", WorkflowExecutor(store))
         spec = {k: v for k, v in _GUEST_SPEC.items() if k != "username"}
         result = server.create_workflow_from_template(
-            "clone_and_test", {"target_vm": "db01", "change_spec": spec}
+            "clone_and_test", {"target_vm": "db01", "change_spec": spec, "snapshot_name": "s1"}
         )
         assert "username" in result["error"]
         assert store.list_all() == []

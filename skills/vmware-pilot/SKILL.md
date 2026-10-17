@@ -32,7 +32,7 @@ Multi-step workflow orchestration for VMware MCP skills — design, approve, exe
 
 | Capability | Description |
 |---|---|
-| Workflow Design | Natural language goal → AI designs steps from the `get_skill_catalog` building-block list (100 curated tools across 13 skills) |
+| Workflow Design | Natural language goal → AI designs steps from the `get_skill_catalog` building-block list (101 curated tools across 13 skills) |
 | Approval Gates | Pause execution for human review before destructive operations |
 | State Persistence | SQLite-backed, survives restarts, supports resume from checkpoint |
 | Rollback | Explicit, best-effort undo of completed steps in reverse order — never automatic (see Troubleshooting) |
@@ -96,10 +96,11 @@ AI calls: run_workflow(id)             → execute with approval gates
 AI calls: create_workflow_from_template("clone_and_test", {
     target_vm: "db01",
     change_spec: {memory_mb: 32768},
+    snapshot_name: "pre-change",   # required: list_vm_snapshots (monitor)
     target: "vcenter-prod"
 })
 AI calls: run_workflow(workflow_id)
-→ Clone → Apply → Monitor → [Approval Gate] → Commit → Cleanup
+→ Clone (off) → Resize → Power on → Check → [Approval Gate] → Production → Power off staging
 ```
 
 ### 3. Batch Operations with Approval
@@ -145,9 +146,11 @@ Deploy a backend VM, create a K8s namespace, and wire up AKO Ingress to the AVI 
 
 **Pilot is a Dispatcher, not an Executor.** It generates plans, tracks state, gates on approvals — it does NOT call companion skills' MCP tools itself. The calling AI agent is responsible for invoking `vmware-aiops::clone_vm` etc. when pilot's `run_workflow` returns a step description.
 
+**Who executes steps: you do.** Through this MCP server every step is recorded `not_executed` and returned in `pending_dispatch`; perform them in order. At a gate, `approve` refuses while earlier steps are `not_executed` — show the user what those steps returned, then call `approve(..., acknowledge_not_executed=True)`; they become `reported_done`. Through MCP a workflow never reaches `completed` (it ends `dispatch_required`); only an embedder that gives `WorkflowExecutor` a dispatcher gets that.
+
 This is intentional v2-style architecture: pilot's context stays small, state is always on disk, and there are no persistent agent threads. Full contract details: see [`references/integration-patterns.md`](references/integration-patterns.md#the-dispatch-contract).
 
-**`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 100 hand-picked building blocks across 13 skills — a deliberate subset of what those skills expose (aiops alone has 61 tools; the catalog lists 19). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
+**`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 101 hand-picked building blocks across 13 skills — a deliberate subset of what those skills expose (aiops alone has 61 tools; the catalog lists 19). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
 
 ## MCP Tools (13 — 4 read, 9 write/control)
 
@@ -177,7 +180,7 @@ The five most-used:
 
 | Template | Steps | Approval | Skills Used |
 |---|---|---|---|
-| `clone_and_test` | 6 (7 for a guest command) | Yes | aiops + monitor |
+| `clone_and_test` | 7 (8 for a guest command) | Yes | aiops + monitor |
 | `incident_response` | 4 | Yes | monitor + aiops |
 | `investigate_alert` | 4 / 8 | Yes | monitor + aria (parallel-group gather + 4-criteria checkpoint, optional `deep_dive`) |
 | `plan_and_approve` | 3 | Yes | aiops |
@@ -280,7 +283,7 @@ The template name is case-sensitive. Use `list_workflows()` to see all available
 4. A file that lists but will not plan is missing an approval gate -- the `create_workflow_from_template` error names the step and the file
 
 ### Rollback did nothing, or fails on some steps
-Rollback never happens on its own: a failed step leaves the workflow `failed` and stops. A bare `rollback(workflow_id)` only previews; `confirm=True` acts. It only reverses steps pilot recorded as `success`, and on the MCP server (no dispatcher) the steps you performed from `pending_dispatch` stay `not_executed` — so `rollback` there reverses nothing but approval gates. Undo them yourself: call each performed step's `rollback_tool` with its `rollback_params`, last step first, after confirming with the user. Steps without a `rollback_tool` cannot be undone. When pilot does dispatch (an embedder supplied a dispatcher), rollback is best-effort: a failed undo does not stop the rest, and the result reports each one.
+Rollback never happens on its own: a failed step leaves the workflow `failed` and stops. A bare `rollback(workflow_id)` only previews; `confirm=True` acts. It only reverses steps pilot recorded as `success`, and on the MCP server (no dispatcher) the steps you performed from `pending_dispatch` stay `not_executed` — so `rollback` there reverses nothing but approval gates. Undo them yourself: call each performed step's `rollback_tool` with its `rollback_params`, last step first, after confirming with the user. Steps without a `rollback_tool` cannot be undone: rollback reports them `not_reversible` (a production resize stays). An undo that does not remove what the step created is `partial` — a clone that was only powered off stays; delete it by hand. When pilot does dispatch (an embedder supplied a dispatcher), rollback is best-effort: a failed undo does not stop the rest, and the result reports each one.
 
 ### "Workflow cannot be run" state error
 A workflow can only be run from `pending` or `running` states. If it is in `draft`, call `confirm_draft()` first. If it is in `completed` or `failed`, create a new workflow -- completed workflows cannot be re-run.

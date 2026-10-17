@@ -34,22 +34,51 @@ def _guest_gate(change_params: dict[str, Any], staging_name: str) -> dict[str, A
     }
 
 
+def _describe_change(tool: str, change_params: dict[str, Any]) -> str:
+    if tool == "reconfigure_vm":
+        parts = []
+        if "cpu" in change_params:
+            parts.append(f"{change_params['cpu']} vCPU")
+        if "memory_mb" in change_params:
+            parts.append(f"{change_params['memory_mb']} MB memory")
+        return "resize to " + " / ".join(parts)
+    return f"guest command '{change_params['command']}'"
+
+
+def _production_caveat(tool: str) -> str:
+    if tool == "reconfigure_vm":
+        return (
+            "if it is running, resizing it in place needs CPU/memory hot-add enabled on "
+            "that VM (without it vCenter refuses the change and nothing is applied)"
+        )
+    return "the command runs inside the running VM"
+
+
 def clone_and_test(
     target_vm: str,
     change_spec: dict[str, Any],
     monitor_minutes: int = 5,
     target: str = "",
+    snapshot_name: str = "",
 ) -> Workflow:
-    """Clone a VM, apply changes in staging, monitor, then await approval.
+    """Clone a VM from a snapshot, apply a change in staging, then await approval.
 
-    Steps:
-      1. Clone target VM → staging
-      2. (guest change only) Await approval to run the command in staging
-      3. Apply change_spec to staging
-      4. Monitor staging for N minutes
+    Steps (resize):
+      1. Linked-clone target VM @ snapshot_name → staging, powered off
+      2. Apply the resize to staging while it is off (no hot-add needed)
+      3. Power staging on
+      4. Check the staging VM (monitor investigate_vm: its alarms and events)
       5. Await human approval
-      6. Apply change_spec to production (original VM)
+      6. Apply the resize to production (original VM)
       7. Power off staging VM
+
+    A guest command needs a running guest, so it runs after step 3, behind an
+    approval gate of its own.
+
+    What Pilot does not do: it does not wait ``monitor_minutes`` — the check is
+    one call right after power-on, and the approval message asks the approver
+    to give staging that long first. Rollback powers staging off but does not
+    delete the clone, and the production change has no rollback.
 
     Args:
         target_vm: Production VM name to clone.
@@ -60,52 +89,91 @@ def clone_and_test(
             ``arguments`` / ``working_directory`` — applied with aiops
             ``run_vm_guest_command``. Anything the chosen tool would reject is refused
             here, before the staging clone exists.
-        monitor_minutes: How long to monitor staging (default 5).
+        monitor_minutes: How long the approver should let staging run before
+            approving (default 5). Pilot does not wait; it says so in the gate.
         target: vCenter target name.
+        snapshot_name: Snapshot of ``target_vm`` to clone from (required; a linked
+            clone needs one). vmware-monitor ``list_vm_snapshots`` lists them.
     """
     tool, change_params = plan_change(change_spec)
+    if not isinstance(snapshot_name, str) or not snapshot_name.strip():
+        raise ValueError(
+            "clone_and_test: snapshot_name is required — the linked clone is made from a "
+            f"snapshot of '{target_vm}', and there is no default (it used to be the "
+            "literal name 'current', which almost no VM has). Run list_vm_snapshots "
+            f"(vmware-monitor skill) for '{target_vm}' and pass the snapshot's name; "
+            "take one first if it has none."
+        )
+    snapshot_name = snapshot_name.strip()
     staging_name = f"{target_vm}-staging"
     now = datetime.now(tz=timezone.utc).isoformat()
+    change = _describe_change(tool, change_params)
+    apply_to_staging = {
+        "action": "apply_changes",
+        "skill": "aiops",
+        "tool": tool,
+        "params": confirmed_params(
+            "aiops", tool, {"vm_name": staging_name, **change_params, "target": target}
+        ),
+    }
+    power_on_staging = {
+        "action": "power_on_staging",
+        "skill": "aiops",
+        "tool": "power_on_vm",
+        "params": {"vm_name": staging_name, "target": target},
+        "rollback_tool": "power_off_vm",
+        "rollback_params": {
+            "vm_name": staging_name, "force": True, "target": target, "confirm": True,
+        },
+    }
+    if tool == "reconfigure_vm":
+        # Resize while powered off: a running VM needs hot-add for this.
+        staging_change = [apply_to_staging, power_on_staging]
+    else:
+        # run_vm_guest_command is destructive (aiops publishes destructiveHint=True),
+        # needs a running guest, and the final approval comes after it has run.
+        staging_change = [
+            power_on_staging, _guest_gate(change_params, staging_name), apply_to_staging,
+        ]
 
     specs: list[dict[str, Any]] = [
         {
+            # No rollback_tool: powering the clone off would not remove it, and
+            # Pilot does not delete VMs. Rollback lists this step as staying.
             "action": "clone",
             "skill": "aiops",
             "tool": "deploy_linked_clone",
             "params": {
                 "source_vm_name": target_vm,
-                "snapshot_name": "current",
+                "snapshot_name": snapshot_name,
                 "new_name": staging_name,
-                "power_on": True,
+                "power_on": False,
                 "target": target,
             },
-            "rollback_tool": "power_off_vm",
-            "rollback_params": {
-                "vm_name": staging_name, "force": True, "target": target, "confirm": True,
-            },
         },
-        # run_vm_guest_command is destructive (aiops publishes destructiveHint=True), and
-        # the approval at the end comes after it has already run in staging.
-        *([_guest_gate(change_params, staging_name)] if tool == "run_vm_guest_command" else []),
-        {
-            "action": "apply_changes",
-            "skill": "aiops",
-            "tool": tool,
-            "params": confirmed_params(
-                "aiops", tool, {"vm_name": staging_name, **change_params, "target": target}
-            ),
-        },
+        *staging_change,
         {
             "action": "monitor",
             "skill": "monitor",
-            "tool": "get_alarms",
-            "params": {"target": target},
+            "tool": "investigate_vm",
+            "params": {"vm_name": staging_name, "target": target},
         },
         {
             "action": "require_approval",
             "skill": "pilot",
             "tool": "approve",
-            "params": {"message": f"Staging VM '{staging_name}' tested. Apply to production?"},
+            "params": {
+                "message": (
+                    f"Staging VM '{staging_name}' should now be a linked clone of "
+                    f"'{target_vm}' @ snapshot '{snapshot_name}' with the change ({change}) "
+                    "applied, powered on, and checked once by investigate_vm. Check those "
+                    "steps' results — Pilot did not run them unless it has a dispatcher — "
+                    f"and let staging run for {monitor_minutes} minute(s) before deciding; "
+                    "Pilot does not wait. Approving applies the change to PRODUCTION VM "
+                    f"'{target_vm}': {_production_caveat(tool)}. That production change is "
+                    "not rolled back by Pilot. Apply to production?"
+                )
+            },
         },
         {
             "action": "apply_to_production",
@@ -133,6 +201,7 @@ def clone_and_test(
             "target_vm": target_vm,
             "change_spec": change_spec,
             "staging_vm": staging_name,
+            "snapshot_name": snapshot_name,
             "monitor_minutes": monitor_minutes,
             "target": target,
         },

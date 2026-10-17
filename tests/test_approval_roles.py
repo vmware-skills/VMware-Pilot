@@ -96,7 +96,7 @@ def test_approve_itself_applies_the_role_mode(monkeypatch):
             return _wf("token:alice")
 
     class _Executor:
-        def resume_after_approval(self, wf, approver):
+        def resume_after_approval(self, wf, approver, acknowledge_not_executed=False):
             resumed.append(approver)
             return {"state": "running"}
 

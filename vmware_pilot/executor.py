@@ -28,6 +28,7 @@ from vmware_pilot.models import (
     WorkflowStore,
     is_sensitive_key,
 )
+from vmware_pilot.reversibility import leaves_behind
 
 _log = logging.getLogger("vmware-pilot.executor")
 
@@ -96,13 +97,45 @@ def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
     return payloads
 
 
+#: How the family's string-returning tools report a caught failure
+#: (``tool_errors("str")`` in every skill: ``f"Error: {msg} {hint}"``). A tool
+#: whose ops layer *returned* its failure as prose instead of raising — AIops
+#: 2.4.0's linked clone: "Snapshot 'current' not found …" — sets neither
+#: ``isError`` nor this prefix, and no reading of free text can tell it from a
+#: success message. That one is fixed in the skill (it now raises → isError);
+#: this prefix covers the family's own declared string shape, nothing wider.
+_TEXT_FAILURE_PREFIX = "Error: "
+
+
+def _top_level_texts(result: Any) -> list[str]:
+    """The strings a dispatch result carries at its top level.
+
+    A plain ``str``; an MCP result's single text block; or FastMCP's
+    ``{"result": "<str>"}`` structured wrapper around a ``-> str`` tool.
+    """
+    if isinstance(result, str):
+        return [result]
+    texts: list[str] = []
+    structured = getattr(result, "structuredContent", None)
+    if isinstance(structured, dict) and isinstance(structured.get("result"), str):
+        texts.append(structured["result"])
+    content = getattr(result, "content", None)
+    if isinstance(content, list) and len(content) == 1:
+        text = getattr(content[0], "text", None)
+        if isinstance(text, str):
+            texts.append(text)
+    return texts
+
+
 def _returned_failure(result: Any) -> str | None:
     """Return the failure message if this dispatch result reports failure.
 
     Only a TOP-LEVEL, non-empty ``error`` counts: ``{"error": None}`` is an
     explicit "no error", and an ``error`` nested inside a row (an alarm's
     ``error_count``, say) is data, not a failed call. A TOP-LEVEL
-    ``"action": "preview"`` is a failure too: the tool changed nothing.
+    ``"action": "preview"`` is a failure too: the tool changed nothing. So is a
+    top-level string starting ``"Error: "`` and a ``-> list`` tool's error shape,
+    a list holding exactly one ``{"error": ...}`` row.
     """
     if any(p.get("action") == "preview" for p in _top_level_payloads(result)):
         return _PREVIEW_ONLY
@@ -113,10 +146,17 @@ def _returned_failure(result: Any) -> str | None:
         if isinstance(content, list) and content and getattr(content[0], "text", None):
             return str(content[0].text)
         return str(content or "the tool reported isError")
-    if isinstance(result, dict):
-        err = result.get("error")
+    for payload in _top_level_payloads(result):
+        err = payload.get("error")
         if err not in (None, "", [], {}):
             return str(err)
+    if isinstance(result, list) and len(result) == 1 and isinstance(result[0], dict):
+        err = result[0].get("error")
+        if err not in (None, "", [], {}):
+            return str(err)
+    for text in _top_level_texts(result):
+        if text.startswith(_TEXT_FAILURE_PREFIX):
+            return text
     return None
 
 
@@ -354,10 +394,18 @@ class WorkflowExecutor:
             )
         return result
 
-    def resume_after_approval(self, wf: Workflow, approver: str = "") -> dict[str, Any]:
+    def resume_after_approval(
+        self, wf: Workflow, approver: str = "", acknowledge_not_executed: bool = False
+    ) -> dict[str, Any]:
         """Continue execution after human approval.
 
         ``approver`` is mandatory — the audit trail must name a human.
+
+        A gate whose earlier steps Pilot recorded as ``not_executed`` (no
+        dispatcher) is refused unless ``acknowledge_not_executed`` is True: the
+        gate's message describes those steps' outcome, and Pilot has no record
+        that they ran. Acknowledged, they become ``reported_done`` — performed
+        by the caller, not by Pilot — and are not handed out again.
         """
         if wf.state != WorkflowState.AWAITING_APPROVAL:
             return {"error": f"Workflow {wf.id} is not awaiting approval (state: {wf.state.value})"}
@@ -373,16 +421,39 @@ class WorkflowExecutor:
             }
         approver = approver.strip()
 
+        gate = next(
+            (s for s in wf.steps if s.action == "require_approval" and s.status == "pending"),
+            None,
+        )
+        unrun = [
+            s for s in wf.steps
+            if gate is not None and s.index < gate.index and s.status == "not_executed"
+        ]
+        if unrun and not acknowledge_not_executed:
+            return _unrun_refusal(wf, unrun)
+
         wf.approved_by = approver
         wf.log("approved", f"Approved by {approver}")
+        for step in unrun:
+            step.status = "reported_done"
+            step.result = {
+                "reason": "Pilot did not execute this step; the approver acknowledged "
+                f"that it was performed outside Pilot ({approver})."
+            }
+        if unrun:
+            wf.log(
+                "approved_over_unexecuted_steps",
+                f"{approver} acknowledged steps {[s.index for s in unrun]} as performed "
+                "outside Pilot",
+            )
 
         # Mark the approval step as done
-        for step in wf.steps:
-            if step.action == "require_approval" and step.status == "pending":
-                step.status = "success"
-                step.result = {"approved_by": approver}
-                step.completed_at = _now()
-                break
+        if gate is not None:
+            gate.status = "success"
+            gate.result = {"approved_by": approver}
+            if unrun:
+                gate.result["acknowledged_not_executed"] = [s.index for s in unrun]
+            gate.completed_at = _now()
 
         # Continue executing remaining steps
         return self.run_until_checkpoint(wf)
@@ -417,14 +488,17 @@ class WorkflowExecutor:
         wf.rollback_results = rollback_results
         for step in reversed(wf.completed_steps()):
             if not step.rollback_tool:
-                rollback_results.append(
-                    {
-                        "step": step.index,
-                        "tool": step.tool,
-                        "status": "skipped",
-                        "reason": "no rollback defined",
-                    }
-                )
+                # Approval gates record a decision; there is nothing to reverse.
+                if step.action != "require_approval":
+                    rollback_results.append(
+                        {
+                            "step": step.index,
+                            "tool": step.tool,
+                            "status": "not_reversible",
+                            "reason": f"no rollback defined: {step.tool} stays applied — "
+                            "reverse it by hand (or with an explicit new plan) if needed",
+                        }
+                    )
                 continue
 
             try:
@@ -438,16 +512,21 @@ class WorkflowExecutor:
                 returned_failure = _returned_failure(result)
                 if returned_failure is not None:
                     raise _StepReturnedFailure(returned_failure, result)
-                step.status = "rolled_back"
-                rollback_results.append(
-                    {
-                        "step": step.index,
-                        "tool": step.rollback_tool,
-                        "status": "success",
-                        "result": result,
-                    }
+                left = leaves_behind(step)
+                step.status = "partially_rolled_back" if left else "rolled_back"
+                entry = {
+                    "step": step.index,
+                    "tool": step.rollback_tool,
+                    "status": "partial" if left else "success",
+                    "result": result,
+                }
+                if left:
+                    entry["left_behind"] = left
+                rollback_results.append(entry)
+                wf.log(
+                    "rollback_step",
+                    f"Step {step.index}: {step.rollback_tool} → {entry['status']}",
                 )
-                wf.log("rollback_step", f"Step {step.index}: {step.rollback_tool} → success")
             except Exception as exc:
                 rollback_results.append(
                     {
@@ -627,6 +706,27 @@ def _first_redacted_sensitive_key(params: Any) -> str | None:
             if nested is not None:
                 return nested
     return None
+
+
+def _unrun_refusal(wf: Workflow, unrun: list[WorkflowStep]) -> dict[str, Any]:
+    """Teaching refusal: the gate would approve steps Pilot never ran."""
+    listed = ", ".join(f"step {s.index} ({s.skill}.{s.tool})" for s in unrun)
+    return {
+        "error": (
+            f"Refusing to approve workflow '{wf.id}': {len(unrun)} step(s) before this "
+            f"gate — {listed} — were recorded but NOT executed: there is no dispatcher, so "
+            "Pilot has no record that they ran or what they returned, whatever the "
+            "approval message says. If you performed each of them yourself and checked its result, show "
+            "those results to the approver and call approve again with "
+            "acknowledge_not_executed=True. An embedder with a dispatcher runs "
+            "run_until_checkpoint again instead, which executes them first."
+        ),
+        "workflow_id": wf.id,
+        "state": wf.state.value,
+        "not_executed_before_gate": [
+            {"index": s.index, "skill": s.skill, "tool": s.tool} for s in unrun
+        ],
+    }
 
 
 def _now() -> str:
