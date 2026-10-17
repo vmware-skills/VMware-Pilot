@@ -1584,6 +1584,7 @@
     "begin_ms",
     "bin_width_ms",
     "end_ms",
+    "field",
     "last",
     "target",
     "text"
