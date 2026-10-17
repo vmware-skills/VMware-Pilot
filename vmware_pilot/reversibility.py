@@ -17,6 +17,7 @@ from __future__ import annotations
 from types import MappingProxyType
 
 from vmware_pilot.models import WorkflowStep
+from vmware_pilot.renames import _server
 
 #: (skill, tool) that creates an object → rollback tools that remove it.
 _CREATES = MappingProxyType({
@@ -29,6 +30,12 @@ _CREATES = MappingProxyType({
     ("aiops", "batch_linked_clone_vms"): frozenset(),
 })
 
+OUTSIDE_PILOT_NOTE = (
+    "not reversible by Pilot: these steps were handed to the caller (no dispatcher) and have no "
+    "rollback_tool — if they were performed, their change stays after rollback (a clone stays in "
+    "the inventory, a production resize stays applied); check and reverse by hand"
+)
+
 NOT_REVERSIBLE_NOTE = (
     "not reversible by Pilot: these steps have no rollback_tool, so their change stays "
     "applied after rollback — reverse it by hand (or with an explicit new plan) if needed"
@@ -37,7 +44,9 @@ NOT_REVERSIBLE_NOTE = (
 
 def leaves_behind(step: WorkflowStep) -> str:
     """What stays after ``step``'s rollback runs, or "" when it is a full undo."""
-    removers = _CREATES.get((step.skill, step.tool))
+    # Same spellings the rest of Pilot accepts: aiops / vmware-aiops / vmware_aiops / AIops.
+    skill = _server(step.skill).removeprefix("vmware-") if isinstance(step.skill, str) else ""
+    removers = _CREATES.get((skill, step.tool))
     if removers is None or step.rollback_tool in removers:
         return ""
     what = step.params.get("new_name") or step.params.get("vm_name") or "the object it created"

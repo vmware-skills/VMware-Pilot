@@ -34,7 +34,7 @@ from typing import Any
 
 from vmware_pilot.executor import _ROLLBACK_FORBIDDEN_STATES, _TERMINAL_STATES
 from vmware_pilot.models import Workflow, WorkflowStep, WorkflowStore, _redact_for_persistence
-from vmware_pilot.reversibility import NOT_REVERSIBLE_NOTE, leaves_behind
+from vmware_pilot.reversibility import NOT_REVERSIBLE_NOTE, OUTSIDE_PILOT_NOTE, leaves_behind
 
 _log = logging.getLogger("vmware-pilot.lifecycle_gate")
 
@@ -169,6 +169,12 @@ def rollback_blast_radius(
     agent_side = [
         s for s in wf.steps if s.status in ("not_executed", "reported_done") and s.rollback_tool
     ]
+    # Handed to the caller with no undo at all: listed nowhere else, so the human
+    # confirming the rollback would not see the clone or production change stay.
+    outside = [
+        s for s in wf.steps
+        if s.status in ("not_executed", "reported_done") and not s.rollback_tool
+    ]
     blockers = []
     if wf.state in _ROLLBACK_FORBIDDEN_STATES:
         blockers.append(
@@ -182,6 +188,8 @@ def rollback_blast_radius(
         **_listed(left, "left_in_place"),
         "left_in_place_note": NOT_REVERSIBLE_NOTE if left else "",
         **_listed(agent_side, "not_reversed_by_pilot", _rollback_ref),
+        **_listed(outside, "not_reversible_outside_pilot"),
+        "not_reversible_outside_pilot_note": OUTSIDE_PILOT_NOTE if outside else "",
         "blockers": blockers,
         "unmeasured": _unmeasured(wf, acknowledge_unknown_effects),
     }

@@ -9,6 +9,7 @@
       "expectations": [
         "Uses create_workflow_from_template with type clone_and_test",
         "Change spec includes memory_mb: 32768",
+        "Passes snapshot_name, found with vmware-monitor list_vm_snapshots (required, no default)",
         "Workflow has approval gate before production apply",
         "Shows workflow steps for user review"
       ]

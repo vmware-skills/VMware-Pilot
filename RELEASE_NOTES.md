@@ -14,7 +14,10 @@ that dispatched steps to the 2.4.0 skill servers.
 * **`approve` refuses a gate whose earlier steps nobody ran.** Through the MCP server (no dispatcher) every step
   before the gate is `not_executed`, and the gate used to pass under "Staging VM … tested". It now refuses and
   lists them in `not_executed_before_gate`; `acknowledge_not_executed=True` records them as `reported_done`
-  (performed outside Pilot) and they are not handed out again. Embedders with a dispatcher are unaffected.
+  (performed outside Pilot) and they are not handed out again; a later step that references one of them is
+  refused (Pilot never saw its result). An embedder with a dispatcher is unaffected unless it resumes a workflow
+  that was first run without one — then the same refusal applies. The acknowledgement is the caller's
+  statement, not a check: Pilot records who sent it, not what the steps returned.
   SKILL.md now says plainly who executes steps: through MCP the agent does, and a workflow never reaches
   `completed` that way.
 * **Rollback says what it cannot undo.** A step with no rollback is reported `not_reversible` (it was `skipped`,
@@ -27,6 +30,10 @@ that dispatched steps to the 2.4.0 skill servers.
   that returns failure as free prose with neither marker still cannot be told from success; AIops's linked clone
   did, and is fixed there (it now raises).
 * `investigate_vm` added to the design catalog (101 tools).
+* Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
+  workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.
+* The rollback preview gains `not_reversible_outside_pilot` (steps handed to the caller with no undo — a clone,
+  a production resize) with a note; through MCP those used to appear nowhere in the preview.
 
 ## v2.3.0 — roles for network callers (HLD §18)
 

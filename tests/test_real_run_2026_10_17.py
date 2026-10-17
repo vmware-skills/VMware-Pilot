@@ -311,3 +311,73 @@ def test_ordinary_text_results_are_still_success(tmp_path, text):
     wf = _last_step_wf("wf-ok")
     result = WorkflowExecutor(store, dispatch=_last_fails(text)).run_until_checkpoint(wf)
     assert result["outcome"] == "completed"
+
+
+# ── review of the fix (2026-10-17) ───────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_mcp_rollback_preview_names_the_clone_and_the_production_change(tmp_path):
+    """H1: through MCP (no dispatcher) the clone has no rollback_tool and was
+    never 'success' — the preview listed it nowhere, so the leftover clone and
+    the production change vanished from what the human sees before confirming."""
+    store = _store(tmp_path)
+    wf = clone_and_test(target_vm="app", change_spec={"cpu": 4}, snapshot_name="s1")
+    ex = WorkflowExecutor(store)
+    ex.run_until_checkpoint(wf)
+    ex.resume_after_approval(wf, approver="wei", acknowledge_not_executed=True)
+
+    radius = rollback_blast_radius(wf)
+    listed = {e["index"]: e for e in radius["not_reversible_outside_pilot"]}
+    clone = next(s.index for s in wf.steps if s.tool == "deploy_linked_clone")
+    prod = next(s.index for s in wf.steps if s.action == "apply_to_production")
+    assert clone in listed and prod in listed
+    assert "not reversible" in radius["not_reversible_outside_pilot_note"]
+    assert all(wf.steps[i].action != "require_approval" for i in listed)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("skill", ["vmware-aiops", "vmware_aiops", "AIops"])
+def test_a_clone_powered_off_is_partial_whatever_the_skill_spelling(skill):
+    """M1: the rest of Pilot accepts these spellings; the table must too."""
+    from vmware_pilot.reversibility import leaves_behind
+
+    step = WorkflowStep(index=0, action="clone", skill=skill, tool="deploy_linked_clone",
+                        params={"new_name": "stg"}, rollback_tool="power_off_vm")
+    assert "stays" in leaves_behind(step)
+
+
+@pytest.mark.unit
+def test_a_reference_to_a_step_performed_outside_pilot_says_so(tmp_path):
+    """M2: the old text said 'resolve that cause and re-run' — re-running a
+    step the caller already performed duplicates it."""
+    store = _store(tmp_path)
+    wf = Workflow(
+        id="wf-ref-1", workflow_type="test", state=WorkflowState.PENDING,
+        steps=[
+            WorkflowStep(index=0, action="plan", skill="aiops", tool="create_vm_plan",
+                         params={}),
+            WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve",
+                         params={"message": "go?"}),
+            WorkflowStep(index=2, action="apply", skill="aiops", tool="apply_vm_plan",
+                         params={"plan_id": "__from_step_0__:plan_id"}),
+        ],
+        params={}, created_at="", updated_at="",
+    )
+    WorkflowExecutor(store).run_until_checkpoint(wf)
+    result = WorkflowExecutor(store, dispatch=_ok).resume_after_approval(
+        wf, approver="wei", acknowledge_not_executed=True)
+    assert result["outcome"] == "failed"
+    message = str(wf.steps[2].result)
+    assert "outside Pilot" in message
+    assert "re-run the workflow" not in message
+
+
+@pytest.mark.unit
+def test_the_refusal_warns_against_re_executing_performed_steps(tmp_path):
+    store = _store(tmp_path)
+    wf = _gated_wf("wf-gate-5")
+    ex = WorkflowExecutor(store)
+    ex.run_until_checkpoint(wf)
+    refusal = ex.resume_after_approval(wf, approver="wei")["error"]
+    assert "do not" in refusal.lower() and "again" in refusal

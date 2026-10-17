@@ -437,8 +437,9 @@ class WorkflowExecutor:
         for step in unrun:
             step.status = "reported_done"
             step.result = {
-                "reason": "Pilot did not execute this step; the approver acknowledged "
-                f"that it was performed outside Pilot ({approver})."
+                "reason": "Pilot did not execute this step and has no record of its "
+                "result; approve(acknowledge_not_executed=True) from "
+                f"{approver} stated it was performed outside Pilot."
             }
         if unrun:
             wf.log(
@@ -656,6 +657,15 @@ class WorkflowExecutor:
                 )
 
             source = steps[idx]
+            if source.status == "reported_done":
+                raise ValueError(
+                    f"Step reference '{v}' points to step {idx} ({source.tool}), which "
+                    "was performed outside Pilot (acknowledged at an approval gate) — "
+                    "Pilot never saw its result, so it cannot fill this reference. Do "
+                    f"not run step {idx} again. Perform step {current_index} yourself "
+                    f"with the value from step {idx}'s own result, or cancel_workflow "
+                    "and re-author it."
+                )
             if source.status != "success":
                 raise ValueError(
                     f"Step reference '{v}' points to step {idx} "
@@ -716,10 +726,11 @@ def _unrun_refusal(wf: Workflow, unrun: list[WorkflowStep]) -> dict[str, Any]:
             f"Refusing to approve workflow '{wf.id}': {len(unrun)} step(s) before this "
             f"gate — {listed} — were recorded but NOT executed: there is no dispatcher, so "
             "Pilot has no record that they ran or what they returned, whatever the "
-            "approval message says. If you performed each of them yourself and checked its result, show "
-            "those results to the approver and call approve again with "
-            "acknowledge_not_executed=True. An embedder with a dispatcher runs "
-            "run_until_checkpoint again instead, which executes them first."
+            "approval message says. If you performed each of them yourself and checked "
+            "its result, show those results to the approver and call approve again with "
+            "acknowledge_not_executed=True; do not perform them again. Only if nobody "
+            "performed them may an embedder with a dispatcher call run_until_checkpoint "
+            "again, which executes them first."
         ),
         "workflow_id": wf.id,
         "state": wf.state.value,

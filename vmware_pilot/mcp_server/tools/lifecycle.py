@@ -385,7 +385,10 @@ def rollback(
     often carry confirm=True, and this call's confirm=True is the decision to
     run them), the executed steps that have none and stay applied
     (left_in_place), steps you performed from pending_dispatch that Pilot will
-    not reverse (not_reversed_by_pilot), steps with unknown effects, and
+    not reverse (not_reversed_by_pilot: they have an undo you must call;
+    not_reversible_outside_pilot: they have none — a clone, a production
+    resize), undos that would leave something behind (leaves_behind on a
+    would_roll_back entry), steps with unknown effects, and
     blockers — and changes nothing. Show that to the user and get their
     explicit decision. Do not set confirm=True on your own because the user
     asked for a rollback earlier — the user has not seen the preview yet.
@@ -394,11 +397,13 @@ def rollback(
     'failed' and stops. This tool is the explicit, best-effort undo, and it
     only reverses steps pilot itself recorded as 'success' — which, on this
     server (no dispatcher), are approval gates only. Steps YOU performed from
-    pending_dispatch are still 'not_executed' here, so to undo them call each
+    pending_dispatch are 'not_executed' (or 'reported_done' once acknowledged at
+    a gate) here, so to undo them call each
     one's rollback_tool with its rollback_params yourself, last step first.
     Embedders that pass a dispatcher to WorkflowExecutor get those calls made
-    for them. Steps without a rollback_tool are skipped; a failed undo does not
-    stop the rest. The workflow state is set to 'failed' afterwards.
+    for them. Steps without a rollback_tool are reported 'not_reversible' and
+    stay applied; an undo that does not remove what the step created is
+    'partial' (a clone powered off stays). A failed undo does not stop the rest. The workflow state is set to 'failed' afterwards.
 
     Refused with confirm=True: a workflow in draft, completed, rolling_back or
     cancelled state, a step whose status Pilot does not recognise, a workflow
