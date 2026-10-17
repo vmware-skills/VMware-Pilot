@@ -165,8 +165,9 @@ rollback(workflow_id="wf-...", confirm=True)   # after the user has seen the pre
 ```
 
 `cancel_workflow(workflow_id, reason, confirm=False)` works the same way: the
-preview lists the executed steps that stay applied and the steps that would be
-skipped; `confirm=True` cancels.
+preview lists the executed steps that stay applied, the steps already handed to
+you in `pending_dispatch` (`handed_out_to_caller` — cancel neither stops nor undoes
+them) and the steps that would be skipped; `confirm=True` cancels.
 
 Both refuse `confirm=True` while a step is in `unknown_effects` (left `running`
 or `interrupted` when a Pilot process stopped mid-dispatch). Check in the target

@@ -664,9 +664,9 @@ class WorkflowExecutor:
                     f"Step reference '{v}' points to step {idx} ({source.tool}), which "
                     "was performed outside Pilot (acknowledged at an approval gate) — "
                     "Pilot never saw its result, so it cannot fill this reference. Do "
-                    f"not run step {idx} again. Perform step {current_index} yourself "
-                    f"with the value from step {idx}'s own result, or create a new "
-                    "workflow."
+                    f"not run step {idx} again. Make the call that needs this value "
+                    f"yourself, filling it from step {idx}'s own result, or create a "
+                    "new workflow."
                 )
             if source.status != "success":
                 raise ValueError(

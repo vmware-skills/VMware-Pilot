@@ -442,3 +442,18 @@ def test_reference_refusal_does_not_point_at_a_refused_cancel(tmp_path):
         wf, approver="wei", acknowledge_not_executed=True)
     assert wf.state == WorkflowState.FAILED
     assert "cancel_workflow" not in str(wf.steps[2].result)
+
+
+@pytest.mark.unit
+def test_a_write_whose_name_merely_contains_get_stays_listed(tmp_path):
+    """Third review: 'retarget_vm' contains 'get'; only the catalog may call a step read-only."""
+    store = _store(tmp_path)
+    wf = Workflow(
+        id="wf-ro-1", workflow_type="test", state=WorkflowState.PENDING,
+        steps=[WorkflowStep(index=0, action="move", skill="custom", tool="retarget_vm",
+                            params={})],
+        params={}, created_at="", updated_at="",
+    )
+    WorkflowExecutor(store).run_until_checkpoint(wf)
+    radius = rollback_blast_radius(wf)
+    assert [e["tool"] for e in radius["not_reversible_outside_pilot"]] == ["retarget_vm"]

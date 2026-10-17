@@ -35,7 +35,7 @@ from typing import Any
 from vmware_pilot.executor import _ROLLBACK_FORBIDDEN_STATES, _TERMINAL_STATES
 from vmware_pilot.models import Workflow, WorkflowStep, WorkflowStore, _redact_for_persistence
 from vmware_pilot.reversibility import NOT_REVERSIBLE_NOTE, OUTSIDE_PILOT_NOTE, leaves_behind
-from vmware_pilot.review import TIER_READ, classify_step
+from vmware_pilot.review import _catalog_risk
 
 _log = logging.getLogger("vmware-pilot.lifecycle_gate")
 
@@ -175,7 +175,9 @@ def rollback_blast_radius(
     outside = [
         s for s in wf.steps
         if s.status in ("not_executed", "reported_done") and not s.rollback_tool
-        and classify_step(s.skill, s.tool, s.action)[0] != TIER_READ
+        # Only the catalog may call a step read-only here; the name heuristic
+        # reads "retarget_vm" as a read because it contains "get".
+        and _catalog_risk(s.skill, s.tool) != "low"
     ]
     blockers = []
     if wf.state in _ROLLBACK_FORBIDDEN_STATES:

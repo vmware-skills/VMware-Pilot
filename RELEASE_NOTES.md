@@ -34,7 +34,7 @@ that dispatched steps to the 2.4.0 skill servers.
 * Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
   workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.
 * The rollback preview gains `not_reversible_outside_pilot` (steps handed to the caller with no undo — a clone,
-  a production resize; read-only checks left out) with a note; through MCP those used to appear nowhere in the
+  a production resize; tools the catalog marks read-only left out) with a note; through MCP those used to appear nowhere in the
   preview. The cancel preview gains `handed_out_to_caller`: steps already in `pending_dispatch`, which cancel
   can neither stop nor undo — they used to be listed as `would_skip`, and cancel now keeps them `not_executed`
   on the record instead of rewriting them to `skipped`.
