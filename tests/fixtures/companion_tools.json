@@ -2787,7 +2787,8 @@
   "list_cached_images": {
    "properties": [
     "datastore",
-    "image_type"
+    "image_type",
+    "target"
    ],
    "required": []
   },
