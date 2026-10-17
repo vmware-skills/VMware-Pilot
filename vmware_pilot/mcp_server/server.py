@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 _store: WorkflowStore | None = None
 _executor: WorkflowExecutor | None = None
+#: Set by ``main(dispatch=True)``; ``VMWARE_PILOT_DISPATCH=stdio`` does the same (HLD §19).
+_dispatch_enabled = False
 
 
 def _get_store() -> WorkflowStore:
@@ -41,7 +43,10 @@ def _get_store() -> WorkflowStore:
 def _get_executor() -> WorkflowExecutor:
     global _executor
     if _executor is None:
-        _executor = WorkflowExecutor(_get_store())
+        from vmware_pilot.dispatcher import StdioDispatcher, dispatch_requested
+
+        dispatch = StdioDispatcher() if dispatch_requested(_dispatch_enabled) else None
+        _executor = WorkflowExecutor(_get_store(), dispatch=dispatch)
     return _executor
 
 
@@ -158,9 +163,28 @@ def main(
     key: Optional[str] = None,
     public_name: Optional[str] = None,
     token_file: Optional[str] = None,
+    dispatch: bool = False,
 ) -> None:
-    """Run the MCP server over stdio."""
+    """Run the MCP server (stdio unless ``transport`` says otherwise).
+
+    ``dispatch``: Pilot runs each step itself in that skill's own MCP server
+    (HLD §19). stdio only — refused with a network transport.
+    """
+    global _dispatch_enabled
     logging.basicConfig(level=logging.INFO)
+    from vmware_pilot.dispatcher import dispatch_requested
+
+    if dispatch_requested(dispatch):
+        if transport not in (None, "", "stdio"):
+            raise SystemExit(
+                f"vmware-pilot MCP server not started: --dispatch (or VMWARE_PILOT_DISPATCH) "
+                f"works only over stdio, not --transport {transport}. Over a network the skills' "
+                "servers Pilot starts would act with no caller identity, so roles could not "
+                "apply. Drop --dispatch for the network endpoint (callers perform the steps "
+                "from pending_dispatch), or serve Pilot over stdio."
+            )
+        _dispatch_enabled = True
+        logger.info("vmware-pilot: dispatch on — steps run in each skill's own MCP server")
     from vmware_policy.serve import run_server
     run_server(
         mcp,

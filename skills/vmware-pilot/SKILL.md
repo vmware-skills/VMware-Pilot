@@ -144,11 +144,12 @@ Deploy a backend VM, create a K8s namespace, and wire up AKO Ingress to the AVI 
 
 ## Dispatch Contract (Important)
 
-**Pilot is a Dispatcher, not an Executor.** It generates plans, tracks state, gates on approvals — it does NOT call companion skills' MCP tools itself. The calling AI agent is responsible for invoking `vmware-aiops::clone_vm` etc. when pilot's `run_workflow` returns a step description.
+**Who executes steps depends on how pilot was started.**
 
-**Who executes steps: you do.** Through this MCP server every step is recorded `not_executed` and returned in `pending_dispatch`; perform them in order. At a gate, `approve` refuses while earlier steps are `not_executed` — show the user what those steps returned, then call `approve(..., acknowledge_not_executed=True)`; they become `reported_done`. Through MCP a workflow never reaches `completed` (it ends `dispatch_required`); only an embedder that gives `WorkflowExecutor` a dispatcher gets that.
+- **`vmware-pilot mcp --dispatch`** (or `VMWARE_PILOT_DISPATCH=stdio`): pilot runs each step itself, in that skill's own MCP server (its policy, confirmation gate and audit apply), and stops at every approval gate — nothing after a gate runs before `approve`. Workflows reach `completed`. stdio only: refused with `--transport https`.
+- **Default (no `--dispatch`): you do.** Every step is recorded `not_executed` and returned in `pending_dispatch`; perform them in order. At a gate, `approve` refuses while earlier steps are `not_executed` — show the user what they returned, then `approve(..., acknowledge_not_executed=True)`; they become `reported_done`. The workflow ends `dispatch_required`, never `completed`.
 
-This is intentional v2-style architecture: pilot's context stays small, state is always on disk, and there are no persistent agent threads. Full contract details: see [`references/integration-patterns.md`](references/integration-patterns.md#the-dispatch-contract).
+Without `--dispatch` this is the v2-style architecture: pilot's context stays small, state is always on disk, and there are no persistent agent threads. Full contract details: see [`references/integration-patterns.md`](references/integration-patterns.md#the-dispatch-contract).
 
 **`get_skill_catalog` is a curated design aid, not a whitelist.** It surfaces 101 hand-picked building blocks across 13 skills — a deliberate subset of what those skills expose (aiops alone has 61 tools; the catalog lists 19). A step's `skill` field is a free-form string handed to the calling agent, so a workflow may name any companion skill, including ones the catalog does not list — pilot itself (`pilot`) is used that way by built-in templates for approval gates. Use the catalog for inspiration; consult the target skill's own SKILL.md for its full tool surface.
 
@@ -305,6 +306,8 @@ No vCenter credentials needed — pilot orchestrates other skills that handle co
   }
 }
 ```
+
+Add `"--dispatch"` to `args` to have pilot run the steps itself (each companion skill must be installed: `vmware-<skill>-mcp` on `PATH`).
 
 > Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==2.3.0", "vmware-pilot-mcp"]}` also
 > works, but `uvx` re-resolves the package against PyPI on every start and fails behind a

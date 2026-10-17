@@ -100,6 +100,13 @@ def mcp_cmd(
     token_file: Optional[str] = typer.Option(
         None, "--token-file", help="Token hash file (default $OPS_HOME/mcp-tokens)."
     ),
+    dispatch: bool = typer.Option(
+        False,
+        "--dispatch",
+        help="Run each workflow step in that skill's own MCP server (stdio only). Without it "
+        "steps are returned to the caller in pending_dispatch. "
+        "Same as VMWARE_PILOT_DISPATCH=stdio.",
+    ),
 ) -> None:
     """Start the MCP server (stdio by default; --transport https serves the network).
 
@@ -129,7 +136,7 @@ def mcp_cmd(
 
     _mcp_main(
         expose=expose, allow_write=allow_write, transport=transport, host=host, port=port,
-        cert=cert, key=key, public_name=public_name, token_file=token_file,
+        cert=cert, key=key, public_name=public_name, token_file=token_file, dispatch=dispatch,
     )
 
 

@@ -47,6 +47,14 @@ DispatchFn = Callable[[str, str, dict[str, Any]], Any]
 # found again here on a real run against a live vCenter, 2026-09-12.
 
 
+class StepEffectUnknownError(Exception):
+    """A dispatch that ended without telling whether the tool took effect (a timeout).
+
+    Recorded ``interrupted``, not ``failed``: rollback and cancel then refuse
+    until a human has checked the target system (``acknowledge_unknown_effects``).
+    """
+
+
 class _StepReturnedFailure(Exception):
     """A step whose dispatch returned a failure instead of raising one."""
 
@@ -330,6 +338,17 @@ class WorkflowExecutor:
                 step.result = result
                 step.completed_at = _now()
                 wf.log("step_completed", f"Step {step.index}: {step.tool} → success")
+            except StepEffectUnknownError as unknown:
+                step.status = "interrupted"
+                step.result = {"error": str(unknown)}
+                step.completed_at = _now()
+                wf.state = WorkflowState.FAILED
+                wf.log("step_effect_unknown", f"Step {step.index}: {step.tool} → {unknown}")
+                for remaining in wf.steps:
+                    if remaining.status == "pending":
+                        remaining.status = "skipped"
+                self._store.save(wf)
+                return self._finish(wf, "failed")
             except _StepReturnedFailure as failed:
                 # The skill reported failure by RETURNING it. Keep its own
                 # payload: the teaching message is what the operator needs.
@@ -737,8 +756,8 @@ def _unrun_refusal(wf: Workflow, unrun: list[WorkflowStep]) -> dict[str, Any]:
     return {
         "error": (
             f"Refusing to approve workflow '{wf.id}': {len(unrun)} step(s) before this "
-            f"gate — {listed} — were recorded but NOT executed: there is no dispatcher, so "
-            "Pilot has no record that they ran or what they returned, whatever the "
+            f"gate — {listed} — were recorded but NOT executed (the server runs without "
+            "--dispatch), so Pilot has no record that they ran or what they returned, whatever the "
             "approval message says. If you performed each of them yourself and checked "
             "its result, show those results to the approver and call approve again with "
             "acknowledge_not_executed=True; do not perform them again. Only if nobody "

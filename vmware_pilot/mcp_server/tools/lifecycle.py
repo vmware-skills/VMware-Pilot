@@ -139,13 +139,16 @@ def create_workflow_from_template(
 def run_workflow(workflow_id: str, force: bool = False) -> dict:
     """[WRITE] Advance a planned workflow. Pauses at approval gates.
 
-    IMPORTANT — this MCP server has no dispatcher and cannot call other
-    skills' MCP tools itself. Steps are recorded as 'not_executed' and the
-    run finishes with outcome='dispatch_required' (NOT 'completed'),
-    returning each pending step's skill/tool/params. YOU (the calling
-    agent) must then perform those skill/tool calls in order. A workflow
-    only reaches 'completed' when every step genuinely executed via a
-    real dispatcher (embedders supplying one to WorkflowExecutor).
+    Who runs the steps depends on how this server was started:
+      - with --dispatch (or VMWARE_PILOT_DISPATCH=stdio): Pilot runs each
+        step itself in that skill's own MCP server, stops at each approval
+        gate, and the workflow can reach 'completed'. A long step makes this
+        call take that long.
+      - without it (the default): Pilot runs nothing. Steps are recorded as
+        'not_executed' and the run ends with outcome='dispatch_required'
+        (NOT 'completed'), listing each step in 'pending_dispatch'. YOU (the
+        calling agent) must perform those skill/tool calls in order.
+    The result says which: a 'pending_dispatch' list means you run them.
 
     Safety: the workflow is structurally reviewed before each run. Runs
     are REFUSED if review finds ungated destructive or unclassifiable steps,
@@ -293,10 +296,10 @@ def approve(
     Only works when workflow state is 'awaiting_approval'.
     After approval, execution continues to the next steps.
 
-    This server has no dispatcher, so the steps before the gate are
-    'not_executed': Pilot has no record that they ran, whatever the gate's
-    message says. approve refuses (listing them in not_executed_before_gate)
-    until acknowledge_not_executed=True — set it only after you performed each
+    Without --dispatch, the steps before the gate are 'not_executed': Pilot
+    has no record that they ran, whatever the gate's message says. approve
+    refuses (listing them in not_executed_before_gate) until
+    acknowledge_not_executed=True — set it only after you performed each
     of those steps yourself and showed the user their results. They are then
     recorded as 'reported_done' and not handed out again.
 
@@ -308,10 +311,11 @@ def approve(
         acknowledge_not_executed: True says the steps before this gate were
             performed outside Pilot and their results were checked.
 
-    Note: after approval the remaining steps are recorded as 'not_executed'
-    and the result carries outcome='dispatch_required' with a
-    'pending_dispatch' list for the calling agent to perform (see
-    run_workflow). Through this server a workflow never reaches 'completed'.
+    Note: with --dispatch, approving runs the next steps (this call takes as
+    long as they do). Without it, the remaining steps are recorded as
+    'not_executed' and the result carries outcome='dispatch_required' with a
+    'pending_dispatch' list for you to perform (see run_workflow); the
+    workflow then never reaches 'completed'.
 
     Returns:
         Updated workflow state after resuming.
@@ -395,8 +399,8 @@ def rollback(
 
     Nothing rolls back automatically: a failed step leaves the workflow
     'failed' and stops. This tool is the explicit, best-effort undo, and it
-    only reverses steps pilot itself recorded as 'success' — which, on this
-    server (no dispatcher), are approval gates only. Steps YOU performed from
+    only reverses steps pilot itself recorded as 'success' — without
+    --dispatch, approval gates only. Steps YOU performed from
     pending_dispatch are 'not_executed' (or 'reported_done' once acknowledged at
     a gate) here, so to undo them call each
     one's rollback_tool with its rollback_params yourself, last step first.

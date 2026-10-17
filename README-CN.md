@@ -97,6 +97,21 @@ CLI 命令也不变。技能目录同时跟随 vmware-vks 的改名（`get_super
 > （`invalid peer certificate: UnknownIssuer`）。上面的入口点走 PATH，完全不联网；
 > 若必须用 `uvx`，请设置 `UV_NATIVE_TLS=true`。
 
+### 由 Pilot 自己执行步骤：`--dispatch`
+
+默认情况下 Pilot 不执行任何步骤：`run_workflow` 把每一步放在 `pending_dispatch` 里返回，由你的 agent 去执行。
+加上 `--dispatch`（或设置 `VMWARE_PILOT_DISPATCH=stdio`）后，Pilot 会在对应 skill 自己的 MCP server
+（`vmware-<skill>-mcp`，需已安装）里执行每一步，因此该 skill 的策略规则、确认门和审计照常生效。审批点之后的步骤
+在 `approve` 之前不会执行，工作流可以走到 `completed`。
+
+```json
+{"mcpServers": {"vmware-pilot": {"command": "vmware-pilot", "args": ["mcp", "--dispatch"]}}}
+```
+
+仅限 stdio：`--dispatch` 与 `--transport https`/`http` 同时使用时 Pilot 拒绝启动（它启动的 skill server 没有调用者
+身份，角色无法生效）。超过 `VMWARE_PILOT_DISPATCH_TIMEOUT` 秒（默认 1800）的步骤记为 `interrupted`——效果未知——
+回滚会等你确认后再进行。
+
 ## 审计与安全
 
 所有操作通过 vmware-policy（`@vmware_tool` 装饰器）自动审计：

@@ -67,7 +67,8 @@ def test_exit_code_on_another_tool_is_data(tmp_path):
     """Only the guest-command tools promise exit_code means the call's outcome."""
     store = WorkflowStore(tmp_path / "wf.db")
     wf = _guest_wf("get_alarms", skill="monitor")
-    out = WorkflowExecutor(store, dispatch=lambda s, t, p: {"exit_code": 3}).run_until_checkpoint(wf)
+    ex = WorkflowExecutor(store, dispatch=lambda s, t, p: {"exit_code": 3})
+    out = ex.run_until_checkpoint(wf)
     assert out["outcome"] == "completed"
 
 

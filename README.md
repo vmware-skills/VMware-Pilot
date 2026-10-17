@@ -130,6 +130,21 @@ update it. Requires vmware-policy ≥ 1.19.0. Details: [RELEASE_NOTES.md](RELEAS
 > corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed entry point above
 > touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.
 
+### Pilot runs the steps itself: `--dispatch`
+
+By default pilot executes nothing: `run_workflow` returns each step in `pending_dispatch` and your agent performs it.
+Add `--dispatch` (or set `VMWARE_PILOT_DISPATCH=stdio`) and pilot runs each step itself, in that skill's own MCP
+server (`vmware-<skill>-mcp`, which must be installed), so the skill's policy rules, confirmation gate and audit
+apply as usual. Nothing after an approval gate runs before `approve`, and workflows reach `completed`.
+
+```json
+{"mcpServers": {"vmware-pilot": {"command": "vmware-pilot", "args": ["mcp", "--dispatch"]}}}
+```
+
+stdio only: pilot refuses to start with `--dispatch` and `--transport https`/`http` (the skill servers it starts would
+have no caller identity, so roles could not apply). A step that takes longer than `VMWARE_PILOT_DISPATCH_TIMEOUT`
+seconds (default 1800) is recorded `interrupted` — its effect is unknown — and rollback waits for you to check it.
+
 <!-- usage: remote-and-exposure -->
 ## Remote access (HTTPS) and limiting tools
 

@@ -18,7 +18,9 @@ vmware-pilot is the odd one out. It manages no infrastructure of its own — it
 designs multi-step workflows, tracks their state, and gates them on human
 approval. Two consequences follow, and both matter more on a small model than
 on a large one: **authoring a workflow is itself the write operation**, and
-**pilot does not execute anything** — the calling agent does.
+**by default pilot executes nothing** — the calling agent does. (Started with
+`--dispatch`, pilot runs each step itself in that skill's own MCP server; the
+result then has no `pending_dispatch`, and you do not perform the steps.)
 
 > **Disclaimer**: This is a community-maintained open-source project and is
 > **not affiliated with, endorsed by, or sponsored by VMware, Inc. or Broadcom
@@ -34,7 +36,7 @@ These are structural, so it cannot.
 
 | Guardrail you would otherwise prompt for | Now enforced by |
 |---|---|
-| "Do not execute steps yourself — hand them back for a human to run" | **The dispatch contract.** Pilot never calls a companion skill's MCP tools; it returns a step description and the calling agent invokes the tool. This is architecture, not etiquette. |
+| "Do not execute steps yourself — hand them back for a human to run" | **The dispatch contract.** Without `--dispatch`, pilot never calls a companion skill's MCP tools; it returns a step description and the calling agent invokes the tool. With `--dispatch`, pilot runs the steps and stops at each approval gate, so nothing after a gate runs before `approve`. |
 | "Check the plan makes sense before running it" | **`review_workflow`** performs a structural sanity check and returns `approved` or `needs_revision`. It is a read tool that inspects a definition without executing it. |
 | "Put an approval gate before anything destructive" | **Custom-workflow rejection.** In a custom workflow (YAML, `create_workflow`, or a draft), a destructive or unclassifiable step — or any step passing `confirm: True` — with no `require_approval` before it makes `create_workflow` / `confirm_draft` / `create_workflow_from_template` refuse to save it and `run_workflow` refuse to run it — `force=True` does not override that. The refusal names the step and the gate to insert. |
 | "Log every state change you make" | **The `@vmware_tool` decorator.** Every workflow transition is recorded to `~/.vmware/audit.db`, and `get_workflow_status` returns the state plus its audit log. |
@@ -66,8 +68,8 @@ your agent's instruction block.
 
 - vmware-pilot: multi-step workflows — design, plan, run, approve, roll back,
   cancel, and inspect state.
-- vmware-aiops: VM lifecycle. Pilot never calls it; you do, when pilot hands
-  you a step.
+- vmware-aiops: VM lifecycle. Without `--dispatch` pilot never calls it; you
+  do, when pilot hands you a step.
 - vmware-monitor: read-only vCenter inventory, hosts, alarms, events.
 - vmware-nsx / vmware-nsx-security: networking and firewall.
 - vmware-storage, vmware-vks, vmware-aria, vmware-avi: their own domains.
@@ -75,8 +77,9 @@ your agent's instruction block.
 
 ## The dispatch contract
 
-- Pilot is a dispatcher, not an executor. When run_workflow returns a step, YOU
-  invoke that skill's MCP tool and report the result back. Pilot will not do it.
+- Read the result: a `pending_dispatch` list means pilot runs without
+  `--dispatch` and YOU invoke each listed tool. No `pending_dispatch` means pilot
+  ran the steps itself — do not run them again.
 - Never claim a step ran because pilot advanced its state. State advanced
   because you told pilot it did.
 - If you cannot invoke the tool a step names — it is not installed or is

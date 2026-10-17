@@ -30,6 +30,14 @@ that dispatched steps to the 2.4.0 skill servers.
   the step, the last step included. A string is never read as failure, even one starting `Error: ` — decided,
   as in vmware-policy, because tools return console text that can start that way. A skill must set `isError`;
   AIops's linked clone returned its failure as prose in 2.4.0 and is fixed there (it now raises).
+* **Pilot can run the steps itself: `vmware-pilot mcp --dispatch`** (or `VMWARE_PILOT_DISPATCH=stdio`), off by
+  default (HLD §19, D-25). Each step runs in that skill's own MCP server (`vmware-<skill>-mcp`), so its policy,
+  confirmation gate and audit apply; nothing after an approval gate runs before `approve`; workflows reach
+  `completed`. stdio only — refused with `--transport https`/`http`, and a call with a network caller is refused.
+  Only the family's skills (not `pilot`) are started, without a shell. A step that exceeds
+  `VMWARE_PILOT_DISPATCH_TIMEOUT` (default 1800 s) is recorded `interrupted` (effect unknown).
+* A guest command (`run_vm_guest_command`, `_with_output`) that exits non-zero or times out now fails the step;
+  it was recorded as success. A clone left `partially_rolled_back` is still listed by a second rollback.
 * `investigate_vm` added to the design catalog (101 tools).
 * Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
   workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.
