@@ -97,34 +97,13 @@ def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
     return payloads
 
 
-#: How the family's string-returning tools report a caught failure
-#: (``tool_errors("str")`` in every skill: ``f"Error: {msg} {hint}"``). A tool
-#: whose ops layer *returned* its failure as prose instead of raising — AIops
-#: 2.4.0's linked clone: "Snapshot 'current' not found …" — sets neither
-#: ``isError`` nor this prefix, and no reading of free text can tell it from a
-#: success message. That one is fixed in the skill (it now raises → isError);
-#: this prefix covers the family's own declared string shape, nothing wider.
-_TEXT_FAILURE_PREFIX = "Error: "
-
-
-def _top_level_texts(result: Any) -> list[str]:
-    """The strings a dispatch result carries at its top level.
-
-    A plain ``str``; an MCP result's single text block; or FastMCP's
-    ``{"result": "<str>"}`` structured wrapper around a ``-> str`` tool.
-    """
-    if isinstance(result, str):
-        return [result]
-    texts: list[str] = []
-    structured = getattr(result, "structuredContent", None)
-    if isinstance(structured, dict) and isinstance(structured.get("result"), str):
-        texts.append(structured["result"])
-    content = getattr(result, "content", None)
-    if isinstance(content, list) and len(content) == 1:
-        text = getattr(content[0], "text", None)
-        if isinstance(text, str):
-            texts.append(text)
-    return texts
+#: Prose is never read as failure (decided 2026-10-17, after the first real-
+#: vSphere run). A string result starting "Error: " without ``isError`` is
+#: success here, as in vmware-policy (``report_tool_failure`` does not sniff
+#: strings): a tool may legitimately return console text that starts that way.
+#: A skill that fails must say so in the frame — AIops's linked clone returned
+#: its failure as prose in 2.4.0 and now raises, which sets ``isError``. Do not
+#: add a text heuristic here; tests/test_last_step_clone_failure.py pins it.
 
 
 def _returned_failure(result: Any) -> str | None:
@@ -134,8 +113,8 @@ def _returned_failure(result: Any) -> str | None:
     explicit "no error", and an ``error`` nested inside a row (an alarm's
     ``error_count``, say) is data, not a failed call. A TOP-LEVEL
     ``"action": "preview"`` is a failure too: the tool changed nothing. So is a
-    top-level string starting ``"Error: "`` and a ``-> list`` tool's error shape,
-    a list holding exactly one ``{"error": ...}`` row.
+    ``-> list`` tool's error shape, a list holding exactly one ``{"error": ...}``
+    row. A string is never read as failure (see the note above).
     """
     if any(p.get("action") == "preview" for p in _top_level_payloads(result)):
         return _PREVIEW_ONLY
@@ -154,9 +133,6 @@ def _returned_failure(result: Any) -> str | None:
         err = result[0].get("error")
         if err not in (None, "", [], {}):
             return str(err)
-    for text in _top_level_texts(result):
-        if text.startswith(_TEXT_FAILURE_PREFIX):
-            return text
     return None
 
 

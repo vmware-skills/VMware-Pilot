@@ -259,10 +259,10 @@ class _Result:
         self.structuredContent = structured
 
 
+#: Envelope shapes only. A "plain" "Error: ..." string is success by decision
+#: (no prose sniffing, as in vmware-policy) — see test_last_step_clone_failure.
 _FAILURE_SHAPES = {
-    "plain string": "Error: Snapshot 'current' not found on 'agt-w2-src'. Available: s1",
-    "text block": _Result("Error: Snapshot 'current' not found on 'agt-w2-src'."),
-    "structured str": _Result("x", {"result": "Error: VM 'x' not found."}),
+    "structured error envelope": _Result("x", {"error": "VM 'x' not found.", "hint": "h"}),
     "error list": [{"error": "VM 'x' not found.", "hint": "list VMs"}],
 }
 
@@ -304,9 +304,10 @@ def test_a_failure_in_the_last_step_does_not_complete_the_workflow(tmp_path, sha
     "VM 'stg' powered on. 0 errors in the last hour.",
     "error_count: 0",
     "Errors: none",
+    "Error: this line was quoted from a guest console, not a failed call",
 ])
 def test_ordinary_text_results_are_still_success(tmp_path, text):
-    """Negative control for the text marker: only the family's 'Error: ' prefix counts."""
+    """Text is never read as failure, whatever it says."""
     store = _store(tmp_path)
     wf = _last_step_wf("wf-ok")
     result = WorkflowExecutor(store, dispatch=_last_fails(text)).run_until_checkpoint(wf)

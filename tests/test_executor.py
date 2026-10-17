@@ -609,8 +609,7 @@ class _CallToolResult:
 
 
 def _is_error_object_dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
-    # Only the failing call carries the error text: since 2026-10-17 a result
-    # whose text starts "Error: " is a failure even without isError.
+    # Only the failing call is an error frame; the others are plain successes.
     if tool == "failing_tool":
         return _CallToolResult(is_error=True)
     return {"ok": True}

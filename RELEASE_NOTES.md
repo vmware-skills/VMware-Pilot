@@ -25,11 +25,11 @@ that dispatched steps to the 2.4.0 skill servers.
   "no rollback defined"); a rollback that does not remove what the step created — a clone powered off — is
   `partial` with `left_behind`, and the step is `partially_rolled_back`. The preview carries the same:
   `leaves_behind` on such entries and `left_in_place_note`. Approval gates are no longer listed as skipped.
-* **A failure returned as text is a failure.** Besides `isError` and a top-level `error`, a result that is (or
-  whose single text block / FastMCP `{"result": ...}` is) a string starting `Error: ` — the family's string error
-  shape — or a one-row `[{"error": ...}]` list now fails the step, including when it is the last step. A skill
-  that returns failure as free prose with neither marker still cannot be told from success; AIops's linked clone
-  did, and is fixed there (it now raises).
+* **Failure is read from the frame, not from prose.** Besides `isError` and a top-level `error` on a plain
+  dict, a top-level `error` in an MCP result's structured content and a one-row `[{"error": ...}]` list now fail
+  the step, the last step included. A string is never read as failure, even one starting `Error: ` — decided,
+  as in vmware-policy, because tools return console text that can start that way. A skill must set `isError`;
+  AIops's linked clone returned its failure as prose in 2.4.0 and is fixed there (it now raises).
 * `investigate_vm` added to the design catalog (101 tools).
 * Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
   workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.
