@@ -193,6 +193,10 @@ def rollback_blast_radius(
         "left_in_place_note": NOT_REVERSIBLE_NOTE if left else "",
         **_listed(agent_side, "not_reversed_by_pilot", _rollback_ref),
         **_listed(outside, "not_reversible_outside_pilot"),
+        # A previous rollback ran these and they still left something behind.
+        **_listed([s for s in wf.steps if s.status == "partially_rolled_back"],
+                  "left_behind_by_earlier_rollback",
+                  lambda s: {**_ref(s), "leaves_behind": leaves_behind(s)}),
         "not_reversible_outside_pilot_note": OUTSIDE_PILOT_NOTE if outside else "",
         "blockers": blockers,
         "unmeasured": _unmeasured(wf, acknowledge_unknown_effects),

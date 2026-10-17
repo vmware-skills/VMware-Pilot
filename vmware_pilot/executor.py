@@ -28,6 +28,7 @@ from vmware_pilot.models import (
     WorkflowStore,
     is_sensitive_key,
 )
+from vmware_pilot.renames import _server
 from vmware_pilot.reversibility import leaves_behind
 
 _log = logging.getLogger("vmware-pilot.executor")
@@ -106,7 +107,31 @@ def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
 #: add a text heuristic here; tests/test_last_step_clone_failure.py pins it.
 
 
-def _returned_failure(result: Any) -> str | None:
+#: Tools whose ``exit_code`` / ``timed_out`` ARE the call's outcome: aiops runs
+#: the command and waits for it. Elsewhere an ``exit_code`` is data (a log row,
+#: an inventory field), so this is a table, not a rule.
+_EXIT_CODE_TOOLS = frozenset({
+    ("aiops", "run_vm_guest_command"),
+    ("aiops", "run_vm_guest_command_with_output"),
+})
+
+
+def _guest_failure(result: Any, skill: str, tool: str) -> str | None:
+    """A guest command that ran but did not succeed (non-zero exit, timed out)."""
+    bare = _server(skill).removeprefix("vmware-") if isinstance(skill, str) else ""
+    if (bare, tool) not in _EXIT_CODE_TOOLS:
+        return None
+    for payload in _top_level_payloads(result):
+        if payload.get("timed_out") is True:
+            return f"{tool} timed out in the guest (exit_code {payload.get('exit_code')!r})"
+        code = payload.get("exit_code")
+        if isinstance(code, int) and not isinstance(code, bool) and code != 0:
+            stderr = str(payload.get("stderr") or "")[:300]
+            return f"{tool}: the command exited with exit_code {code}. stderr: {stderr}"
+    return None
+
+
+def _returned_failure(result: Any, skill: str = "", tool: str = "") -> str | None:
     """Return the failure message if this dispatch result reports failure.
 
     Only a TOP-LEVEL, non-empty ``error`` counts: ``{"error": None}`` is an
@@ -133,7 +158,7 @@ def _returned_failure(result: Any) -> str | None:
         err = result[0].get("error")
         if err not in (None, "", [], {}):
             return str(err)
-    return None
+    return _guest_failure(result, skill, tool)
 
 
 _NO_DISPATCH_REASON = (
@@ -298,7 +323,7 @@ class WorkflowExecutor:
                         "cancel_workflow to retire the stale one."
                     )
                 result = self._dispatch(step.skill, step.tool, resolved_params)
-                returned_failure = _returned_failure(result)
+                returned_failure = _returned_failure(result, step.skill, step.tool)
                 if returned_failure is not None:
                     raise _StepReturnedFailure(returned_failure, result)
                 step.status = "success"
@@ -463,6 +488,16 @@ class WorkflowExecutor:
         rollback_results: list[dict[str, Any]] = []
         # Persist results into the workflow record as they accumulate.
         wf.rollback_results = rollback_results
+        # An earlier rollback already ran these; what it left behind still stays.
+        for step in wf.steps:
+            if step.status == "partially_rolled_back":
+                rollback_results.append({
+                    "step": step.index,
+                    "tool": step.rollback_tool,
+                    "status": "partial",
+                    "reason": "rolled back by an earlier rollback call; not run again",
+                    "left_behind": leaves_behind(step),
+                })
         for step in reversed(wf.completed_steps()):
             if not step.rollback_tool:
                 # Approval gates record a decision; there is nothing to reverse.
@@ -486,7 +521,7 @@ class WorkflowExecutor:
                 # A rollback that *returns* a failure is not a rollback. Saying
                 # "rolled back" when the estate never changed back is the worst
                 # place in this file to be optimistic.
-                returned_failure = _returned_failure(result)
+                returned_failure = _returned_failure(result, step.skill, step.rollback_tool)
                 if returned_failure is not None:
                     raise _StepReturnedFailure(returned_failure, result)
                 left = leaves_behind(step)
