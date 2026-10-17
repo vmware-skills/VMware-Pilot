@@ -329,6 +329,7 @@
     "power_on",
     "snapshot_name",
     "target",
+    "target_host",
     "template_name"
    ],
    "required": [
