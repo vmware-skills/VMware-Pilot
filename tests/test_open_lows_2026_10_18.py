@@ -38,19 +38,25 @@ def _guest_result(result: dict[str, Any]):
 @pytest.mark.unit
 @pytest.mark.parametrize("tool", ["run_vm_guest_command", "run_vm_guest_command_with_output"])
 @pytest.mark.parametrize("skill", ["aiops", "vmware-aiops"])
-@pytest.mark.parametrize("result", [
-    {"exit_code": 1, "stdout": "", "stderr": "boom", "timed_out": False},
-    {"exit_code": -1, "stdout": "", "stderr": "", "timed_out": True},
-    {"exit_code": 0, "stdout": "", "stderr": "", "timed_out": True},
-    {"exit_code": -1, "stdout": "", "stderr": "process not found", "timed_out": False},
-], ids=["exit-1", "timeout-minus-1", "timeout-exit-0", "minus-1"])
-def test_a_guest_command_that_did_not_succeed_fails_the_step(tmp_path, tool, skill, result):
+@pytest.mark.parametrize("result,status", [
+    ({"exit_code": 1, "stdout": "", "stderr": "boom", "timed_out": False}, "failed"),
+    ({"exit_code": 3, "stdout": "", "stderr": "", "timed_out": False}, "failed"),
+    # May still be running in the guest: an unknown effect (review, 2026-10-18).
+    ({"exit_code": -1, "stdout": "", "stderr": "", "timed_out": True}, "interrupted"),
+    ({"exit_code": 0, "stdout": "", "stderr": "", "timed_out": True}, "interrupted"),
+    ({"exit_code": -1, "stdout": "", "stderr": "process not found", "timed_out": False},
+     "interrupted"),
+], ids=["exit-1", "exit-3", "timeout-minus-1", "timeout-exit-0", "minus-1"])
+def test_a_guest_command_that_did_not_succeed_fails_the_step(tmp_path, tool, skill, result,
+                                                             status):
     store = WorkflowStore(tmp_path / "wf.db")
     wf = _guest_wf(tool, skill)
     out = WorkflowExecutor(store, dispatch=_guest_result(result)).run_until_checkpoint(wf)
     assert out["outcome"] == "failed"
-    assert wf.steps[0].status == "failed"
-    assert "exit" in str(wf.steps[0].result) or "timed out" in str(wf.steps[0].result)
+    assert wf.steps[0].status == status
+    message = wf.steps[0].result["error"]
+    assert ("exit_code" in message and "stderr" in message) if status == "failed" \
+        else "UNKNOWN" in message
 
 
 @pytest.mark.unit

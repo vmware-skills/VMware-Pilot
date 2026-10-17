@@ -2,7 +2,9 @@
 
 vmware-pilot orchestrates the VMware skill family into coherent workflows. Its
 design catalog (`get_skill_catalog`) offers 101 curated building blocks across 13
-skills; a dispatched step may name any companion skill, catalogued or not.
+skills. Without `--dispatch` a step handed to the agent may name any companion skill,
+catalogued or not; with `--dispatch` pilot runs only the catalog's skills and refuses the rest
+before any step runs.
 This reference documents the most common integration patterns and when to use
 Pilot vs. calling a skill directly.
 
@@ -18,7 +20,7 @@ The contract:
 2. **Pilot tracks state** via `run_workflow`, `approve`, `rollback`. Each call returns immediately on the next checkpoint — running, awaiting approval, completed, or failed.
 3. **The calling AI agent dispatches each step**. After `run_workflow` returns a step description, the agent invokes the corresponding MCP tool on the target skill (e.g., `vmware-aiops::clone_vm`) and captures the result. Pilot has no call for reporting a step's result back, so on the MCP server those steps stay `not_executed` in pilot's record — which is why `rollback` there cannot undo them (see Error Handling).
 
-In other words: pilot is the brain, the AI agent is the hands. Pilot never reaches across the wire to call other skills' tools itself — its `dispatch` function defaults to a no-op.
+In other words: by default pilot is the brain and the AI agent is the hands — pilot does not call other skills' tools. Started with `vmware-pilot mcp --dispatch`, pilot runs each step itself in that skill's own MCP server instead, and the result carries no `pending_dispatch`.
 
 ### Why this matters
 
@@ -320,17 +322,17 @@ When a workflow step fails:
 3. The workflow state becomes `FAILED`
 4. **Nothing is undone automatically.** Undo happens only when someone decides to
    roll back, and it is best-effort:
-   - **MCP server (the normal case — no dispatcher):** the steps the agent
+   - **MCP server without `--dispatch` (the default):** the steps the agent
      performed are still `not_executed` in pilot's record, so `rollback()`
      reverses nothing but approval gates and just marks the workflow `failed`.
      The agent undoes the work itself: for each step it performed, last first,
      call that step's `rollback_tool` with its `rollback_params`, after the user
      agrees.
-   - **Embedders that pass a dispatcher to `WorkflowExecutor`:** `rollback()`
+   - **With `--dispatch` (or an embedder's dispatcher):** `rollback()`
      dispatches `rollback_tool` for each step pilot recorded as `success`, in
      reverse order. The failed step itself is not rolled back (it is `failed`,
      not `success`).
-5. Steps without a `rollback_tool` are skipped; they cannot be undone this way
+5. Steps without a `rollback_tool` are reported `not_reversible`; they cannot be undone this way
 6. `rollback()` itself previews first: a bare call returns `blast_radius` and
    changes nothing; call it again with `confirm=True` after the user decides
 

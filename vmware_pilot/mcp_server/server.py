@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Optional
 import logging
+import os
 
 from vmware_policy import describe_tool_parameters
 
@@ -172,9 +173,24 @@ def main(
     """
     global _dispatch_enabled
     logging.basicConfig(level=logging.INFO)
-    from vmware_pilot.dispatcher import dispatch_requested
+    from vmware_pilot.dispatcher import (
+        ENV_FLAG,
+        DispatchRefusedError,
+        _timeout_from_env,
+        dispatch_requested,
+    )
 
+    raw = os.environ.get(ENV_FLAG, "").strip()
+    if raw and raw.lower() != "stdio":
+        raise SystemExit(
+            f"vmware-pilot MCP server not started: {ENV_FLAG}={raw!r} is not understood. "
+            "Set it to 'stdio' to have Pilot run the steps, or unset it."
+        )
     if dispatch_requested(dispatch):
+        try:
+            _timeout_from_env()
+        except DispatchRefusedError as exc:
+            raise SystemExit(f"vmware-pilot MCP server not started: {exc}") from None
         if transport not in (None, "", "stdio"):
             raise SystemExit(
                 f"vmware-pilot MCP server not started: --dispatch (or VMWARE_PILOT_DISPATCH) "

@@ -61,7 +61,12 @@ class _StepReturnedFailure(Exception):
     def __init__(self, message: str, payload: Any) -> None:
         super().__init__(message)
         self.message = message
-        self.payload = payload if isinstance(payload, dict) else {"error": message}
+        if isinstance(payload, dict):
+            # Keep the tool's own payload; add why Pilot read it as a failure when
+            # the payload does not say (a guest command's exit_code, say).
+            self.payload = payload if payload.get("error") else {**payload, "error": message}
+        else:
+            self.payload = {"error": message}
 
 
 #: What a step that merely previewed is recorded as. Across the family a
@@ -124,14 +129,30 @@ _EXIT_CODE_TOOLS = frozenset({
 })
 
 
-def _guest_failure(result: Any, skill: str, tool: str) -> str | None:
-    """A guest command that ran but did not succeed (non-zero exit, timed out)."""
+def _guest_payloads(result: Any, skill: str, tool: str) -> list[dict[str, Any]]:
     bare = _server(skill).removeprefix("vmware-") if isinstance(skill, str) else ""
-    if (bare, tool) not in _EXIT_CODE_TOOLS:
-        return None
-    for payload in _top_level_payloads(result):
-        if payload.get("timed_out") is True:
-            return f"{tool} timed out in the guest (exit_code {payload.get('exit_code')!r})"
+    return _top_level_payloads(result) if (bare, tool) in _EXIT_CODE_TOOLS else []
+
+
+def _guest_unknown(result: Any, skill: str, tool: str) -> str | None:
+    """A guest command that may still be running: timed out, or its process vanished.
+
+    aiops does not kill the guest process on timeout, and exit_code -1 means it
+    could not read one — either way the command may still be changing the guest.
+    """
+    for payload in _guest_payloads(result, skill, tool):
+        if payload.get("timed_out") is True or payload.get("exit_code") == -1:
+            return (
+                f"{tool}: the guest command timed out or its process could not be read "
+                f"(exit_code {payload.get('exit_code')!r}); it may still be running, so its "
+                "effect is UNKNOWN — check the guest before retrying or rolling back."
+            )
+    return None
+
+
+def _guest_failure(result: Any, skill: str, tool: str) -> str | None:
+    """A guest command that ran to completion and exited non-zero."""
+    for payload in _guest_payloads(result, skill, tool):
         code = payload.get("exit_code")
         if isinstance(code, int) and not isinstance(code, bool) and code != 0:
             stderr = str(payload.get("stderr") or "")[:300]
@@ -170,11 +191,9 @@ def _returned_failure(result: Any, skill: str = "", tool: str = "") -> str | Non
 
 
 _NO_DISPATCH_REASON = (
-    "No dispatch function is configured — vmware-pilot cannot invoke other "
-    "skills' MCP tools itself. The step was recorded but NOT executed. "
-    "The calling agent must perform this skill/tool call with the listed "
-    "params, or an embedder must construct WorkflowExecutor with a real "
-    "dispatch callable."
+    "Pilot is running without --dispatch, so it does not invoke other skills' "
+    "MCP tools. The step was recorded but NOT executed: the calling agent "
+    "must perform this skill/tool call with the listed params."
 )
 
 # States from which run_until_checkpoint may legally start.
@@ -275,6 +294,11 @@ class WorkflowExecutor:
                 )
                 return result
 
+        if self._has_dispatch:
+            refused = self._dispatch_refusal(wf)
+            if refused is not None:
+                return refused
+
         wf.state = WorkflowState.RUNNING
         wf.log("run_started")
         self._store.save(wf)
@@ -331,6 +355,9 @@ class WorkflowExecutor:
                         "cancel_workflow to retire the stale one."
                     )
                 result = self._dispatch(step.skill, step.tool, resolved_params)
+                unknown = _guest_unknown(result, step.skill, step.tool)
+                if unknown is not None:
+                    raise StepEffectUnknownError(unknown)
                 returned_failure = _returned_failure(result, step.skill, step.tool)
                 if returned_failure is not None:
                     raise _StepReturnedFailure(returned_failure, result)
@@ -395,6 +422,42 @@ class WorkflowExecutor:
         self._store.save(wf)
         return self._finish(wf, "completed")
 
+    def _dispatch_refusal(self, wf: Workflow) -> dict[str, Any] | None:
+        """Why a dispatcher must not start this run, or None.
+
+        Steps handed to a caller earlier (``not_executed``) may already have been
+        performed — the workflow store is shared, and the same workflow can reach
+        a Pilot started with ``--dispatch`` after one started without it. Running
+        them again would clone twice. And a step whose skill cannot be started
+        should stop the run before step 0 changes anything, not halfway.
+        """
+        handed = [s for s in wf.steps if s.status == "not_executed"]
+        if handed:
+            listed = ", ".join(f"step {s.index} ({s.skill}.{s.tool})" for s in handed)
+            return {
+                "error": (
+                    f"Refusing to run workflow '{wf.id}': {listed} were handed out earlier "
+                    "(pending_dispatch) by a Pilot running without --dispatch and may "
+                    "already have been performed; Pilot will not run them again. If they "
+                    "come before an approval gate and were performed, approve with "
+                    "acknowledge_not_executed=True. Otherwise cancel_workflow this one and "
+                    "create a new workflow."
+                ),
+                "workflow_id": wf.id,
+                "state": wf.state.value,
+                "handed_out": [{"index": s.index, "skill": s.skill, "tool": s.tool}
+                               for s in handed],
+            }
+        preflight = getattr(self._dispatch, "preflight", None)
+        if preflight is None:
+            return None
+        try:
+            preflight([s for s in wf.steps if s.status == "pending"
+                       and s.action != "require_approval"])
+        except ValueError as exc:
+            return {"error": str(exc), "workflow_id": wf.id, "state": wf.state.value}
+        return None
+
     def _finish(self, wf: Workflow, outcome: str) -> dict[str, Any]:
         """Build the run result dict, surfacing any not-executed steps."""
         result = wf.to_dict()
@@ -410,7 +473,8 @@ class WorkflowExecutor:
                 "Workflow is NOT completed: no dispatch function is "
                 "configured, so the listed steps were recorded but not "
                 "executed. Perform each pending step's skill/tool call "
-                "yourself (in order), or re-run with a real dispatcher."
+                "yourself (in order). A Pilot started with --dispatch will "
+                "not run steps handed out here."
             )
         return result
 
@@ -538,6 +602,9 @@ class WorkflowExecutor:
                     step.rollback_params, wf.steps, current_index=step.index + 1
                 )
                 result = self._dispatch(step.skill, step.rollback_tool, resolved_rb)
+                unknown = _guest_unknown(result, step.skill, step.rollback_tool)
+                if unknown is not None:
+                    raise StepEffectUnknownError(unknown)
                 # A rollback that *returns* a failure is not a rollback. Saying
                 # "rolled back" when the estate never changed back is the worst
                 # place in this file to be optimistic.
@@ -558,6 +625,21 @@ class WorkflowExecutor:
                 wf.log(
                     "rollback_step",
                     f"Step {step.index}: {step.rollback_tool} → {entry['status']}",
+                )
+            except StepEffectUnknownError as unknown_exc:
+                # Whether the undo happened is unknown: the next preview must say
+                # so, and a second rollback must not re-send it unacknowledged.
+                step.status = "interrupted"
+                rollback_results.append(
+                    {
+                        "step": step.index,
+                        "tool": step.rollback_tool,
+                        "status": "unknown",
+                        "error": str(unknown_exc),
+                    }
+                )
+                wf.log(
+                    "rollback_unknown", f"Step {step.index}: {step.rollback_tool} → {unknown_exc}"
                 )
             except Exception as exc:
                 rollback_results.append(
@@ -712,7 +794,14 @@ class WorkflowExecutor:
 
             if result_key is not None:
                 if isinstance(source.result, dict):
-                    return source.result.get(result_key, source.result)
+                    if result_key not in source.result:
+                        raise ValueError(
+                            f"Step reference '{v}': step {idx} ({source.tool}) returned no "
+                            f"'{result_key}' (its keys: {sorted(source.result)[:12]}). Pilot "
+                            "will not send the whole result in its place. Fix the reference "
+                            "with a key the tool returns and create a new workflow."
+                        )
+                    return source.result[result_key]
                 return source.result
             return source.result
 
@@ -761,9 +850,8 @@ def _unrun_refusal(wf: Workflow, unrun: list[WorkflowStep]) -> dict[str, Any]:
             "--dispatch), so Pilot has no record that they ran or what they returned, whatever the "
             "approval message says. If you performed each of them yourself and checked "
             "its result, show those results to the approver and call approve again with "
-            "acknowledge_not_executed=True; do not perform them again. Only if nobody "
-            "performed them may an embedder with a dispatcher call run_until_checkpoint "
-            "again, which executes them first."
+            "acknowledge_not_executed=True; do not perform them again. If nobody "
+            "performed them, cancel_workflow this one and create a new workflow."
         ),
         "workflow_id": wf.id,
         "state": wf.state.value,

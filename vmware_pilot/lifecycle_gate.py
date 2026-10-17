@@ -151,8 +151,10 @@ def _unmeasured(wf: Workflow, acknowledge_unknown_effects: bool) -> list[str]:
 
 def _executed(wf: Workflow) -> list[WorkflowStep]:
     """Steps that ran and may have changed something (gates and catalog reads did not)."""
+    # A read with a rollback_tool stays: that rollback will run, so the preview shows it.
     return [
-        s for s in wf.steps if s.status == "success" and not _is_gate(s) and not is_read_only(s)
+        s for s in wf.steps if s.status == "success" and not _is_gate(s)
+        and not (is_read_only(s) and not s.rollback_tool)
     ]
 
 

@@ -170,7 +170,10 @@ class TestNoDispatchHonesty:
         assert pending[0]["params"] == {"vm": "x"}
         assert "message" in result
 
-    def test_not_executed_steps_are_retried_with_real_dispatch(self, tmp_path):
+    def test_not_executed_steps_are_not_rerun_by_a_real_dispatch(self, tmp_path):
+        # Reversed 2026-10-18 (review of the stdio dispatcher): a step handed out
+        # in pending_dispatch may already have been performed by the agent, so a
+        # dispatcher must not run it again (it would clone twice).
         store = _make_store(tmp_path)
         wf = self._wf("wf-noop2")
         store.save(wf)
@@ -178,9 +181,8 @@ class TestNoDispatchHonesty:
         assert wf.steps[0].status == "not_executed"
 
         result = WorkflowExecutor(store, dispatch=_success_dispatch).run_until_checkpoint(wf)
-        assert result["state"] == "completed"
-        assert result["outcome"] == "completed"
-        assert all(s["status"] == "success" for s in result["steps"])
+        assert "handed out" in result["error"]
+        assert wf.steps[0].status == "not_executed"
 
     def test_no_dispatch_still_pauses_at_approval_gate(self, tmp_path):
         store = _make_store(tmp_path)

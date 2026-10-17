@@ -1,4 +1,4 @@
-"""Pilot runs its own steps: the opt-in stdio dispatcher (HLD §19, D-25).
+"""Pilot runs its own steps: the opt-in stdio dispatcher (HLD §19, D-26).
 
 Off by default. Without it Pilot's server executes nothing: every step goes back
 to the calling agent in ``pending_dispatch``, so an approval gate is only an
@@ -48,6 +48,10 @@ class DispatchRefusedError(ValueError):
     """
 
 
+class DispatchConnectionLostError(StepEffectUnknownError):
+    """The child went away after the call was sent. Whether it took effect is unknown."""
+
+
 class DispatchTimeoutError(StepEffectUnknownError):
     """The child did not answer in time. Whether the tool took effect is unknown."""
 
@@ -91,7 +95,8 @@ def resolve_command(skill: Any) -> str:
     if beside.is_file() and os.access(beside, os.X_OK):
         return str(beside)
     found = shutil.which(name)
-    if found:
+    # A relative PATH entry (".") would resolve against the MCP client's cwd.
+    if found and os.path.isabs(found):
         return found
     raise DispatchRefusedError(
         f"{name} is not installed where Pilot can find it (next to {sys.executable} or on "
@@ -115,11 +120,36 @@ def _timeout_from_env() -> float:
     return value
 
 
+def _refuse_network_caller() -> None:
+    from vmware_policy.caller import current_caller
+
+    if current_caller() is not None:
+        raise DispatchRefusedError(
+            "Pilot does not run steps for a network caller: the skill's server would act "
+            "with no caller identity, so roles could not apply. Serve Pilot over stdio to "
+            "use --dispatch, or perform the steps from pending_dispatch yourself."
+        )
+
+
 class StdioDispatcher:
     """``WorkflowExecutor`` dispatch: one child ``vmware-<skill>-mcp`` per call."""
 
     def __init__(self, timeout: float | None = None) -> None:
         self._timeout = timeout
+
+    def preflight(self, steps: list[Any]) -> None:
+        """Refuse before step 0 if any step's skill cannot be started."""
+        _refuse_network_caller()
+        problems = []
+        for step in steps:
+            try:
+                resolve_command(step.skill)
+            except DispatchRefusedError as exc:
+                problems.append(f"step {step.index} ({step.skill}.{step.tool}): {exc}")
+        if problems:
+            raise DispatchRefusedError(
+                "Nothing was run — these steps could not be started: " + " | ".join(problems)
+            )
 
     def __call__(self, skill: str, tool: str, params: dict[str, Any]) -> Any:
         from vmware_policy.caller import current_caller
@@ -140,6 +170,15 @@ class StdioDispatcher:
             return future.result()
 
 
+def _leaf(exc: BaseException) -> str:
+    """The first concrete error inside an (anyio) ExceptionGroup, as one short line."""
+    # Duck-typed: BaseExceptionGroup is builtin only from 3.11 (exceptiongroup backport on 3.10).
+    while getattr(exc, "exceptions", None):
+        exc = exc.exceptions[0]
+    text = str(exc).strip().splitlines()[0][:200] if str(exc).strip() else ""
+    return f"{type(exc).__name__}: {text}" if text else type(exc).__name__
+
+
 def _payload(result: Any) -> Any:
     """The tool's own data, as the workflow stores it and step references read it.
 
@@ -150,19 +189,24 @@ def _payload(result: Any) -> Any:
     envelope so the executor records a failure.
     """
     texts = [t for t in (getattr(c, "text", None) for c in result.content or []) if t]
-    if result.isError:
-        return {"error": " ".join(texts) or "the tool reported isError with no message"}
     structured = result.structuredContent
-    if isinstance(structured, dict):
-        if set(structured) == {"result"}:
-            return structured["result"]
+    if isinstance(structured, dict) and set(structured) == {"result"}:
+        structured = structured["result"]
+    if result.isError:
+        if isinstance(structured, dict) and structured.get("error"):
+            return structured
+        return {"error": " ".join(texts) or "the tool reported isError with no message"}
+    if structured is not None:
         return structured
-    if len(texts) == 1:
-        try:
-            return json.loads(texts[0])
-        except ValueError:
-            return texts[0]
-    return texts
+    parsed = [_maybe_json(t) for t in texts]
+    return parsed[0] if len(parsed) == 1 else parsed
+
+
+def _maybe_json(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text
 
 
 async def _call(command: str, tool: str, params: dict[str, Any], timeout: float) -> Any:
@@ -172,18 +216,33 @@ async def _call(command: str, tool: str, params: dict[str, Any], timeout: float)
     server = StdioServerParameters(
         command=command, args=[], env=dict(os.environ), cwd=str(Path.home())
     )
+    name = Path(command).name
+    sent = False
 
     async def run() -> Any:
+        nonlocal sent
         async with stdio_client(server) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
+                sent = True
                 return await session.call_tool(tool, params)
 
     try:
         return _payload(await asyncio.wait_for(run(), timeout))
     except asyncio.TimeoutError:
         raise DispatchTimeoutError(
-            f"{Path(command).name} did not answer {tool} within {timeout:g} s; the call was "
-            "abandoned and its effect is UNKNOWN — check the target system before retrying "
-            f"or rolling back (raise {ENV_TIMEOUT} for long operations)."
+            f"{name} did not answer {tool} within {timeout:g} s; the call was abandoned and "
+            "its effect is UNKNOWN — check the target system before retrying or rolling back "
+            f"(raise {ENV_TIMEOUT} for long operations)."
+        ) from None
+    except Exception as exc:  # noqa: BLE001 — the transport's errors arrive as ExceptionGroups
+        cause = _leaf(exc)
+        if sent:
+            raise DispatchConnectionLostError(
+                f"{name} ended while running {tool} ({cause}); whether the call took effect "
+                "is UNKNOWN — check the target system before retrying or rolling back."
+            ) from None
+        raise DispatchRefusedError(
+            f"{name} did not start or did not finish the MCP handshake ({cause}); nothing "
+            f"was run. Start {name} by hand to see its error (install, config, credentials)."
         ) from None

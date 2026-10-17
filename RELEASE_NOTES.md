@@ -31,13 +31,22 @@ that dispatched steps to the 2.4.0 skill servers.
   as in vmware-policy, because tools return console text that can start that way. A skill must set `isError`;
   AIops's linked clone returned its failure as prose in 2.4.0 and is fixed there (it now raises).
 * **Pilot can run the steps itself: `vmware-pilot mcp --dispatch`** (or `VMWARE_PILOT_DISPATCH=stdio`), off by
-  default (HLD §19, D-25). Each step runs in that skill's own MCP server (`vmware-<skill>-mcp`), so its policy,
+  default (HLD §19, D-26). Each step runs in that skill's own MCP server (`vmware-<skill>-mcp`), so its policy,
   confirmation gate and audit apply; nothing after an approval gate runs before `approve`; workflows reach
   `completed`. stdio only — refused with `--transport https`/`http`, and a call with a network caller is refused.
   Only the family's skills (not `pilot`) are started, without a shell. A step that exceeds
-  `VMWARE_PILOT_DISPATCH_TIMEOUT` (default 1800 s) is recorded `interrupted` (effect unknown).
-* A guest command (`run_vm_guest_command`, `_with_output`) that exits non-zero or times out now fails the step;
-  it was recorded as success. A clone left `partially_rolled_back` is still listed by a second rollback.
+  `VMWARE_PILOT_DISPATCH_TIMEOUT` (default 1800 s) is recorded `interrupted` (effect unknown), as is a step whose
+  skill server died after the call was sent; a server that never starts fails the step with its reason. Every
+  step's skill is resolved before step 0 runs; settings are checked at start (`VMWARE_PILOT_DISPATCH` must be
+  `stdio` or unset). A step already handed out in `pending_dispatch` is never run again by a `--dispatch` Pilot.
+  Results are stored as the tool's own data, so `__from_step_N__:key` works; a reference to a key the step did
+  not return is refused (it used to send the whole result in its place). Known gap: AVI's string-returning
+  tools do not set `isError`, so a failed AVI write reads as success under `--dispatch` until AVI is fixed.
+  Pilot's tools are synchronous: set the MCP client's tool timeout above the longest step.
+* A guest command (`run_vm_guest_command`, `_with_output`) that exits non-zero now fails the step (it was recorded
+  as success); one that timed out or whose process vanished (`exit_code` -1) is `interrupted` — it may still be
+  running. A clone left `partially_rolled_back` is still listed by a second rollback; an undo whose effect is
+  unknown marks its step `interrupted`. The rollback preview lists a rollback attached to a read step.
 * `investigate_vm` added to the design catalog (101 tools).
 * Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
   workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.

@@ -144,6 +144,8 @@ apply as usual. Nothing after an approval gate runs before `approve`, and workfl
 stdio only: pilot refuses to start with `--dispatch` and `--transport https`/`http` (the skill servers it starts would
 have no caller identity, so roles could not apply). A step that takes longer than `VMWARE_PILOT_DISPATCH_TIMEOUT`
 seconds (default 1800) is recorded `interrupted` — its effect is unknown — and rollback waits for you to check it.
+`run_workflow` and `approve` take as long as the steps they run: set your MCP client's tool timeout above your
+longest step, and if a call does time out, check `get_workflow_status` — never perform those steps yourself.
 
 <!-- usage: remote-and-exposure -->
 ## Remote access (HTTPS) and limiting tools
