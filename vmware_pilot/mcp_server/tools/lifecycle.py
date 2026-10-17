@@ -403,7 +403,8 @@ def rollback(
     Embedders that pass a dispatcher to WorkflowExecutor get those calls made
     for them. Steps without a rollback_tool are reported 'not_reversible' and
     stay applied; an undo that does not remove what the step created is
-    'partial' (a clone powered off stays). A failed undo does not stop the rest. The workflow state is set to 'failed' afterwards.
+    'partial' (a clone powered off stays). A failed undo does not stop the
+    rest. The workflow state is set to 'failed' afterwards.
 
     Refused with confirm=True: a workflow in draft, completed, rolling_back or
     cancelled state, a step whose status Pilot does not recognise, a workflow
@@ -479,8 +480,11 @@ def cancel_workflow(
 
     Without confirm=True this only previews: it returns blast_radius — the
     workflow's id, type and state, the executed steps that stay applied
-    (left_in_place: cancelling part-way leaves a half-applied change), the
-    steps that would be skipped (would_skip), steps with unknown effects, and
+    (left_in_place: cancelling part-way leaves a half-applied change), steps
+    performed outside Pilot (performed_outside_pilot), steps already handed to
+    you in pending_dispatch that cancel can neither stop nor undo
+    (handed_out_to_caller), the steps that would be skipped (would_skip),
+    steps with unknown effects, and
     blockers — and changes nothing. Show that to the user and get their
     explicit decision. Do not set confirm=True on your own because the user
     asked to cancel earlier — the user has not seen the preview yet.

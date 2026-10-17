@@ -14,8 +14,9 @@ that dispatched steps to the 2.4.0 skill servers.
 * **`approve` refuses a gate whose earlier steps nobody ran.** Through the MCP server (no dispatcher) every step
   before the gate is `not_executed`, and the gate used to pass under "Staging VM … tested". It now refuses and
   lists them in `not_executed_before_gate`; `acknowledge_not_executed=True` records them as `reported_done`
-  (performed outside Pilot) and they are not handed out again; a later step that references one of them is
-  refused (Pilot never saw its result). An embedder with a dispatcher is unaffected unless it resumes a workflow
+  (performed outside Pilot) and they are not handed out again. Pilot never saw their results: through MCP a later
+  step that references one is handed out with the reference unresolved (fill it from that step's result), and
+  an embedder that dispatches it refuses it. An embedder with a dispatcher is unaffected unless it resumes a workflow
   that was first run without one — then the same refusal applies. The acknowledgement is the caller's
   statement, not a check: Pilot records who sent it, not what the steps returned.
   SKILL.md now says plainly who executes steps: through MCP the agent does, and a workflow never reaches
@@ -33,7 +34,10 @@ that dispatched steps to the 2.4.0 skill servers.
 * Two new step statuses, `reported_done` and `partially_rolled_back`. Pilot 2.3.0 does not know them: reading a
   workflow that has them, its `rollback` / `cancel_workflow` refuse ("unrecognised status") rather than guess.
 * The rollback preview gains `not_reversible_outside_pilot` (steps handed to the caller with no undo — a clone,
-  a production resize) with a note; through MCP those used to appear nowhere in the preview.
+  a production resize; read-only checks left out) with a note; through MCP those used to appear nowhere in the
+  preview. The cancel preview gains `handed_out_to_caller`: steps already in `pending_dispatch`, which cancel
+  can neither stop nor undo — they used to be listed as `would_skip`, and cancel now keeps them `not_executed`
+  on the record instead of rewriting them to `skipped`.
 
 ## v2.3.0 — roles for network callers (HLD §18)
 

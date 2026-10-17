@@ -584,9 +584,11 @@ class WorkflowExecutor:
         wf.state = WorkflowState.CANCELLED
         wf.blocked_reason = reason or "cancelled"
         wf.log("cancelled", reason or "no reason given")
-        # Steps not yet executed are dead — mark them so status reflects reality.
+        # Steps never handed out are dead. A not_executed step was handed to the
+        # caller and may have run: keep that on the record (cancel_blast_radius
+        # lists it under handed_out_to_caller).
         for step in wf.steps:
-            if step.status in ("pending", "not_executed"):
+            if step.status == "pending":
                 step.status = "skipped"
         self._store.save(wf)
 
@@ -663,8 +665,8 @@ class WorkflowExecutor:
                     "was performed outside Pilot (acknowledged at an approval gate) — "
                     "Pilot never saw its result, so it cannot fill this reference. Do "
                     f"not run step {idx} again. Perform step {current_index} yourself "
-                    f"with the value from step {idx}'s own result, or cancel_workflow "
-                    "and re-author it."
+                    f"with the value from step {idx}'s own result, or create a new "
+                    "workflow."
                 )
             if source.status != "success":
                 raise ValueError(
@@ -672,9 +674,9 @@ class WorkflowExecutor:
                     f"({source.tool}) which has status '{source.status}', "
                     "not 'success' — its result cannot be used. Run "
                     f"get_workflow_status to see why step {idx} did not "
-                    "succeed, resolve that cause and re-run the workflow; if "
-                    "it cannot succeed, use cancel_workflow and re-author "
-                    "without the reference."
+                    "succeed and resolve that cause; a failed workflow cannot "
+                    "be re-run or cancelled, so create a new workflow (without "
+                    "the reference if the step cannot succeed)."
                 )
 
             if result_key is not None:

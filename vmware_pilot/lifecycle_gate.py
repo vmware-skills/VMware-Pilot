@@ -35,6 +35,7 @@ from typing import Any
 from vmware_pilot.executor import _ROLLBACK_FORBIDDEN_STATES, _TERMINAL_STATES
 from vmware_pilot.models import Workflow, WorkflowStep, WorkflowStore, _redact_for_persistence
 from vmware_pilot.reversibility import NOT_REVERSIBLE_NOTE, OUTSIDE_PILOT_NOTE, leaves_behind
+from vmware_pilot.review import TIER_READ, classify_step
 
 _log = logging.getLogger("vmware-pilot.lifecycle_gate")
 
@@ -174,6 +175,7 @@ def rollback_blast_radius(
     outside = [
         s for s in wf.steps
         if s.status in ("not_executed", "reported_done") and not s.rollback_tool
+        and classify_step(s.skill, s.tool, s.action)[0] != TIER_READ
     ]
     blockers = []
     if wf.state in _ROLLBACK_FORBIDDEN_STATES:
@@ -199,7 +201,11 @@ def cancel_blast_radius(
     wf: Workflow, acknowledge_unknown_effects: bool = False
 ) -> dict[str, Any]:
     """What ``cancel_workflow`` would leave half-applied and what it would skip."""
-    skipped = [s for s in wf.steps if s.status in ("pending", "not_executed")]
+    # Never handed out: cancelling really does stop these.
+    skipped = [s for s in wf.steps if s.status == "pending"]
+    # Handed to the caller in pending_dispatch: they may already have run, and
+    # cancel cannot stop or undo what already ran.
+    handed_out = [s for s in wf.steps if s.status == "not_executed"]
     blockers = []
     if wf.state in _TERMINAL_STATES:
         blockers.append(
@@ -213,6 +219,11 @@ def cancel_blast_radius(
         **_listed([s for s in wf.steps if s.status == "reported_done"],
                   "performed_outside_pilot"),
         **_listed(skipped, "would_skip"),
+        **_listed(handed_out, "handed_out_to_caller"),
+        "handed_out_to_caller_note": (
+            "these steps were handed to the caller (pending_dispatch) and may already have "
+            "been performed; cancel neither stops nor undoes them — check before deciding"
+        ) if handed_out else "",
         "blockers": blockers,
         "unmeasured": _unmeasured(wf, acknowledge_unknown_effects),
     }

@@ -381,3 +381,64 @@ def test_the_refusal_warns_against_re_executing_performed_steps(tmp_path):
     ex.run_until_checkpoint(wf)
     refusal = ex.resume_after_approval(wf, approver="wei")["error"]
     assert "do not" in refusal.lower() and "again" in refusal
+
+
+# ── narrow second review (2026-10-17) ────────────────────────────────────
+
+
+def _mcp_clone_after_approval(tmp_path):
+    store = _store(tmp_path)
+    wf = clone_and_test(target_vm="app", change_spec={"cpu": 4}, snapshot_name="s1")
+    ex = WorkflowExecutor(store)
+    ex.run_until_checkpoint(wf)
+    ex.resume_after_approval(wf, approver="wei", acknowledge_not_executed=True)
+    return ex, wf
+
+
+@pytest.mark.unit
+def test_cancel_preview_does_not_call_handed_out_steps_skipped(tmp_path):
+    """The production resize was handed out in pending_dispatch; the agent may
+    have done it. 'would_skip' said cancel would prevent it."""
+    from vmware_pilot.lifecycle_gate import cancel_blast_radius
+
+    ex, wf = _mcp_clone_after_approval(tmp_path)
+    prod = next(s.index for s in wf.steps if s.action == "apply_to_production")
+    radius = cancel_blast_radius(wf)
+    assert prod in [e["index"] for e in radius["handed_out_to_caller"]]
+    assert prod not in [e["index"] for e in radius["would_skip"]]
+    assert "may already" in radius["handed_out_to_caller_note"]
+
+    ex.cancel(wf, reason="test")
+    assert wf.steps[prod].status == "not_executed", "the record must keep that it was handed out"
+
+
+@pytest.mark.unit
+def test_outside_list_leaves_out_read_only_checks(tmp_path):
+    _, wf = _mcp_clone_after_approval(tmp_path)
+    radius = rollback_blast_radius(wf)
+    tools = [e["tool"] for e in radius["not_reversible_outside_pilot"]]
+    assert "investigate_vm" not in tools
+    assert "deploy_linked_clone" in tools
+
+
+@pytest.mark.unit
+def test_reference_refusal_does_not_point_at_a_refused_cancel(tmp_path):
+    """The workflow is FAILED (terminal) by then; cancel_workflow refuses it."""
+    store = _store(tmp_path)
+    wf = Workflow(
+        id="wf-ref-2", workflow_type="test", state=WorkflowState.PENDING,
+        steps=[
+            WorkflowStep(index=0, action="plan", skill="aiops", tool="create_vm_plan",
+                         params={}),
+            WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve",
+                         params={"message": "go?"}),
+            WorkflowStep(index=2, action="apply", skill="aiops", tool="apply_vm_plan",
+                         params={"plan_id": "__from_step_0__:plan_id"}),
+        ],
+        params={}, created_at="", updated_at="",
+    )
+    WorkflowExecutor(store).run_until_checkpoint(wf)
+    WorkflowExecutor(store, dispatch=_ok).resume_after_approval(
+        wf, approver="wei", acknowledge_not_executed=True)
+    assert wf.state == WorkflowState.FAILED
+    assert "cancel_workflow" not in str(wf.steps[2].result)
