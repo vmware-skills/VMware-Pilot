@@ -324,7 +324,7 @@ When a workflow step fails:
    roll back, and it is best-effort:
    - **MCP server without `--dispatch` (the default):** the steps the agent
      performed are still `not_executed` in pilot's record, so `rollback()`
-     reverses nothing but approval gates and just marks the workflow `failed`.
+     reverses nothing and just marks the workflow `failed`.
      The agent undoes the work itself: for each step it performed, last first,
      call that step's `rollback_tool` with its `rollback_params`, after the user
      agrees.

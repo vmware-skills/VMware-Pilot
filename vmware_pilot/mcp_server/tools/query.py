@@ -85,8 +85,8 @@ def get_workflow_status(workflow_id: str) -> dict:
     """[READ] Get current workflow state, diff report, and audit log.
 
     Use this to poll a workflow after run_workflow and to find out why one
-    stopped: outcome='dispatch_required' means you must perform the pending
-    steps yourself, 'awaiting_approval' means call approve. Returns a
+    stopped: steps with status 'not_executed' are yours to perform (the server
+    runs without --dispatch), state 'awaiting_approval' means call approve. Returns a
     point-in-time snapshot and does not advance the workflow.
 
     Args:

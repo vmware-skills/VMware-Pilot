@@ -308,8 +308,8 @@ class WorkflowExecutor:
         self._store.save(wf)
 
         for step in wf.steps:
-            # "not_executed" steps (recorded by a previous dispatch-less run)
-            # are still pending work and may be retried once dispatch exists.
+            # "not_executed" steps are work for the caller when there is no
+            # dispatcher; with one, _dispatch_refusal has already refused the run.
             if step.status not in ("pending", "not_executed"):
                 continue
 
@@ -680,6 +680,16 @@ class WorkflowExecutor:
 
         result = wf.to_dict()
         result["rollback_results"] = rollback_results
+        broken = [r for r in rollback_results if r["status"] in ("failed", "unknown")]
+        if broken:
+            # The family's failure shape (vmware-policy marks the frame isError on it):
+            # a rollback whose undo failed or may not have happened did not succeed.
+            result["outcome"] = "failed"
+            result["error"] = (
+                f"{len(broken)} undo(s) did not complete: "
+                + "; ".join(f"step {r['step']} {r['tool']} {r['status']}" for r in broken)
+                + ". Check those in the target system; get_workflow_status shows each step."
+            )
         return result
 
     def cancel(self, wf: Workflow, reason: str = "") -> dict[str, Any]:

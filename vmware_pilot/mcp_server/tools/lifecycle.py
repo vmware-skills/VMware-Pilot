@@ -430,7 +430,9 @@ def rollback(
 
     Returns:
         Preview: {"action": "preview", "blast_radius", "hint"}. Acting: the
-        workflow state with "action": "rolled_back", rollback_results for each
+        workflow state with "action": "rolled_back" ("rollback_incomplete", with
+        outcome "failed" and an error naming them, when an undo failed or its effect
+        is unknown), rollback_results for each
         step pilot recorded as succeeded, and blast_radius. Check
         get_workflow_status afterwards to see which steps were actually
         reversed and which were skipped.
@@ -454,9 +456,10 @@ def rollback(
             return refused
 
         result = _get_executor().rollback(wf)
-        if "error" in result:
-            return {**result, "blast_radius": radius}
-        return {**result, "action": "rolled_back", "blast_radius": radius}
+        if "error" in result and "rollback_results" not in result:
+            return {**result, "blast_radius": radius}  # refused before any undo ran
+        action = "rollback_incomplete" if result.get("outcome") == "failed" else "rolled_back"
+        return {**result, "action": action, "blast_radius": radius}
     except Exception as e:
         return {
             "error": _safe_error(e, "rollback"),

@@ -200,6 +200,14 @@ def _payload(result: Any) -> Any:
     if result.isError:
         if isinstance(structured, dict) and structured.get("error"):
             return structured
+        # Family tools are '-> dict' with no structuredContent: the envelope is the
+        # single JSON text block, and flattening it would lose hint and the rest.
+        parsed = [_maybe_json(t) for t in texts]
+        if len(parsed) == 1 and isinstance(parsed[0], dict) and parsed[0].get("error"):
+            return parsed[0]
+        if (len(parsed) == 1 and isinstance(parsed[0], list) and len(parsed[0]) == 1
+                and isinstance(parsed[0][0], dict) and parsed[0][0].get("error")):
+            return parsed[0][0]
         return {"error": " ".join(texts) or "the tool reported isError with no message"}
     if wrapped or structured is not None:
         return structured  # FastMCP's {"result": None} is a real None

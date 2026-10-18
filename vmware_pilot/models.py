@@ -153,6 +153,9 @@ _SENSITIVE_KEYS = frozenset(
         "private_key",
         "credential",
         "credentials",
+        # A Supervisor/TKC kubeconfig carries a bearer token; under --dispatch it
+        # comes back in a step result and must not reach workflows.db in clear.
+        "kubeconfig",
     }
 )
 

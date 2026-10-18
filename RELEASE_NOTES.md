@@ -1,4 +1,24 @@
-## Unreleased (proposed v2.4.0) — first run against real vSphere (2026-10-17)
+## v2.4.0 — runs its own steps on request; honest gates and rollback (first real-vSphere run)
+
+### Behaviour changes for existing callers
+
+* `approve` refuses a gate whose earlier steps were handed out (`not_executed`) until
+  `acknowledge_not_executed=True` — this applies to the default MCP server and to workflows saved by 2.3.0 that are
+  already awaiting approval. An automated `approve` caller must pass the flag after performing the steps.
+* `clone_and_test` requires `snapshot_name` (it used to clone from a snapshot literally named `current`).
+* Rollback reports a step without an undo as `not_reversible` (was `skipped`); approval gates and catalog reads are no
+  longer listed. A rollback whose undo failed or whose effect is unknown returns `action: "rollback_incomplete"` with
+  `outcome: "failed"` and an `error` naming them (it said `rolled_back`).
+* `cancel_workflow` keeps handed-out steps `not_executed` (was rewritten to `skipped`).
+* With vmware-policy 1.24.2, Pilot's own refusals and failed outcomes (`run_workflow`/`approve` ending
+  `outcome: "failed"`, refusals carrying `error`, an incomplete rollback) are `isError` frames; previews,
+  `awaiting_approval` and `dispatch_required` are not.
+
+### Details
+
+* A step result's `kubeconfig` (a bearer token from VKS `issue_*_kubeconfig` under `--dispatch`) is masked in
+  `workflows.db` like a password. With `--dispatch`, a skill's failed call keeps its own error envelope (`hint`
+  included) instead of a flattened JSON string.
 
 Found running Pilot workflows on vCenter 8.0.3 for the first time, through the MCP server and through an embedder
 that dispatched steps to the 2.4.0 skill servers.
@@ -41,8 +61,8 @@ that dispatched steps to the 2.4.0 skill servers.
   `stdio` or unset). A step already handed out in `pending_dispatch` is never run again by a `--dispatch` Pilot.
   Results are stored as the tool's own data, so `__from_step_N__:key` works; a reference to a key the step did
   not return is refused (it used to send the whole result in its place). Failure is read from the frame:
-  skills' failed calls arrive as `isError` once they run vmware-policy with `vmware_policy.frame` (unreleased
-  1.24.1). With an older Policy, 13 of 14 skills sent failures with `isError: false`; Pilot catches the
+  skills' failed calls arrive as `isError` once they run vmware-policy with `vmware_policy.frame` (vmware-policy
+  1.24.2). With an older Policy, 13 of 14 skills sent failures with `isError: false`; Pilot catches the
   `{"error": ...}` envelope itself, but a string-shaped failure (mostly AVI's) reads as success.
   Pilot's tools are synchronous: set the MCP client's tool timeout above the longest step.
 * A guest command (`run_vm_guest_command`, `_with_output`) that exits non-zero now fails the step (it was recorded

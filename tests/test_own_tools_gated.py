@@ -31,7 +31,9 @@ class _SpyExecutor(WorkflowExecutor):
     """Records whether the acting method was reached."""
 
     def __init__(self, store: WorkflowStore) -> None:
-        super().__init__(store)
+        # A dispatcher whose undos succeed: these tests exercise the gate, and since
+        # 2.4.0 an undo that fails (no dispatcher) makes the rollback "incomplete".
+        super().__init__(store, dispatch=lambda skill, tool, params: {"ok": True})
         self.calls: list[str] = []
 
     def rollback(self, wf: Workflow) -> dict[str, Any]:
