@@ -210,12 +210,25 @@ in `~/.vmware/rules.yaml` can match on (for example, to freeze writes on
 vmware-pilot has no targets and needs no such declaration: it registers no
 environment resolver, so its own calls are unlabeled and match no
 environment-scoped rule. That is accurate rather than an exemption — pilot's own
-writes land in `~/.vmware/workflows.db`, and its executor never calls VMware
-APIs. When a workflow reaches an executable step, the MCP server records it as
-`not_executed` and returns `dispatch_required`; the calling agent then performs
-that step through the target skill's own MCP tool, where that skill's own
-policy rules apply. Pilot's approval gate is a step in its own workflow — it
-pauses before the agent dispatches the step, so it is not skipped.
+writes land in `~/.vmware/workflows.db`, and it never calls VMware APIs itself.
+By default, when a workflow reaches an executable step, the MCP server records
+it as `not_executed` and returns `dispatch_required`; the calling agent then
+performs that step through the target skill's own MCP tool, where that skill's
+own policy rules apply. With `vmware-pilot mcp --dispatch` (or
+`VMWARE_PILOT_DISPATCH=stdio`) pilot starts that skill's own MCP server
+(`vmware-<skill>-mcp`) for each step and calls the tool there — the same skill
+policy, confirmation gate and audit apply — and nothing after an approval gate
+runs before `approve`. `--dispatch` is stdio only: pilot refuses to start with
+`--transport https`/`http`, because the skill servers it starts would have no
+caller identity and roles could not apply. Each step has a timeout
+(`VMWARE_PILOT_DISPATCH_TIMEOUT`, default 1800 s); a step that times out is
+recorded `interrupted` — its effect is unknown — and the workflow `failed`; so is a step
+whose skill server died after the call was sent, and a guest command that timed out. Rollback
+then waits for `acknowledge_unknown_effects=True` (a failed workflow cannot be cancelled). Failure is read from the tool's
+frame (`isError`, the error envelope, a guest `exit_code`), never from text: AVI's
+string-returning tools do not set `isError` yet, so a failed AVI write reads as success under
+`--dispatch`. Pilot's tools are synchronous, so a long step makes `run_workflow`/`approve`
+take that long — set your MCP client's tool timeout above your longest step.
 
 ### Audit Database
 

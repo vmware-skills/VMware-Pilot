@@ -72,7 +72,9 @@ mcp = FastMCP(
         "the workflow, and rollback is an explicit, best-effort call. "
         "Use create_workflow_from_template to create and save a workflow from a "
         "template (create_workflow for your own step list), run_workflow to execute, "
-        "approve to continue past gates, rollback to undo."
+        "approve to continue past gates, rollback to undo. Unless the server runs with "
+        "--dispatch, Pilot executes nothing: perform each step it returns in "
+        "pending_dispatch yourself."
     ),
 )
 

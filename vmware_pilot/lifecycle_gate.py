@@ -34,8 +34,12 @@ from typing import Any
 
 from vmware_pilot.executor import _ROLLBACK_FORBIDDEN_STATES, _TERMINAL_STATES
 from vmware_pilot.models import Workflow, WorkflowStep, WorkflowStore, _redact_for_persistence
-from vmware_pilot.reversibility import NOT_REVERSIBLE_NOTE, OUTSIDE_PILOT_NOTE, leaves_behind
-from vmware_pilot.review import _catalog_risk
+from vmware_pilot.reversibility import (
+    NOT_REVERSIBLE_NOTE,
+    OUTSIDE_PILOT_NOTE,
+    is_read_only,
+    leaves_behind,
+)
 
 _log = logging.getLogger("vmware-pilot.lifecycle_gate")
 
@@ -135,18 +139,34 @@ def _unmeasured(wf: Workflow, acknowledge_unknown_effects: bool) -> list[str]:
     ]
     if acknowledge_unknown_effects:
         return unrecognised
+    undo_unknown = {
+        r.get("step") for r in (wf.rollback_results or []) if r.get("status") == "unknown"
+    }
     unknown = [
-        f"step {s.index} ({s.skill}.{s.tool}) is '{s.status}': a Pilot process stopped "
-        f"while dispatching it, so whether {s.tool} took effect is unknown — check in the "
-        "target system whether it did (and whether anything must be reversed by hand), "
-        "then re-run with acknowledge_unknown_effects=True"
+        f"step {s.index} ({s.skill}.{s.tool}) is '{s.status}': whether "
+        f"{(s.rollback_tool + ' (its rollback)') if s.index in undo_unknown else s.tool} took "
+        "effect is unknown (a Pilot process stopped, the call timed out, or the skill's "
+        "server went away mid-call) — check in the target system whether it did (and "
+        "whether anything must be reversed by hand), then re-run with "
+        "acknowledge_unknown_effects=True"
         for s in _unknown_effect_steps(wf)
     ]
     return [*unrecognised, *unknown]
 
 
+def _changed(wf: Workflow) -> list[WorkflowStep]:
+    """Steps that ran and may have changed something: gates and catalog reads did not."""
+    return [s for s in wf.steps if s.status == "success" and not _is_gate(s)
+            and not is_read_only(s)]
+
+
 def _executed(wf: Workflow) -> list[WorkflowStep]:
-    return [s for s in wf.steps if s.status == "success" and not _is_gate(s)]
+    """Steps that ran and may have changed something (gates and catalog reads did not)."""
+    # A read with a rollback_tool stays: that rollback will run, so the preview shows it.
+    return [
+        s for s in wf.steps if s.status == "success" and not _is_gate(s)
+        and not (is_read_only(s) and not s.rollback_tool)
+    ]
 
 
 def _common(wf: Workflow, state_after: str, acknowledged: bool) -> dict[str, Any]:
@@ -177,7 +197,7 @@ def rollback_blast_radius(
         if s.status in ("not_executed", "reported_done") and not s.rollback_tool
         # Only the catalog may call a step read-only here; the name heuristic
         # reads "retarget_vm" as a read because it contains "get".
-        and _catalog_risk(s.skill, s.tool) != "low"
+        and not is_read_only(s)
     ]
     blockers = []
     if wf.state in _ROLLBACK_FORBIDDEN_STATES:
@@ -193,6 +213,10 @@ def rollback_blast_radius(
         "left_in_place_note": NOT_REVERSIBLE_NOTE if left else "",
         **_listed(agent_side, "not_reversed_by_pilot", _rollback_ref),
         **_listed(outside, "not_reversible_outside_pilot"),
+        # A previous rollback ran these and they still left something behind.
+        **_listed([s for s in wf.steps if s.status == "partially_rolled_back"],
+                  "left_behind_by_earlier_rollback",
+                  lambda s: {**_ref(s), "leaves_behind": leaves_behind(s)}),
         "not_reversible_outside_pilot_note": OUTSIDE_PILOT_NOTE if outside else "",
         "blockers": blockers,
         "unmeasured": _unmeasured(wf, acknowledge_unknown_effects),
@@ -216,7 +240,7 @@ def cancel_blast_radius(
         )
     return {
         **_common(wf, "cancelled", acknowledge_unknown_effects),
-        **_listed(_executed(wf), "left_in_place"),
+        **_listed(_changed(wf), "left_in_place"),
         # Performed by the caller, acknowledged at a gate: also stays applied.
         **_listed([s for s in wf.steps if s.status == "reported_done"],
                   "performed_outside_pilot"),
