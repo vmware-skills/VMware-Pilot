@@ -86,7 +86,7 @@ def _calls(log: Path) -> list[str]:
         return []
     import json
 
-    return [json.loads(line)["tool"] for line in log.read_text().splitlines()]
+    return [json.loads(line)["tool"] for line in log.read_text(encoding="utf-8").splitlines()]
 
 
 def _wf(wid: str, steps: list[WorkflowStep]) -> Workflow:
@@ -270,7 +270,7 @@ def test_a_step_reference_reads_the_tools_own_result(tmp_path, fake_bin):
     ])
     out = WorkflowExecutor(store, dispatch=StdioDispatcher()).run_until_checkpoint(wf)
     assert out["outcome"] == "completed", out
-    args = [json.loads(line)["args"] for line in fake_bin.read_text().splitlines()]
+    args = [json.loads(line)["args"] for line in fake_bin.read_text(encoding="utf-8").splitlines()]
     assert args[1] == {"plan_id": "plan-42"}
     assert wf.steps[0].result == {"plan_id": "plan-42", "items": []}
     assert wf.steps[1].result == "events for plan-42"
