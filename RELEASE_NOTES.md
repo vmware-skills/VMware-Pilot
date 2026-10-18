@@ -40,8 +40,10 @@ that dispatched steps to the 2.4.0 skill servers.
   step's skill is resolved before step 0 runs; settings are checked at start (`VMWARE_PILOT_DISPATCH` must be
   `stdio` or unset). A step already handed out in `pending_dispatch` is never run again by a `--dispatch` Pilot.
   Results are stored as the tool's own data, so `__from_step_N__:key` works; a reference to a key the step did
-  not return is refused (it used to send the whole result in its place). Known gap: AVI's string-returning
-  tools do not set `isError`, so a failed AVI write reads as success under `--dispatch` until AVI is fixed.
+  not return is refused (it used to send the whole result in its place). Failure is read from the frame:
+  skills' failed calls arrive as `isError` once they run vmware-policy with `vmware_policy.frame` (unreleased
+  1.24.1). With an older Policy, 13 of 14 skills sent failures with `isError: false`; Pilot catches the
+  `{"error": ...}` envelope itself, but a string-shaped failure (mostly AVI's) reads as success.
   Pilot's tools are synchronous: set the MCP client's tool timeout above the longest step.
 * A guest command (`run_vm_guest_command`, `_with_output`) that exits non-zero now fails the step (it was recorded
   as success); one that timed out or whose process vanished (`exit_code` -1) is `interrupted` — it may still be

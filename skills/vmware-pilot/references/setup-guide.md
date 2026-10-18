@@ -225,9 +225,11 @@ caller identity and roles could not apply. Each step has a timeout
 recorded `interrupted` — its effect is unknown — and the workflow `failed`; so is a step
 whose skill server died after the call was sent, and a guest command that timed out. Rollback
 then waits for `acknowledge_unknown_effects=True` (a failed workflow cannot be cancelled). Failure is read from the tool's
-frame (`isError`, the error envelope, a guest `exit_code`), never from text: AVI's
-string-returning tools do not set `isError` yet, so a failed AVI write reads as success under
-`--dispatch`. Pilot's tools are synchronous, so a long step makes `run_workflow`/`approve`
+frame (`isError`, the error envelope, a guest `exit_code`), never from text. A skill's failed
+calls arrive as `isError` once it runs a vmware-policy with `vmware_policy.frame` (unreleased
+1.24.1). With an older Policy most skills sent failures with `isError: false`; Pilot still
+catches an `{"error": ...}` envelope, but a string-shaped failure (mostly AVI's) reads as
+success under `--dispatch`. Pilot's tools are synchronous, so a long step makes `run_workflow`/`approve`
 take that long — set your MCP client's tool timeout above your longest step.
 
 ### Audit Database
