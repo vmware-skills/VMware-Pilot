@@ -22,8 +22,8 @@ import asyncio
 import concurrent.futures
 import json
 import os
+import math
 import re
-import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -94,10 +94,14 @@ def resolve_command(skill: Any) -> str:
     beside = _interpreter_bin() / name
     if beside.is_file() and os.access(beside, os.X_OK):
         return str(beside)
-    found = shutil.which(name)
-    # A relative PATH entry (".") would resolve against the MCP client's cwd.
-    if found and os.path.isabs(found):
-        return found
+    # Walk PATH ourselves: a relative entry (".") would resolve against the MCP
+    # client's cwd, and shutil.which would stop at it before a real install.
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if not entry or not os.path.isabs(entry):
+            continue
+        candidate = Path(entry) / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
     raise DispatchRefusedError(
         f"{name} is not installed where Pilot can find it (next to {sys.executable} or on "
         f"PATH), so this step was not run. Install the skill (uv tool install vmware-{bare}) "
@@ -115,7 +119,7 @@ def _timeout_from_env() -> float:
         raise DispatchRefusedError(
             f"{ENV_TIMEOUT}={raw!r} is not a number of seconds."
         ) from None
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         raise DispatchRefusedError(f"{ENV_TIMEOUT} must be positive, got {raw!r}.")
     return value
 
@@ -190,14 +194,15 @@ def _payload(result: Any) -> Any:
     """
     texts = [t for t in (getattr(c, "text", None) for c in result.content or []) if t]
     structured = result.structuredContent
-    if isinstance(structured, dict) and set(structured) == {"result"}:
+    wrapped = isinstance(structured, dict) and set(structured) == {"result"}
+    if wrapped:
         structured = structured["result"]
     if result.isError:
         if isinstance(structured, dict) and structured.get("error"):
             return structured
         return {"error": " ".join(texts) or "the tool reported isError with no message"}
-    if structured is not None:
-        return structured
+    if wrapped or structured is not None:
+        return structured  # FastMCP's {"result": None} is a real None
     parsed = [_maybe_json(t) for t in texts]
     return parsed[0] if len(parsed) == 1 else parsed
 

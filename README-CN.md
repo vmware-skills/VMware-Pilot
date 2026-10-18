@@ -112,7 +112,7 @@ CLI 命令也不变。技能目录同时跟随 vmware-vks 的改名（`get_super
 身份，角色无法生效）。超过 `VMWARE_PILOT_DISPATCH_TIMEOUT` 秒（默认 1800）的步骤记为 `interrupted`——效果未知——
 回滚会等你确认后再进行。
 `run_workflow` 和 `approve` 的耗时等于它们执行的步骤：请把 MCP 客户端的工具超时设得比最长的步骤更长；万一调用超时，
-用 `get_workflow_status` 查看状态——不要自己去执行这些步骤。
+Pilot 会继续执行，并在该步骤结束前不响应其他调用；之后用 `get_workflow_status` 查看结果——不要自己去执行这些步骤。
 
 ## 审计与安全
 

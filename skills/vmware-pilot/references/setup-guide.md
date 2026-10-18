@@ -224,7 +224,7 @@ caller identity and roles could not apply. Each step has a timeout
 (`VMWARE_PILOT_DISPATCH_TIMEOUT`, default 1800 s); a step that times out is
 recorded `interrupted` — its effect is unknown — and the workflow `failed`; so is a step
 whose skill server died after the call was sent, and a guest command that timed out. Rollback
-and cancel then wait for `acknowledge_unknown_effects=True`. Failure is read from the tool's
+then waits for `acknowledge_unknown_effects=True` (a failed workflow cannot be cancelled). Failure is read from the tool's
 frame (`isError`, the error envelope, a guest `exit_code`), never from text: AVI's
 string-returning tools do not set `isError` yet, so a failed AVI write reads as success under
 `--dispatch`. Pilot's tools are synchronous, so a long step makes `run_workflow`/`approve`

@@ -139,14 +139,25 @@ def _unmeasured(wf: Workflow, acknowledge_unknown_effects: bool) -> list[str]:
     ]
     if acknowledge_unknown_effects:
         return unrecognised
+    undo_unknown = {
+        r.get("step") for r in (wf.rollback_results or []) if r.get("status") == "unknown"
+    }
     unknown = [
-        f"step {s.index} ({s.skill}.{s.tool}) is '{s.status}': a Pilot process stopped "
-        f"while dispatching it, so whether {s.tool} took effect is unknown — check in the "
-        "target system whether it did (and whether anything must be reversed by hand), "
-        "then re-run with acknowledge_unknown_effects=True"
+        f"step {s.index} ({s.skill}.{s.tool}) is '{s.status}': whether "
+        f"{(s.rollback_tool + ' (its rollback)') if s.index in undo_unknown else s.tool} took "
+        "effect is unknown (a Pilot process stopped, the call timed out, or the skill's "
+        "server went away mid-call) — check in the target system whether it did (and "
+        "whether anything must be reversed by hand), then re-run with "
+        "acknowledge_unknown_effects=True"
         for s in _unknown_effect_steps(wf)
     ]
     return [*unrecognised, *unknown]
+
+
+def _changed(wf: Workflow) -> list[WorkflowStep]:
+    """Steps that ran and may have changed something: gates and catalog reads did not."""
+    return [s for s in wf.steps if s.status == "success" and not _is_gate(s)
+            and not is_read_only(s)]
 
 
 def _executed(wf: Workflow) -> list[WorkflowStep]:
@@ -229,7 +240,7 @@ def cancel_blast_radius(
         )
     return {
         **_common(wf, "cancelled", acknowledge_unknown_effects),
-        **_listed(_executed(wf), "left_in_place"),
+        **_listed(_changed(wf), "left_in_place"),
         # Performed by the caller, acknowledged at a gate: also stays applied.
         **_listed([s for s in wf.steps if s.status == "reported_done"],
                   "performed_outside_pilot"),

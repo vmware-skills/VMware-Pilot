@@ -308,3 +308,145 @@ def test_a_relative_path_entry_is_not_used(tmp_path, monkeypatch):
     monkeypatch.setattr(dispatcher_mod, "_interpreter_bin", lambda: tmp_path / "nowhere")
     with pytest.raises(DispatchRefusedError):
         dispatcher_mod.resolve_command("monitor")
+
+
+# ── narrow second review of c7acaea ──────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_a_refused_approve_changes_nothing_in_memory(tmp_path, monkeypatch):
+    """M-A: preflight refused, but the cached workflow already said 'approved by bob'."""
+    _bin(tmp_path, monkeypatch, "vmware-monitor-mcp", "#!/bin/sh\n")
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-ma", [
+        WorkflowStep(index=0, action="look", skill="monitor", tool="get_alarms", params={}),
+        WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve",
+                     params={"message": "go?"}),
+        WorkflowStep(index=2, action="clone", skill="aiops", tool="deploy_linked_clone",
+                     params={}),
+    ])
+    wf.steps[0].status = "success"
+    wf.state = WorkflowState.AWAITING_APPROVAL
+    store.save(wf)
+
+    class Spy(StdioDispatcher):
+        def __call__(self, skill, tool, params):
+            return {"ok": True}
+
+    out = WorkflowExecutor(store, dispatch=Spy()).resume_after_approval(wf, approver="bob")
+    assert "vmware-aiops-mcp" in out["error"]
+    assert wf.approved_by == ""
+    assert wf.steps[1].status == "pending" and wf.steps[1].result is None
+    assert not any(e["action"] == "approved" for e in wf.audit_log)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("source", ["Plan p-1 created", [{"plan_id": "p"}], None])
+def test_a_key_reference_to_a_non_dict_result_is_refused(tmp_path, source):
+    """M-B: a string or list result used to be sent whole as plan_id."""
+    store = WorkflowStore(tmp_path / "wf.db")
+    seen: list[dict[str, Any]] = []
+    wf = _wf("wf-mb", [
+        WorkflowStep(index=0, action="plan", skill="aiops", tool="create_vm_plan", params={}),
+        WorkflowStep(index=1, action="apply", skill="aiops", tool="apply_vm_plan",
+                     params={"plan_id": "__from_step_0__:plan_id"}),
+    ])
+
+    def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
+        seen.append(params)
+        return source
+
+    out = WorkflowExecutor(store, dispatch=dispatch).run_until_checkpoint(wf)
+    assert out["outcome"] == "failed" and len(seen) == 1
+    assert "not a dict" in str(wf.steps[1].result)
+
+
+@pytest.mark.unit
+def test_cancel_preview_leaves_out_reads_even_with_a_rollback_tool(tmp_path):
+    """L-1: cancel runs no rollback; a read changed nothing."""
+    from vmware_pilot.lifecycle_gate import cancel_blast_radius
+
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-l1", [
+        WorkflowStep(index=0, action="look", skill="monitor", tool="get_alarms", params={},
+                     rollback_tool="power_off_vm", rollback_params={}),
+        WorkflowStep(index=1, action="require_approval", skill="pilot", tool="approve",
+                     params={"message": "go?"}),
+    ])
+    WorkflowExecutor(store, dispatch=_ok).run_until_checkpoint(wf)
+    assert cancel_blast_radius(wf)["left_in_place"] == []
+
+
+@pytest.mark.unit
+def test_the_handed_out_refusal_gives_advice_that_can_be_followed(tmp_path):
+    """L-2: 'approve with acknowledge…' is unreachable from run_workflow."""
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-l2", [WorkflowStep(index=0, action="a", skill="aiops", tool="power_on_vm",
+                                    params={})])
+    WorkflowExecutor(store).run_until_checkpoint(wf)
+    error = WorkflowExecutor(store, dispatch=_ok).run_until_checkpoint(wf)["error"]
+    assert "acknowledge_not_executed" not in error and "cancel_workflow" in error
+
+
+@pytest.mark.unit
+def test_a_relative_path_entry_does_not_hide_a_real_install(tmp_path, monkeypatch):
+    """L-3: PATH='rel:/abs' with the binary in both used to be refused."""
+    for d in ("rel", "abs"):
+        (tmp_path / d).mkdir()
+        f = tmp_path / d / "vmware-monitor-mcp"
+        f.write_text("#!/bin/sh\n", encoding="utf-8")
+        f.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PATH", "rel" + ":" + str(tmp_path / "abs"))
+    monkeypatch.setattr(dispatcher_mod, "_interpreter_bin", lambda: tmp_path / "nowhere")
+    assert dispatcher_mod.resolve_command("monitor") == str(tmp_path / "abs" / "vmware-monitor-mcp")
+
+
+@pytest.mark.unit
+def test_an_unknown_undo_sets_blocked_reason_and_says_which_call(tmp_path):
+    """L-6."""
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-l6", [
+        WorkflowStep(index=0, action="on", skill="aiops", tool="power_on_vm", params={},
+                     rollback_tool="power_off_vm", rollback_params={"confirm": True}),
+        WorkflowStep(index=1, action="fail", skill="aiops", tool="failing_tool", params={}),
+    ])
+
+    def dispatch(skill: str, tool: str, params: dict[str, Any]) -> Any:
+        if tool == "power_off_vm":
+            raise StepEffectUnknownError("timed out")
+        return {"error": "x"} if tool == "failing_tool" else {"ok": True}
+
+    ex = WorkflowExecutor(store, dispatch=dispatch)
+    ex.run_until_checkpoint(wf)
+    ex.rollback(wf)
+    assert wf.blocked_reason == "rollback_failed"
+    (reason,) = rollback_blast_radius(wf)["unmeasured"]
+    assert "power_off_vm" in reason
+
+
+@pytest.mark.unit
+def test_an_unknown_guest_command_keeps_its_payload(tmp_path):
+    """L-7: pid and stderr are what the operator needs to check the guest."""
+    store = WorkflowStore(tmp_path / "wf.db")
+    wf = _wf("wf-l7", [WorkflowStep(index=0, action="run", skill="aiops",
+                                    tool="run_vm_guest_command", params={"confirm": True})])
+    payload = {"exit_code": -1, "timed_out": True, "pid": 4242, "stderr": "partial"}
+    WorkflowExecutor(store, dispatch=lambda s, t, p: payload).run_until_checkpoint(wf)
+    assert wf.steps[0].status == "interrupted"
+    assert wf.steps[0].result["pid"] == 4242 and "UNKNOWN" in wf.steps[0].result["error"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+def test_a_non_finite_timeout_is_refused(monkeypatch, value):
+    """L-8."""
+    monkeypatch.setenv("VMWARE_PILOT_DISPATCH_TIMEOUT", value)
+    with pytest.raises(DispatchRefusedError):
+        dispatcher_mod._timeout_from_env()
+
+
+@pytest.mark.unit
+def test_payload_keeps_none():
+    """L-9: a tool that returns None must not become []."""
+    assert dispatcher_mod._payload(_Frame([], {"result": None})) is None

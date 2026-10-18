@@ -143,8 +143,9 @@ def run_workflow(workflow_id: str, force: bool = False) -> dict:
       - with --dispatch (or VMWARE_PILOT_DISPATCH=stdio): Pilot runs each
         step itself in that skill's own MCP server, stops at each approval
         gate, and the workflow can reach 'completed'. This call takes as long
-        as the steps it runs. If it times out in your client, Pilot carries on:
-        call get_workflow_status and NEVER perform the steps yourself.
+        as the steps it runs. If it times out in your client, Pilot carries on
+        (and answers nothing else until the step ends); afterwards
+        get_workflow_status shows the outcome. NEVER perform the steps yourself.
       - without it (the default): Pilot runs nothing. Steps are recorded as
         'not_executed' and the run ends with outcome='dispatch_required'
         (NOT 'completed'), listing each step in 'pending_dispatch'. YOU (the
@@ -313,8 +314,9 @@ def approve(
             performed outside Pilot and their results were checked.
 
     Note: with --dispatch, approving runs the next steps (this call takes as
-    long as they do; if it times out in your client, check
-    get_workflow_status and never perform those steps yourself). Without it,
+    long as they do; if it times out in your client, Pilot carries on —
+    check get_workflow_status once it answers again, and never perform those
+    steps yourself). Without it,
     the remaining steps are recorded as 'not_executed' and the result
     carries outcome='dispatch_required' with a 'pending_dispatch' list for
     you to perform (see run_workflow); the workflow then never reaches

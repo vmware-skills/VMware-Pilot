@@ -50,9 +50,13 @@ DispatchFn = Callable[[str, str, dict[str, Any]], Any]
 class StepEffectUnknownError(Exception):
     """A dispatch that ended without telling whether the tool took effect (a timeout).
 
-    Recorded ``interrupted``, not ``failed``: rollback and cancel then refuse
-    until a human has checked the target system (``acknowledge_unknown_effects``).
+    Recorded ``interrupted``, not ``failed``: rollback then refuses until a human
+    has checked the target system (``acknowledge_unknown_effects``).
     """
+
+    def __init__(self, message: str, payload: Any = None) -> None:
+        super().__init__(message)
+        self.payload = payload
 
 
 class _StepReturnedFailure(Exception):
@@ -357,7 +361,7 @@ class WorkflowExecutor:
                 result = self._dispatch(step.skill, step.tool, resolved_params)
                 unknown = _guest_unknown(result, step.skill, step.tool)
                 if unknown is not None:
-                    raise StepEffectUnknownError(unknown)
+                    raise StepEffectUnknownError(unknown, result)
                 returned_failure = _returned_failure(result, step.skill, step.tool)
                 if returned_failure is not None:
                     raise _StepReturnedFailure(returned_failure, result)
@@ -367,7 +371,9 @@ class WorkflowExecutor:
                 wf.log("step_completed", f"Step {step.index}: {step.tool} → success")
             except StepEffectUnknownError as unknown:
                 step.status = "interrupted"
-                step.result = {"error": str(unknown)}
+                # Keep what the tool did return (a guest command's pid, stderr).
+                kept = unknown.payload if isinstance(unknown.payload, dict) else {}
+                step.result = {**kept, "error": str(unknown)}
                 step.completed_at = _now()
                 wf.state = WorkflowState.FAILED
                 wf.log("step_effect_unknown", f"Step {step.index}: {step.tool} → {unknown}")
@@ -422,7 +428,12 @@ class WorkflowExecutor:
         self._store.save(wf)
         return self._finish(wf, "completed")
 
-    def _dispatch_refusal(self, wf: Workflow) -> dict[str, Any] | None:
+    def _dispatch_refusal(
+        self,
+        wf: Workflow,
+        acknowledged: list[WorkflowStep] | tuple[WorkflowStep, ...] = (),
+        gate: WorkflowStep | None = None,
+    ) -> dict[str, Any] | None:
         """Why a dispatcher must not start this run, or None.
 
         Steps handed to a caller earlier (``not_executed``) may already have been
@@ -431,17 +442,17 @@ class WorkflowExecutor:
         them again would clone twice. And a step whose skill cannot be started
         should stop the run before step 0 changes anything, not halfway.
         """
-        handed = [s for s in wf.steps if s.status == "not_executed"]
+        skip = {id(s) for s in acknowledged}
+        handed = [s for s in wf.steps if s.status == "not_executed" and id(s) not in skip]
         if handed:
             listed = ", ".join(f"step {s.index} ({s.skill}.{s.tool})" for s in handed)
             return {
                 "error": (
                     f"Refusing to run workflow '{wf.id}': {listed} were handed out earlier "
                     "(pending_dispatch) by a Pilot running without --dispatch and may "
-                    "already have been performed; Pilot will not run them again. If they "
-                    "come before an approval gate and were performed, approve with "
-                    "acknowledge_not_executed=True. Otherwise cancel_workflow this one and "
-                    "create a new workflow."
+                    "already have been performed; Pilot will not run them again. "
+                    "cancel_workflow this one (its preview lists them), check in the target "
+                    "system which of them ran, and create a new workflow for what is left."
                 ),
                 "workflow_id": wf.id,
                 "state": wf.state.value,
@@ -452,7 +463,7 @@ class WorkflowExecutor:
         if preflight is None:
             return None
         try:
-            preflight([s for s in wf.steps if s.status == "pending"
+            preflight([s for s in wf.steps if s.status == "pending" and s is not gate
                        and s.action != "require_approval"])
         except ValueError as exc:
             return {"error": str(exc), "workflow_id": wf.id, "state": wf.state.value}
@@ -515,6 +526,12 @@ class WorkflowExecutor:
         ]
         if unrun and not acknowledge_not_executed:
             return _unrun_refusal(wf, unrun)
+        if self._has_dispatch:
+            # Refuse before anything changes: a refusal after approved_by and the
+            # gate were set left the cached workflow saying it was approved.
+            refused = self._dispatch_refusal(wf, acknowledged=unrun, gate=gate)
+            if refused is not None:
+                return refused
 
         wf.approved_by = approver
         wf.log("approved", f"Approved by {approver}")
@@ -656,7 +673,7 @@ class WorkflowExecutor:
             self._store.save(wf)
 
         wf.state = WorkflowState.FAILED
-        if any(r["status"] == "failed" for r in rollback_results):
+        if any(r["status"] in ("failed", "unknown") for r in rollback_results):
             wf.blocked_reason = "rollback_failed"
         wf.log("rollback_completed")
         self._store.save(wf)
@@ -802,7 +819,13 @@ class WorkflowExecutor:
                             "with a key the tool returns and create a new workflow."
                         )
                     return source.result[result_key]
-                return source.result
+                raise ValueError(
+                    f"Step reference '{v}': step {idx} ({source.tool}) returned "
+                    f"{type(source.result).__name__}, not a dict, so it has no "
+                    f"'{result_key}'. Pilot will not send the whole result in its place. "
+                    f"Use '__from_step_{idx}__' (no key) if the whole result is meant, and "
+                    "create a new workflow."
+                )
             return source.result
 
         def _resolve_value(v: Any) -> Any:
