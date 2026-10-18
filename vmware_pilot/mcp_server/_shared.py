@@ -17,7 +17,7 @@ from mcp.server.fastmcp import FastMCP
 from vmware_policy import sanitize
 
 from vmware_pilot import __version__
-from vmware_pilot.executor import WorkflowExecutor
+from vmware_pilot.executor import StepEffectUnknownError, WorkflowExecutor
 from vmware_pilot.models import WorkflowStore
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,12 @@ logger = logging.getLogger(__name__)
 #: ``executor._noop_dispatch`` does raise one with an authored message; it is
 #: documented as never invoked, and it wants a domain exception of its own
 #: rather than a hole here.
-_TEACHING_ERRORS = (ValueError,)
+#:
+#: ``StepEffectUnknownError`` (and the dispatcher's timeout / lost-connection
+#: subclasses) is authored too: "whether the call took effect is UNKNOWN — check
+#: the target system". The executor normally records it on the step; if one ever
+#: escaped, reducing it to a class name would hide the one instruction that matters.
+_TEACHING_ERRORS = (ValueError, StepEffectUnknownError)
 
 
 def _safe_error(exc: Exception, tool: str) -> str:

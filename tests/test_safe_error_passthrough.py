@@ -152,3 +152,15 @@ def test_tools_actually_use_the_helper(store, monkeypatch):
     out = run_workflow(wf.id)
     assert out["error"] == "RuntimeError: operation failed."
     assert "hunter2" not in out["error"]
+
+
+@pytest.mark.unit
+def test_an_unknown_effect_message_reaches_the_agent():
+    """It carries the one instruction that matters: check the target system."""
+    from vmware_pilot.dispatcher import DispatchConnectionLostError, DispatchTimeoutError
+    from vmware_pilot.executor import StepEffectUnknownError
+    from vmware_pilot.mcp_server._shared import _safe_error
+
+    for cls in (StepEffectUnknownError, DispatchTimeoutError, DispatchConnectionLostError):
+        text = _safe_error(cls("effect is UNKNOWN — check the target system"), "run_workflow")
+        assert "check the target system" in text, cls
