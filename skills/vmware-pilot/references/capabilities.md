@@ -61,7 +61,7 @@ numbers matter here, and they are not the same thing:
 | vmware-nsx-security | `vmware-nsx-security` | 22 | 7 | DFW policies/rules, security groups, traceflow |
 | vmware-aria | `vmware-aria` | 46 | 7 | Aria Ops metrics, alerts, capacity, anomalies |
 | vmware-vks | `vmware-vks` | 24 | 8 | Tanzu Supervisor, Namespaces, TKC clusters |
-| vmware-storage | `vmware-storage` | 15 | 5 | Datastores, iSCSI, vSAN, FC multipath |
+| vmware-storage | `vmware-storage` | 16 | 5 | Datastores, per-VM usage, iSCSI, vSAN, FC multipath |
 | vmware-avi | `vmware-avi` | 28 | 13 | AVI load balancing, pool members, AKO K8s ops |
 | vmware-debug | `vmware-debug` | 14 | 5 | Incident correlation, evidence-graded cases |
 | vmware-harden | `vmware-harden` | 8 | 5 | Compliance baselines, violations, drift |
@@ -69,7 +69,7 @@ numbers matter here, and they are not the same thing:
 | vmware-privateai | `vmware-privateai` | 18 | 5 | GPU hosts, vGPU profiles, utilisation |
 | vmware-vdi | `vmware-vdi` | 27 | 9 | Horizon pools, sessions, machines, images |
 
-**Totals**: 336 tools across the 13 companion skills; the design catalog covers 101 of them
+**Totals**: 337 tools across the 13 companion skills; the design catalog covers 101 of them
 across all 13. Pilot adds 13 orchestration tools of its own. The counts are checked against
 the companion snapshot by `tests/eval/regression/test_catalog_covers_the_family.py`.
 
