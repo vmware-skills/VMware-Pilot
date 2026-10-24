@@ -2727,6 +2727,16 @@
    ],
    "required": []
   },
+  "get_datastore_vm_usage": {
+   "properties": [
+    "datastore_name",
+    "target",
+    "top_n"
+   ],
+   "required": [
+    "datastore_name"
+   ]
+  },
   "get_iscsi_status": {
    "properties": [
     "host_name",
