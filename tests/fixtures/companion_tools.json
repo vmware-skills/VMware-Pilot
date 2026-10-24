@@ -728,7 +728,6 @@
    "properties": [
     "alert_id",
     "confirm",
-    "confirmed",
     "target"
    ],
    "required": [
@@ -750,7 +749,6 @@
    "properties": [
     "alert_id",
     "confirm",
-    "confirmed",
     "target"
    ],
    "required": [
@@ -777,7 +775,6 @@
   "delete_alert_definition": {
    "properties": [
     "confirm",
-    "confirmed",
     "definition_id",
     "target"
    ],
@@ -788,7 +785,6 @@
   "delete_report": {
    "properties": [
     "confirm",
-    "confirmed",
     "report_id",
     "target"
    ],
@@ -799,7 +795,6 @@
   "end_resource_maintenance": {
    "properties": [
     "confirm",
-    "confirmed",
     "resource_id",
     "target"
    ],
@@ -1168,7 +1163,6 @@
   "start_resource_maintenance": {
    "properties": [
     "confirm",
-    "confirmed",
     "duration_minutes",
     "end_time_ms",
     "resource_id",
@@ -1220,7 +1214,6 @@
   "disable_lb_pool_member": {
    "properties": [
     "confirm",
-    "confirmed",
     "pool",
     "server"
    ],
@@ -1242,7 +1235,6 @@
   "force_ako_sync": {
    "properties": [
     "confirm",
-    "confirmed",
     "context"
    ],
    "required": []
@@ -1351,7 +1343,6 @@
   "restart_ako": {
    "properties": [
     "confirm",
-    "confirmed",
     "context"
    ],
    "required": []
@@ -1359,7 +1350,6 @@
   "set_virtual_service_enabled": {
    "properties": [
     "confirm",
-    "confirmed",
     "enable",
     "name"
    ],
@@ -1371,9 +1361,7 @@
   "upgrade_ako_config": {
    "properties": [
     "chart_version",
-    "confirm",
-    "confirmed",
-    "dry_run"
+    "confirm"
    ],
    "required": []
   }
@@ -2702,7 +2690,6 @@
    "properties": [
     "address",
     "confirm",
-    "dry_run",
     "host_name",
     "port",
     "target"
@@ -2726,7 +2713,6 @@
   "enable_iscsi": {
    "properties": [
     "confirm",
-    "dry_run",
     "host_name",
     "target"
    ],
@@ -2820,7 +2806,6 @@
    "properties": [
     "address",
     "confirm",
-    "dry_run",
     "host_name",
     "port",
     "target"
@@ -2833,7 +2818,6 @@
   "rescan_storage": {
    "properties": [
     "confirm",
-    "dry_run",
     "host_name",
     "target"
    ],
@@ -3127,7 +3111,6 @@
     "confirm",
     "cpu_limit",
     "description",
-    "dry_run",
     "memory_limit_mib",
     "name",
     "storage_policy",
@@ -3143,7 +3126,6 @@
    "properties": [
     "confirm",
     "control_plane_count",
-    "dry_run",
     "k8s_version",
     "name",
     "namespace",
@@ -3162,8 +3144,6 @@
   "delete_namespace": {
    "properties": [
     "confirm",
-    "confirmed",
-    "dry_run",
     "name",
     "target"
    ],
@@ -3174,8 +3154,6 @@
   "delete_tkc_cluster": {
    "properties": [
     "confirm",
-    "confirmed",
-    "dry_run",
     "force",
     "name",
     "namespace",

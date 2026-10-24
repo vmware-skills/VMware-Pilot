@@ -7,8 +7,10 @@ step that calls such a tool comes after a ``require_approval`` step — Pilot's
 own ``approve`` gate, which is the human decision — so the step itself says
 ``confirm=True``. ``tests/test_templates_pass_confirm.py`` fails any template
 that sends ``confirm=True`` before its first approval step. The old spellings
-``confirmed`` / ``dry_run`` are deprecated aliases on those tools for one minor
-cycle and are not sent.
+``confirmed`` / ``dry_run`` were removed from those tools (Aria, AVI and Storage
+2.5.0, VKS 3.5.0), where a call passing one is refused as an unknown argument.
+Pilot never sends them: it drops them from a step and refuses caller params
+that carry them.
 
 The executor records a step that only previewed as *failed*, so a tool missing
 from this table fails loudly on its first dispatch rather than silently doing
@@ -58,7 +60,7 @@ GATED_TOOLS = MappingProxyType({
     "privateai": frozenset({"assign_vgpu"}),
 })
 
-#: Deprecated aliases for ``confirm`` on the gated tools.
+#: Former aliases for ``confirm`` on the gated tools, removed from the companions.
 LEGACY_CONFIRM_KEYS = ("confirmed", "dry_run")
 
 #: Every key through which a caller can say "act" or "hold" on a gated tool.
