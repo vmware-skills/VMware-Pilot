@@ -7,8 +7,8 @@ step that calls such a tool comes after a ``require_approval`` step — Pilot's
 own ``approve`` gate, which is the human decision — so the step itself says
 ``confirm=True``. ``tests/test_templates_pass_confirm.py`` fails any template
 that sends ``confirm=True`` before its first approval step. The old spellings
-``confirmed`` / ``dry_run`` were removed from those tools (Aria, AVI and Storage
-2.5.0, VKS 3.5.0), where a call passing one is refused as an unknown argument.
+``confirmed`` / ``dry_run`` were removed from those tools (Aria 2.4.2, AVI 2.4.1,
+Storage 2.4.3, VKS 3.4.2), where a call passing one is refused as an unknown argument.
 Pilot never sends them: it drops them from a step and refuses caller params
 that carry them.
 
