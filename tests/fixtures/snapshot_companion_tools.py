@@ -80,9 +80,16 @@ def read_live(root: pathlib.Path) -> tuple[dict, list[str]]:
             broken.append(f"{skill}: no checkout at {path}")
             continue
         try:
-            cmd = ["uv", "run", "--project", str(path), "python", "-c", _PROBE, pkg]
+            cmd = ["uv", "run", "--project", str(path)]
+            # Use an existing sibling environment without a PyPI sync when
+            # comparing live registries. CI without a venv builds one normally.
+            has_venv = (path / ".venv" / "bin" / "python").exists()
+            has_venv |= (path / ".venv" / "Scripts" / "python.exe").exists()
+            if has_venv:
+                cmd += ["--no-sync", "--offline"]
+            cmd += ["python", "-c", _PROBE, pkg]
             proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                                  timeout=TIMEOUT)
+                                  timeout=TIMEOUT, cwd=path)
         except subprocess.TimeoutExpired:
             broken.append(f"{skill}: reading the registry did not finish in {TIMEOUT}s")
             continue
