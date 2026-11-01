@@ -1,3 +1,8 @@
+## v2.4.1 — VKS 9.1 upgrade risk in the companion catalog (2026-11-01)
+
+* The companion-tool snapshot now includes VKS 3.5.0's read-only `get_supervisor_upgrade_risk` tool. The documented VKS and family tool counts match the live registries. Pilot's workflow execution behavior is unchanged.
+* Install VMware-VKS 3.5.0 or later to use that tool. Its advisory report does not measure VUMDB schema or establish upgrade clearance.
+
 ## v2.4.0 — runs its own steps on request; honest gates and rollback (first real-vSphere run)
 
 ### Behaviour changes for existing callers
