@@ -2647,6 +2647,22 @@
    ],
    "required": []
   },
+  "list_pais_mcp_servers": {
+   "properties": [
+    "after",
+    "limit"
+   ],
+   "required": []
+  },
+  "list_pais_mcp_tools": {
+   "properties": [
+    "after",
+    "is_approved",
+    "limit",
+    "server_id"
+   ],
+   "required": []
+  },
   "list_pais_models": {
    "properties": [
     "limit",

@@ -66,10 +66,10 @@ numbers matter here, and they are not the same thing:
 | vmware-debug | `vmware-debug` | 14 | 5 | Incident correlation, evidence-graded cases |
 | vmware-harden | `vmware-harden` | 8 | 5 | Compliance baselines, violations, drift |
 | vmware-log-insight | `vmware-log-insight` | 7 | 4 | Log search, aggregation, alerts |
-| vmware-privateai | `vmware-privateai` | 18 | 5 | GPU hosts, vGPU profiles, utilisation |
+| vmware-privateai | `vmware-privateai` | 20 | 5 | GPU hosts, vGPU profiles, utilisation |
 | vmware-vdi | `vmware-vdi` | 27 | 9 | Horizon pools, sessions, machines, images |
 
-**Totals**: 338 tools across the 13 companion skills; the design catalog covers 101 of them
+**Totals**: 340 tools across the 13 companion skills; the design catalog covers 101 of them
 across all 13. Pilot adds 13 orchestration tools of its own. The counts are checked against
 the companion snapshot by `tests/eval/regression/test_catalog_covers_the_family.py`.
 
