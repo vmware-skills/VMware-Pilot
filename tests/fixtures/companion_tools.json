@@ -1900,6 +1900,7 @@
     "group",
     "host_name",
     "lines",
+    "log_keys",
     "target"
    ],
    "required": []
