@@ -1,3 +1,9 @@
+## v2.4.2 — refresh companion tool contracts (2026-11-08)
+
+* Update public author/project contact metadata to `zhouwei008@gmail.com`.
+
+* Refresh the companion contract for Monitor log selection and the PAIS gallery; no Pilot runtime/tool-count changes.
+
 ## v2.4.1 — VKS 9.1 upgrade risk in the companion catalog (2026-11-01)
 
 * The companion-tool snapshot now includes VKS 3.5.0's read-only `get_supervisor_upgrade_risk` tool. The documented VKS and family tool counts match the live registries. Pilot's workflow execution behavior is unchanged.
@@ -1055,7 +1061,7 @@ Tests: 75 → 96 passing (4 parallel_group + 7 investigate_alert + 10 review). M
 - **[READ]/[WRITE] tool prefixes**: All MCP tool descriptions now start with [READ] or [WRITE] to clearly indicate operation type
 - **Read/write split counts**: SKILL.md MCP Tools section header shows exact read vs write tool counts
 - **Negative routing**: Description frontmatter includes "Do NOT use when..." clause to prevent misrouting
-- **Broadcom author attestation**: README.md, README-CN.md, and pyproject.toml include VMware by Broadcom author identity (wei-wz.zhou@broadcom.com) to resolve Snyk E005 brand warnings
+- **Broadcom author attestation**: README.md, README-CN.md, and pyproject.toml include VMware by Broadcom author identity (zhouwei008@gmail.com) to resolve Snyk E005 brand warnings
 
 ## v1.4.9 (2026-04-11)
 
