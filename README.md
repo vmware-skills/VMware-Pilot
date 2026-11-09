@@ -42,7 +42,7 @@ Full agent instructions: [`skills/vmware-pilot/SKILL.md`](skills/vmware-pilot/SK
 Requires Python `>=3.10` and `uv`.
 
 ```bash
-uv tool install vmware-pilot==2.4.2
+uv tool install vmware-pilot==2.4.3
 vmware-pilot --help
 ```
 
@@ -54,7 +54,7 @@ Target, credential and local data setup: [setup guide](skills/vmware-pilot/refer
 ### Install
 
 ```bash
-uv tool install vmware-pilot
+uv tool install vmware-pilot==2.4.3
 vmware-pilot mcp          # start the MCP server (stdio)
 ```
 
@@ -100,7 +100,7 @@ Copy this configuration into your MCP client's local stdio settings. The client 
   "mcpServers": {
     "vmware-pilot": {
       "command": "uvx",
-      "args": ["--from", "vmware-pilot==2.4.2", "vmware-pilot-mcp"]
+      "args": ["--from", "vmware-pilot==2.4.3", "vmware-pilot-mcp"]
     }
   }
 }
@@ -124,7 +124,7 @@ The following sections retain preinstalled CLI alternatives and product-specific
 }
 ```
 
-> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot", "vmware-pilot-mcp"]}` still
+> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot==2.4.3", "vmware-pilot-mcp"]}` still
 > works, but `uvx` re-resolves against PyPI on every start and fails behind a TLS-inspecting
 > corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed entry point above
 > touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.
