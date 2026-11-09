@@ -42,7 +42,7 @@
 需要 Python `>=3.10` 和 `uv`。
 
 ```bash
-uv tool install vmware-pilot==2.4.3
+uv tool install vmware-pilot==2.5.0
 vmware-pilot --help
 ```
 
@@ -54,7 +54,7 @@ vmware-pilot --help
 ### 安装
 
 ```bash
-uv tool install vmware-pilot==2.4.3
+uv tool install vmware-pilot==2.5.0
 vmware-pilot mcp          # 启动 MCP server（stdio）
 ```
 
@@ -72,7 +72,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
   "mcpServers": {
     "vmware-pilot": {
       "command": "uvx",
-      "args": ["--from", "vmware-pilot==2.4.3", "vmware-pilot-mcp"]
+      "args": ["--from", "vmware-pilot==2.5.0", "vmware-pilot-mcp"]
     }
   }
 }
@@ -96,7 +96,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 }
 ```
 
-> 备用方式：`{"command": "uvx", "args": ["--from", "vmware-pilot==2.4.3", "vmware-pilot-mcp"]}` 同样可用，
+> 备用方式：`{"command": "uvx", "args": ["--from", "vmware-pilot==2.5.0", "vmware-pilot-mcp"]}` 同样可用，
 > 但 `uvx` 每次启动都会重新到 PyPI 解析包，在有 TLS 中间人代理的企业网络下会失败
 > （`invalid peer certificate: UnknownIssuer`）。上面的入口点走 PATH，完全不联网；
 > 若必须用 `uvx`，请设置 `UV_NATIVE_TLS=true`。

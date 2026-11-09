@@ -1,6 +1,10 @@
-## Unreleased
+## v2.5.0 — Explicit ClusterClass references in VKS deployment workflows
 
-* Allow explicit ClusterClass name/namespace in the VKS deployment template, omitting new arguments for legacy callers. Requires the companion unreleased VKS adaptation; no live 9.1 validation is claimed.
+Released 2026-11-09.
+
+* Synchronize the companion-tool contract snapshot with the new optional VKS creation arguments.
+
+* Allow explicit ClusterClass name/namespace in the VKS deployment template, omitting new arguments for legacy callers. Requires the companion VKS skill 3.7.0 or newer; no live 9.1 validation is claimed.
 
 ## v2.4.3 — Gemini extension packaging
 
