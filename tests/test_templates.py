@@ -322,6 +322,24 @@ class TestVksClusterDeploy:
         skills = {s.skill for s in wf.steps}
         assert "vks" in skills
 
+    def test_explicit_clusterclass_is_passed_only_to_cluster_creation(self):
+        wf = vks_cluster_deploy(
+            "ns", "c1", "pol", "tkc1", "v1.33", cluster_class="installed-class",
+            cluster_class_namespace="vmware-system-vks-public",
+        )
+        create = next(s for s in wf.steps if s.tool == "create_tkc_cluster")
+        assert create.params["cluster_class"] == "installed-class"
+        assert create.params["cluster_class_namespace"] == "vmware-system-vks-public"
+        assert create.params["confirm"] is True
+        assert all("cluster_class" not in s.params for s in wf.steps if s is not create)
+        assert "cluster_class" not in create.rollback_params
+
+    def test_legacy_workflow_omits_new_parameters_for_older_vks_servers(self):
+        wf = vks_cluster_deploy("ns", "c1", "pol", "tkc1", "v1.28")
+        create = next(s for s in wf.steps if s.tool == "create_tkc_cluster")
+        assert "cluster_class" not in create.params
+        assert "cluster_class_namespace" not in create.params
+
 
 @pytest.mark.unit
 class TestRollingRestart:

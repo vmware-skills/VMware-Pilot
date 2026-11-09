@@ -21,6 +21,8 @@ def vks_cluster_deploy(
     vm_class: str = "best-effort-medium",
     worker_count: int = 3,
     target: str = "",
+    cluster_class: str | None = None,
+    cluster_class_namespace: str | None = None,
 ) -> Workflow:
     """Deploy a complete VKS environment: namespace + TKC cluster + verify.
 
@@ -34,6 +36,11 @@ def vks_cluster_deploy(
     Every step that passes ``confirm=True`` sits behind an approval step: that
     flag tells the companion tool a human already decided.
     """
+    class_params = {}
+    if cluster_class is not None:
+        class_params["cluster_class"] = cluster_class
+    if cluster_class_namespace is not None:
+        class_params["cluster_class_namespace"] = cluster_class_namespace
     now = datetime.now(tz=timezone.utc).isoformat()
     steps = [
         WorkflowStep(
@@ -85,6 +92,7 @@ def vks_cluster_deploy(
                 "k8s_version": k8s_version,
                 "vm_class": vm_class,
                 "worker_count": worker_count,
+                **class_params,
                 "target": target,
                 "confirm": True,
             },
