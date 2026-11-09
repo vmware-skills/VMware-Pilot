@@ -1,3 +1,11 @@
+## v2.4.3 — Gemini extension packaging
+
+Released 2026-11-09.
+
+Add the root Gemini CLI extension manifest and discovery metadata, using the existing canonical skill and exact MCP package version. No duplicate skill entrypoint is introduced.
+
+Runtime infrastructure operations, permissions, TLS defaults and confirmation behavior are unchanged. No new vSphere/VCF 9.x or live product compatibility is claimed. ClawHub skill and bundle verdicts are checked separately after publication; documentation corrections are not a clean-scan claim.
+
 ## v2.4.2 — refresh companion tool contracts (2026-11-08)
 
 * Update public author/project contact metadata to `zhouwei008@gmail.com`.
