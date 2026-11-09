@@ -1,3 +1,7 @@
+## Unreleased
+
+* Allow explicit ClusterClass name/namespace in the VKS deployment template, omitting new arguments for legacy callers. Requires the companion unreleased VKS adaptation; no live 9.1 validation is claimed.
+
 ## v2.4.3 — Gemini extension packaging
 
 Released 2026-11-09.

@@ -229,6 +229,12 @@ create_workflow_from_template("network_segment_setup", {
 
 ## 6. vks_cluster_deploy
 
+Unreleased on main: optional `cluster_class` and `cluster_class_namespace` are
+forwarded to VKS cluster creation when supplied. They require the companion VKS
+ClusterClass adaptation (not the published VKS 3.6.1 server). Omitted values keep
+legacy workflow parameters unchanged. VKS still owns preview/admission and execution
+checks; Pilot approval remains the documented attestation, not an execution gateway.
+
 **Purpose**: Deploy a complete VKS (vSphere with Tanzu) environment: create namespace, then deploy TKC cluster, each behind its own approval gate.
 
 **Steps** (5):
