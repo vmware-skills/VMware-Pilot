@@ -3151,6 +3151,8 @@
   },
   "create_tkc_cluster": {
    "properties": [
+    "cluster_class",
+    "cluster_class_namespace",
     "confirm",
     "control_plane_count",
     "k8s_version",

@@ -1,3 +1,3 @@
 """VMware Pilot — multi-step workflow orchestration with approval gates."""
 
-__version__ = "2.4.3"
+__version__ = "2.5.0"

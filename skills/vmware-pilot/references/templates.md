@@ -229,9 +229,9 @@ create_workflow_from_template("network_segment_setup", {
 
 ## 6. vks_cluster_deploy
 
-Unreleased on main: optional `cluster_class` and `cluster_class_namespace` are
+Available from Pilot 2.5.0: optional `cluster_class` and `cluster_class_namespace` are
 forwarded to VKS cluster creation when supplied. They require the companion VKS
-ClusterClass adaptation (not the published VKS 3.6.1 server). Omitted values keep
+ClusterClass adaptation in VKS skill 3.7.0 or newer (not VKS 3.6.1). Omitted values keep
 legacy workflow parameters unchanged. VKS still owns preview/admission and execution
 checks; Pilot approval remains the documented attestation, not an execution gateway.
 
