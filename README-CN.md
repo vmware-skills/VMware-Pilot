@@ -72,11 +72,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
   "mcpServers": {
     "vmware-pilot": {
       "command": "uvx",
-      "args": [
-        "--from",
-        "vmware-pilot==2.4.2",
-        "vmware-pilot-mcp"
-      ]
+      "args": ["--from", "vmware-pilot==2.4.2", "vmware-pilot-mcp"]
     }
   }
 }
