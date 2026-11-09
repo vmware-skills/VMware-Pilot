@@ -2,13 +2,21 @@
 
 # VMware Pilot
 
-For a read-only check of this skill with your model and agent host, use the shared [model-fit self-test](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md) in the marketplace root.
-
-> **Author**: Wei Zhou, VMware by Broadcom — zhouwei008@gmail.com
-> This is a community-driven project by a VMware engineer, not an official VMware product.
-> For official VMware developer tools see [developer.broadcom.com](https://developer.broadcom.com).
+[![PyPI](https://img.shields.io/pypi/v/vmware-pilot)](https://pypi.org/project/vmware-pilot/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#readme-license)
 
 English | [中文](README-CN.md)
+
+Maintainer: Wei Zhou · [zhouwei008@gmail.com](mailto:zhouwei008@gmail.com)
+
+Community-maintained open-source project; not an official VMware or Broadcom product.
+
+[Overview](#readme-overview) · [Quick Start](#readme-quick-start) · [MCP Configuration](#readme-mcp-configuration) · [Capabilities and Workflows](#readme-capabilities-and-workflows) · [Safety and Audit](#readme-safety-and-audit) · [Troubleshooting](#readme-troubleshooting) · [Companion Skills](#readme-companion-skills) · [Reference](#readme-reference) · [License](#readme-license)
+
+<a id="readme-overview"></a>
+
+## Overview
+
+Runs locally over stdio by default; see below for data sources and execution boundaries.
 
 Multi-step workflow orchestration for VMware MCP skills — state machine, approval gates, audit trail.
 
@@ -25,14 +33,32 @@ Multi-step workflow orchestration for VMware MCP skills — state machine, appro
 > | **[vmware-aria](https://github.com/vmware-skills/VMware-Aria)** | Aria Ops: metrics, alerts, capacity | `uv tool install vmware-aria` |
 > | **[vmware-avi](https://github.com/vmware-skills/VMware-AVI)** | AVI load balancing, pool management, AKO K8s ops | `uv tool install vmware-avi` |
 
-## Install
+Full agent instructions: [`skills/vmware-pilot/SKILL.md`](skills/vmware-pilot/SKILL.md).
+
+<a id="readme-quick-start"></a>
+
+## Quick Start
+
+Requires Python `>=3.10` and `uv`.
+
+```bash
+uv tool install vmware-pilot==2.4.2
+vmware-pilot --help
+```
+
+Target, credential and local data setup: [setup guide](skills/vmware-pilot/references/setup-guide.md).
+
+<details>
+<summary>Installation and configuration details (including offline setup)</summary>
+
+### Install
 
 ```bash
 uv tool install vmware-pilot
 vmware-pilot mcp          # start the MCP server (stdio)
 ```
 
-### Offline / Air-Gapped Install (from source)
+#### Offline / Air-Gapped Install (from source)
 
 This project uses the modern PEP 517 build system (hatchling), so there is **no
 `setup.py`** by design — that is expected, not a missing file. If you cloned the
@@ -60,7 +86,77 @@ pip wheel . -w dist        # → dist/*.whl   (or: uv build, for just this packa
 pip install --no-index --find-links dist vmware-pilot
 ```
 
-## MCP Tools (13 — 4 read, 9 write)
+
+</details>
+
+<a id="readme-mcp-configuration"></a>
+
+## MCP Configuration
+
+Copy this configuration into your MCP client's local stdio settings. The client must be able to find `uvx`; the initial package installation requires access to a package index.
+
+```json
+{
+  "mcpServers": {
+    "vmware-pilot": {
+      "command": "uvx",
+      "args": ["--from", "vmware-pilot==2.4.2", "vmware-pilot-mcp"]
+    }
+  }
+}
+```
+
+The following sections retain preinstalled CLI alternatives and product-specific MCP options.
+
+<details>
+<summary>Preinstalled CLI and additional MCP options</summary>
+
+### MCP Configuration
+
+```json
+{
+  "mcpServers": {
+    "vmware-pilot": {
+      "command": "vmware-pilot",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot", "vmware-pilot-mcp"]}` still
+> works, but `uvx` re-resolves against PyPI on every start and fails behind a TLS-inspecting
+> corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed entry point above
+> touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.
+
+#### Pilot runs the steps itself: `--dispatch`
+
+By default pilot executes nothing: `run_workflow` returns each step in `pending_dispatch` and your agent performs it.
+Add `--dispatch` (or set `VMWARE_PILOT_DISPATCH=stdio`) and pilot runs each step itself, in that skill's own MCP
+server (`vmware-<skill>-mcp`, which must be installed), so the skill's policy rules, confirmation gate and audit
+apply as usual. Nothing after an approval gate runs before `approve`, and workflows reach `completed`.
+
+```json
+{"mcpServers": {"vmware-pilot": {"command": "vmware-pilot", "args": ["mcp", "--dispatch"]}}}
+```
+
+stdio only: pilot refuses to start with `--dispatch` and `--transport https`/`http` (the skill servers it starts would
+have no caller identity, so roles could not apply). A step that takes longer than `VMWARE_PILOT_DISPATCH_TIMEOUT`
+seconds (default 1800) is recorded `interrupted` — its effect is unknown — and rollback waits for you to check it.
+`run_workflow` and `approve` take as long as the steps they run: set your MCP client's tool timeout above your
+longest step. If a call does time out, Pilot carries on and answers nothing else until the step ends; then
+`get_workflow_status` shows the outcome. Never perform those steps yourself.
+
+<!-- usage: remote-and-exposure -->
+
+
+</details>
+
+<a id="readme-capabilities-and-workflows"></a>
+
+## Capabilities and Workflows
+
+### MCP Tools (13 — 4 read, 9 write)
 
 | Tool | Description |
 |------|-------------|
@@ -78,7 +174,7 @@ pip install --no-index --find-links dist vmware-pilot
 | `rollback` | Explicit, best-effort undo of steps pilot recorded as succeeded — never automatic. Previews (`blast_radius`) unless `confirm=True` |
 | `cancel_workflow` | Cancel a workflow — move it to the terminal CANCELLED state. Previews (`blast_radius`) unless `confirm=True` |
 
-## Built-in Templates (15)
+### Built-in Templates (15)
 
 `n` is the number of VMs (or drift items); ranges depend on which optional parameters are set.
 `clone_and_test` needs `snapshot_name` (the snapshot to clone from), resizes staging while it is
@@ -104,54 +200,11 @@ See `skills/vmware-pilot/references/templates.md` for parameters and steps.
 | `baseline_audit` | 1-5 | No | monitor, nsx, storage, aria |
 | `baseline_remediate` | 3+n | Yes | varies |
 
-## Upgrading to 2.0
+<a id="readme-safety-and-audit"></a>
 
-2.0 renames one MCP tool: `plan_workflow` → `create_workflow_from_template`. It always created and saved a
-workflow from a template (it is a write, not a dry run); the new name says so and sets it apart from
-`create_workflow`, which saves your own step list. Parameters and results are unchanged, and so are the CLI
-commands. The skill catalog also follows vmware-vks's renames (`get_supervisor_kubeconfig` →
-`issue_supervisor_kubeconfig`, `get_tkc_kubeconfig` → `issue_tkc_kubeconfig`). Workflows saved with the old
-names are translated when loaded. If an agent prompt, script or `~/.vmware/rules.yaml` names `plan_workflow`,
-update it. Requires vmware-policy ≥ 1.19.0. Details: [RELEASE_NOTES.md](RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names).
+## Safety and Audit
 
-## MCP Configuration
-
-```json
-{
-  "mcpServers": {
-    "vmware-pilot": {
-      "command": "vmware-pilot",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-> Fallback: `{"command": "uvx", "args": ["--from", "vmware-pilot", "vmware-pilot-mcp"]}` still
-> works, but `uvx` re-resolves against PyPI on every start and fails behind a TLS-inspecting
-> corporate proxy (`invalid peer certificate: UnknownIssuer`). The installed entry point above
-> touches the network zero times; set `UV_NATIVE_TLS=true` if you must use `uvx`.
-
-### Pilot runs the steps itself: `--dispatch`
-
-By default pilot executes nothing: `run_workflow` returns each step in `pending_dispatch` and your agent performs it.
-Add `--dispatch` (or set `VMWARE_PILOT_DISPATCH=stdio`) and pilot runs each step itself, in that skill's own MCP
-server (`vmware-<skill>-mcp`, which must be installed), so the skill's policy rules, confirmation gate and audit
-apply as usual. Nothing after an approval gate runs before `approve`, and workflows reach `completed`.
-
-```json
-{"mcpServers": {"vmware-pilot": {"command": "vmware-pilot", "args": ["mcp", "--dispatch"]}}}
-```
-
-stdio only: pilot refuses to start with `--dispatch` and `--transport https`/`http` (the skill servers it starts would
-have no caller identity, so roles could not apply). A step that takes longer than `VMWARE_PILOT_DISPATCH_TIMEOUT`
-seconds (default 1800) is recorded `interrupted` — its effect is unknown — and rollback waits for you to check it.
-`run_workflow` and `approve` take as long as the steps they run: set your MCP client's tool timeout above your
-longest step. If a call does time out, Pilot carries on and answers nothing else until the step ends; then
-`get_workflow_status` shows the outcome. Never perform those steps yourself.
-
-<!-- usage: remote-and-exposure -->
-## Remote access (HTTPS) and limiting tools
+### Remote access (HTTPS) and limiting tools
 
 By default `vmware-pilot mcp` speaks stdio to one local client and offers every tool. Two options change that
 (vmware-policy ≥ 1.21.0).
@@ -214,6 +267,38 @@ Tools not offered do not appear in the client's tool list. A bad value or an unk
 least-privilege.
 
 Details: `skills/vmware-pilot/references/setup-guide.md` ("Serving MCP over HTTPS", "Limiting which tools are offered").
+
+<a id="readme-troubleshooting"></a>
+
+## Troubleshooting
+
+For installation issues, see the installation instructions on this page. Check CLI arguments with `--help` before operating. Include only a minimal, redacted example when reporting a problem.
+
+<a id="readme-companion-skills"></a>
+
+## Companion Skills
+
+The VMware Skills family contains 14 MCP servers and the shared Policy library. Choose tools by responsibility: [vmware-skills](https://github.com/vmware-skills).
+
+<a id="readme-reference"></a>
+
+## Reference
+
+Release history: [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+Read-only self-test with your own model and agent host: [model-fit self-test](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md).
+
+### Upgrading to 2.0
+
+2.0 renames one MCP tool: `plan_workflow` → `create_workflow_from_template`. It always created and saved a
+workflow from a template (it is a write, not a dry run); the new name says so and sets it apart from
+`create_workflow`, which saves your own step list. Parameters and results are unchanged, and so are the CLI
+commands. The skill catalog also follows vmware-vks's renames (`get_supervisor_kubeconfig` →
+`issue_supervisor_kubeconfig`, `get_tkc_kubeconfig` → `issue_tkc_kubeconfig`). Workflows saved with the old
+names are translated when loaded. If an agent prompt, script or `~/.vmware/rules.yaml` names `plan_workflow`,
+update it. Requires vmware-policy ≥ 1.19.0. Details: [RELEASE_NOTES.md](RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names).
+
+<a id="readme-license"></a>
 
 ## License
 

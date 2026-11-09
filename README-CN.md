@@ -1,13 +1,22 @@
 <!-- mcp-name: io.github.vmware-skills/vmware-pilot -->
+
 # VMware Pilot
 
-要用自己的模型和 Agent 平台进行只读自测，请看 marketplace 根目录的[共享模型适配自测任务](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md)。
-
-> **作者**: Wei Zhou, VMware by Broadcom — zhouwei008@gmail.com
-> 本项目由 VMware 工程师维护的社区项目，非 VMware 官方产品。
-> VMware 官方开发者工具请访问 [developer.broadcom.com](https://developer.broadcom.com)。
+[![PyPI](https://img.shields.io/pypi/v/vmware-pilot)](https://pypi.org/project/vmware-pilot/) [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](#readme-license)
 
 [English](README.md) | 中文
+
+维护者: Wei Zhou · [zhouwei008@gmail.com](mailto:zhouwei008@gmail.com)
+
+社区维护的开源项目，非 VMware 或 Broadcom 官方产品。
+
+[概述](#readme-overview) · [快速开始](#readme-quick-start) · [MCP 配置](#readme-mcp-configuration) · [能力与工作流](#readme-capabilities-and-workflows) · [安全与审计](#readme-safety-and-audit) · [故障排查](#readme-troubleshooting) · [配套 Skills](#readme-companion-skills) · [参考资料](#readme-reference) · [许可证](#readme-license)
+
+<a id="readme-overview"></a>
+
+## 概述
+
+默认通过本地 Stdio 运行；具体数据来源和执行边界见下文。
 
 多步骤工作流编排 — 跨 VMware MCP 技能的状态机、审批门控、审计日志。
 
@@ -24,14 +33,99 @@
 > | **[vmware-aria](https://github.com/vmware-skills/VMware-Aria)** | Aria Ops：指标、告警、容量 | `uv tool install vmware-aria` |
 > | **[vmware-avi](https://github.com/vmware-skills/VMware-AVI)** | AVI 负载均衡、Pool 管理、AKO K8s 运维 | `uv tool install vmware-avi` |
 
-## 安装
+完整的 Agent 指令见 [`skills/vmware-pilot/SKILL.md`](skills/vmware-pilot/SKILL.md).
+
+<a id="readme-quick-start"></a>
+
+## 快速开始
+
+需要 Python `>=3.10` 和 `uv`。
+
+```bash
+uv tool install vmware-pilot==2.4.2
+vmware-pilot --help
+```
+
+目标、凭据和本地数据目录设置见 [setup guide](skills/vmware-pilot/references/setup-guide.md).
+
+<details>
+<summary>安装与配置详情（含离线安装）</summary>
+
+### 安装
 
 ```bash
 uv tool install vmware-pilot
 vmware-pilot mcp          # 启动 MCP server（stdio）
 ```
 
-## MCP 工具（13 个 — 4 读 / 9 写）
+
+</details>
+
+<a id="readme-mcp-configuration"></a>
+
+## MCP 配置
+
+将以下配置复制到 MCP 客户端的本地 Stdio 配置中。客户端需要能找到 `uvx`；首次安装所需包时需要访问包源。
+
+```json
+{
+  "mcpServers": {
+    "vmware-pilot": {
+      "command": "uvx",
+      "args": ["--from", "vmware-pilot==2.4.2", "vmware-pilot-mcp"]
+    }
+  }
+}
+```
+
+以下保留预先安装 CLI 的用法及各工具特有的 MCP 选项。
+
+<details>
+<summary>预先安装的 CLI 与其他 MCP 选项</summary>
+
+### MCP 配置
+
+```json
+{
+  "mcpServers": {
+    "vmware-pilot": {
+      "command": "vmware-pilot",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+> 备用方式：`{"command": "uvx", "args": ["--from", "vmware-pilot", "vmware-pilot-mcp"]}` 同样可用，
+> 但 `uvx` 每次启动都会重新到 PyPI 解析包，在有 TLS 中间人代理的企业网络下会失败
+> （`invalid peer certificate: UnknownIssuer`）。上面的入口点走 PATH，完全不联网；
+> 若必须用 `uvx`，请设置 `UV_NATIVE_TLS=true`。
+
+#### 由 Pilot 自己执行步骤：`--dispatch`
+
+默认情况下 Pilot 不执行任何步骤：`run_workflow` 把每一步放在 `pending_dispatch` 里返回，由你的 agent 去执行。
+加上 `--dispatch`（或设置 `VMWARE_PILOT_DISPATCH=stdio`）后，Pilot 会在对应 skill 自己的 MCP server
+（`vmware-<skill>-mcp`，需已安装）里执行每一步，因此该 skill 的策略规则、确认门和审计照常生效。审批点之后的步骤
+在 `approve` 之前不会执行，工作流可以走到 `completed`。
+
+```json
+{"mcpServers": {"vmware-pilot": {"command": "vmware-pilot", "args": ["mcp", "--dispatch"]}}}
+```
+
+仅限 stdio：`--dispatch` 与 `--transport https`/`http` 同时使用时 Pilot 拒绝启动（它启动的 skill server 没有调用者
+身份，角色无法生效）。超过 `VMWARE_PILOT_DISPATCH_TIMEOUT` 秒（默认 1800）的步骤记为 `interrupted`——效果未知——
+回滚会等你确认后再进行。
+`run_workflow` 和 `approve` 的耗时等于它们执行的步骤：请把 MCP 客户端的工具超时设得比最长的步骤更长；万一调用超时，
+Pilot 会继续执行，并在该步骤结束前不响应其他调用；之后用 `get_workflow_status` 查看结果——不要自己去执行这些步骤。
+
+
+</details>
+
+<a id="readme-capabilities-and-workflows"></a>
+
+## 能力与工作流
+
+### MCP 工具（13 个 — 4 读 / 9 写）
 
 | 工具 | 说明 |
 |------|------|
@@ -49,7 +143,7 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `rollback` | 显式、尽力而为地逆序撤销 pilot 记录为成功的步骤——从不自动执行。不带 `confirm=True` 时只预览（`blast_radius`） |
 | `cancel_workflow` | 取消工作流，置为终态 CANCELLED。不带 `confirm=True` 时只预览（`blast_radius`） |
 
-## 内置模板（15 个）
+### 内置模板（15 个）
 
 `n` 为虚拟机（或漂移项）数量；区间取决于设置了哪些可选参数。`clone_and_test` 需要
 `snapshot_name`（克隆所用的快照），在 staging 关机状态下调整规格；`change_spec` 为 guest 命令时
@@ -73,50 +167,11 @@ vmware-pilot mcp          # 启动 MCP server（stdio）
 | `baseline_audit` | 1-5 | 否 | monitor, nsx, storage, aria |
 | `baseline_remediate` | 3+n | 是 | 按需 |
 
-## 升级到 2.0
+<a id="readme-safety-and-audit"></a>
 
-2.0 改了一个 MCP 工具的名字：`plan_workflow` → `create_workflow_from_template`。它一直是从模板创建并保存工作流
-（是写操作，不是预演）；新名字把这一点说清楚，也和 `create_workflow`（保存你自己写的步骤列表）区分开。参数和返回值不变，
-CLI 命令也不变。技能目录同时跟随 vmware-vks 的改名（`get_supervisor_kubeconfig` → `issue_supervisor_kubeconfig`，
-`get_tkc_kubeconfig` → `issue_tkc_kubeconfig`）。用旧名保存的工作流在加载时会自动转换。如果 agent 提示词、脚本或
-`~/.vmware/rules.yaml` 里写了 `plan_workflow`，请改成新名。需要 vmware-policy ≥ 1.19.0。详见 [RELEASE_NOTES.md](RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names)。
+## 安全与审计
 
-## MCP 配置
-
-```json
-{
-  "mcpServers": {
-    "vmware-pilot": {
-      "command": "vmware-pilot",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-> 备用方式：`{"command": "uvx", "args": ["--from", "vmware-pilot", "vmware-pilot-mcp"]}` 同样可用，
-> 但 `uvx` 每次启动都会重新到 PyPI 解析包，在有 TLS 中间人代理的企业网络下会失败
-> （`invalid peer certificate: UnknownIssuer`）。上面的入口点走 PATH，完全不联网；
-> 若必须用 `uvx`，请设置 `UV_NATIVE_TLS=true`。
-
-### 由 Pilot 自己执行步骤：`--dispatch`
-
-默认情况下 Pilot 不执行任何步骤：`run_workflow` 把每一步放在 `pending_dispatch` 里返回，由你的 agent 去执行。
-加上 `--dispatch`（或设置 `VMWARE_PILOT_DISPATCH=stdio`）后，Pilot 会在对应 skill 自己的 MCP server
-（`vmware-<skill>-mcp`，需已安装）里执行每一步，因此该 skill 的策略规则、确认门和审计照常生效。审批点之后的步骤
-在 `approve` 之前不会执行，工作流可以走到 `completed`。
-
-```json
-{"mcpServers": {"vmware-pilot": {"command": "vmware-pilot", "args": ["mcp", "--dispatch"]}}}
-```
-
-仅限 stdio：`--dispatch` 与 `--transport https`/`http` 同时使用时 Pilot 拒绝启动（它启动的 skill server 没有调用者
-身份，角色无法生效）。超过 `VMWARE_PILOT_DISPATCH_TIMEOUT` 秒（默认 1800）的步骤记为 `interrupted`——效果未知——
-回滚会等你确认后再进行。
-`run_workflow` 和 `approve` 的耗时等于它们执行的步骤：请把 MCP 客户端的工具超时设得比最长的步骤更长；万一调用超时，
-Pilot 会继续执行，并在该步骤结束前不响应其他调用；之后用 `get_workflow_status` 查看结果——不要自己去执行这些步骤。
-
-## 审计与安全
+### 审计与安全
 
 所有操作通过 vmware-policy（`@vmware_tool` 装饰器）自动审计：
 - 每个工具调用记录到 `~/.vmware/audit.db`（SQLite, WAL 模式）
@@ -125,7 +180,8 @@ Pilot 会继续执行，并在该步骤结束前不响应其他调用；之后�
 - 查看被拒绝的操作：`vmware-audit log --status denied`
 
 <!-- usage: remote-and-exposure -->
-## 远程访问（HTTPS）与限制工具
+
+### 远程访问（HTTPS）与限制工具
 
 默认情况下 `vmware-pilot mcp` 通过 stdio 服务一个本地客户端，并提供全部工具。以下两个选项可以改变这一点
 （需 vmware-policy ≥ 1.21.0）。
@@ -186,6 +242,36 @@ vmware-pilot mcp --expose read --allow-write cancel_workflow
 这只限制提供给客户端的工具，不是授权；账号本身仍应遵循最小权限。
 
 详见 `skills/vmware-pilot/references/setup-guide.md`（"Serving MCP over HTTPS"、"Limiting which tools are offered"）。
+
+<a id="readme-troubleshooting"></a>
+
+## 故障排查
+
+安装问题请查看本页安装说明；操作前先用 CLI 的 `--help` 核对参数。反馈问题时仅提供经过脱敏的最小示例。
+
+<a id="readme-companion-skills"></a>
+
+## 配套 Skills
+
+VMware Skills 家族包含 14 个 MCP Server 和共享 Policy 库。按职责选择工具： [vmware-skills](https://github.com/vmware-skills).
+
+<a id="readme-reference"></a>
+
+## 参考资料
+
+变更记录： [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+使用自己的模型和 Agent 宿主进行只读自测： [model-fit self-test](https://github.com/vmware-skills/marketplace/blob/main/MODEL_FIT_SELF_TEST.md).
+
+### 升级到 2.0
+
+2.0 改了一个 MCP 工具的名字：`plan_workflow` → `create_workflow_from_template`。它一直是从模板创建并保存工作流
+（是写操作，不是预演）；新名字把这一点说清楚，也和 `create_workflow`（保存你自己写的步骤列表）区分开。参数和返回值不变，
+CLI 命令也不变。技能目录同时跟随 vmware-vks 的改名（`get_supervisor_kubeconfig` → `issue_supervisor_kubeconfig`，
+`get_tkc_kubeconfig` → `issue_tkc_kubeconfig`）。用旧名保存的工作流在加载时会自动转换。如果 agent 提示词、脚本或
+`~/.vmware/rules.yaml` 里写了 `plan_workflow`，请改成新名。需要 vmware-policy ≥ 1.19.0。详见 [RELEASE_NOTES.md](RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names)。
+
+<a id="readme-license"></a>
 
 ## 许可证
 
