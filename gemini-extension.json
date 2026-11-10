@@ -1,6 +1,6 @@
 {
   "name": "vmware-pilot",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "VMware workflow orchestration — multi-step state machine with approval gates",
   "mcpServers": {
     "vmware-pilot": {
@@ -8,7 +8,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "vmware-pilot==2.5.0",
+        "vmware-pilot==2.5.1",
         "vmware-pilot-mcp"
       ]
     }

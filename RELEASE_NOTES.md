@@ -6,6 +6,14 @@ Released 2026-11-09.
 
 * Allow explicit ClusterClass name/namespace in the VKS deployment template, omitting new arguments for legacy callers. Requires the companion VKS skill 3.7.0 or newer; no live 9.1 validation is claimed.
 
+## v2.5.1 (2026-11-10) — Separate dispatch result interpretation and refusals
+
+Extract dispatch-result classification and execution-refusal helpers, preserving preview-only failures, guest commands with unknown effects, sensitive-placeholder refusal, workflow state and public import aliases. Workflow execution and rollback semantics remain unchanged.
+
+Validation: existing suites, complete CLI/MCP surface comparison, structural guard checks and security scanning; exact results are retained in the private release record. Live 9.1/Supervisor, PAIS, NSX and Horizon validation is not established by synthetic tests.
+
+中文：本轮修复和重构范围见上述说明；保留既有 Policy、审计及确认门。合成测试不代表 9.1/Supervisor、PAIS、NSX 或 Horizon 正向真机验证。
+
 ## v2.4.3 — Gemini extension packaging
 
 Released 2026-11-09.

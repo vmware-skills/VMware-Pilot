@@ -14,13 +14,13 @@ state ``completed``.
 
 from __future__ import annotations
 
-import json
+import json  # noqa: F401 — compatibility/runtime export
 import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from vmware_pilot.models import (
+from vmware_pilot.models import (  # noqa: F401 — compatibility/runtime export
     REDACTED_PLACEHOLDER,
     Workflow,
     WorkflowState,
@@ -28,8 +28,25 @@ from vmware_pilot.models import (
     WorkflowStore,
     is_sensitive_key,
 )
-from vmware_pilot.renames import _server
+from vmware_pilot.renames import _server  # noqa: F401 — compatibility/runtime export
 from vmware_pilot.reversibility import is_read_only, leaves_behind
+
+from vmware_pilot._dispatch_result import (
+    _EXIT_CODE_TOOLS as _EXIT_CODE_TOOLS,
+    _PREVIEW_ONLY as _PREVIEW_ONLY,
+    _guest_failure as _guest_failure,
+    _guest_payloads as _guest_payloads,
+    _guest_unknown as _guest_unknown,
+    _returned_failure as _returned_failure,
+    _top_level_payloads as _top_level_payloads,
+)
+
+from vmware_pilot._execution_refusals import (
+    _first_redacted_sensitive_key as _first_redacted_sensitive_key,
+    _unrun_refusal as _unrun_refusal,
+)
+
+
 
 _log = logging.getLogger("vmware-pilot.executor")
 
@@ -78,41 +95,8 @@ class _StepReturnedFailure(Exception):
 #: ``{"action": "preview", "blast_radius": ...}`` and changes nothing (HLD §7,
 #: 2026-09-19). Read as success, a forgotten ``confirm`` would record a change
 #: that never happened — and a previewed undo would read as "rolled back".
-_PREVIEW_ONLY = (
-    "step only previewed; nothing was changed. The tool returned "
-    "action='preview' because it was called without confirm=True — the template "
-    "must pass confirm=True (Pilot's approve step is the human decision). The "
-    "preview's blast_radius is kept in this step's result."
-)
 
 
-def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
-    """The dicts a dispatch result may carry at its top level.
-
-    A plain dict, or an MCP ``CallToolResult``'s ``structuredContent`` (and the
-    ``{"result": ...}`` wrapper FastMCP puts around non-object returns), or its
-    single text block when that block is a JSON object. Never recurses: a
-    nested ``action`` is data.
-    """
-    if isinstance(result, dict):
-        return [result]
-    payloads: list[dict[str, Any]] = []
-    structured = getattr(result, "structuredContent", None)
-    if isinstance(structured, dict):
-        payloads.append(structured)
-        if isinstance(structured.get("result"), dict):
-            payloads.append(structured["result"])
-    content = getattr(result, "content", None)
-    if isinstance(content, list) and len(content) == 1:
-        text = getattr(content[0], "text", None)
-        if isinstance(text, str) and text.lstrip().startswith("{"):
-            try:
-                parsed = json.loads(text)
-            except ValueError:
-                parsed = None
-            if isinstance(parsed, dict):
-                payloads.append(parsed)
-    return payloads
 
 
 #: Prose is never read as failure (decided 2026-10-17, after the first real-
@@ -127,71 +111,14 @@ def _top_level_payloads(result: Any) -> list[dict[str, Any]]:
 #: Tools whose ``exit_code`` / ``timed_out`` ARE the call's outcome: aiops runs
 #: the command and waits for it. Elsewhere an ``exit_code`` is data (a log row,
 #: an inventory field), so this is a table, not a rule.
-_EXIT_CODE_TOOLS = frozenset({
-    ("aiops", "run_vm_guest_command"),
-    ("aiops", "run_vm_guest_command_with_output"),
-})
 
 
-def _guest_payloads(result: Any, skill: str, tool: str) -> list[dict[str, Any]]:
-    bare = _server(skill).removeprefix("vmware-") if isinstance(skill, str) else ""
-    return _top_level_payloads(result) if (bare, tool) in _EXIT_CODE_TOOLS else []
 
 
-def _guest_unknown(result: Any, skill: str, tool: str) -> str | None:
-    """A guest command that may still be running: timed out, or its process vanished.
-
-    aiops does not kill the guest process on timeout, and exit_code -1 means it
-    could not read one — either way the command may still be changing the guest.
-    """
-    for payload in _guest_payloads(result, skill, tool):
-        if payload.get("timed_out") is True or payload.get("exit_code") == -1:
-            return (
-                f"{tool}: the guest command timed out or its process could not be read "
-                f"(exit_code {payload.get('exit_code')!r}); it may still be running, so its "
-                "effect is UNKNOWN — check the guest before retrying or rolling back."
-            )
-    return None
 
 
-def _guest_failure(result: Any, skill: str, tool: str) -> str | None:
-    """A guest command that ran to completion and exited non-zero."""
-    for payload in _guest_payloads(result, skill, tool):
-        code = payload.get("exit_code")
-        if isinstance(code, int) and not isinstance(code, bool) and code != 0:
-            stderr = str(payload.get("stderr") or "")[:300]
-            return f"{tool}: the command exited with exit_code {code}. stderr: {stderr}"
-    return None
 
 
-def _returned_failure(result: Any, skill: str = "", tool: str = "") -> str | None:
-    """Return the failure message if this dispatch result reports failure.
-
-    Only a TOP-LEVEL, non-empty ``error`` counts: ``{"error": None}`` is an
-    explicit "no error", and an ``error`` nested inside a row (an alarm's
-    ``error_count``, say) is data, not a failed call. A TOP-LEVEL
-    ``"action": "preview"`` is a failure too: the tool changed nothing. So is a
-    ``-> list`` tool's error shape, a list holding exactly one ``{"error": ...}``
-    row. A string is never read as failure (see the note above).
-    """
-    if any(p.get("action") == "preview" for p in _top_level_payloads(result)):
-        return _PREVIEW_ONLY
-    if getattr(result, "isError", False):
-        # Unwrap the content block if there is one: the skill's own teaching
-        # message is the useful part, not the repr of the transport object.
-        content = getattr(result, "content", None)
-        if isinstance(content, list) and content and getattr(content[0], "text", None):
-            return str(content[0].text)
-        return str(content or "the tool reported isError")
-    for payload in _top_level_payloads(result):
-        err = payload.get("error")
-        if err not in (None, "", [], {}):
-            return str(err)
-    if isinstance(result, list) and len(result) == 1 and isinstance(result[0], dict):
-        err = result[0].get("error")
-        if err not in (None, "", [], {}):
-            return str(err)
-    return _guest_failure(result, skill, tool)
 
 
 _NO_DISPATCH_REASON = (
@@ -850,48 +777,8 @@ class WorkflowExecutor:
         return {k: _resolve_value(v) for k, v in params.items()}
 
 
-def _first_redacted_sensitive_key(params: Any) -> str | None:
-    """Return the first sensitive-key whose value is the redacted placeholder.
-
-    Recurses through dicts/lists exactly like the persistence redaction, so a
-    secret nested in a sub-dict is caught too. Returns ``None`` when every
-    sensitive param holds a real value (the in-process happy path) — and never
-    fires for a non-sensitive key that merely happens to equal ``'***'``.
-    """
-    if isinstance(params, dict):
-        for key, value in params.items():
-            if is_sensitive_key(key) and value == REDACTED_PLACEHOLDER:
-                return key
-            nested = _first_redacted_sensitive_key(value)
-            if nested is not None:
-                return nested
-    elif isinstance(params, list):
-        for item in params:
-            nested = _first_redacted_sensitive_key(item)
-            if nested is not None:
-                return nested
-    return None
 
 
-def _unrun_refusal(wf: Workflow, unrun: list[WorkflowStep]) -> dict[str, Any]:
-    """Teaching refusal: the gate would approve steps Pilot never ran."""
-    listed = ", ".join(f"step {s.index} ({s.skill}.{s.tool})" for s in unrun)
-    return {
-        "error": (
-            f"Refusing to approve workflow '{wf.id}': {len(unrun)} step(s) before this "
-            f"gate — {listed} — were recorded but NOT executed (the server runs without "
-            "--dispatch), so Pilot has no record that they ran or what they returned, whatever the "
-            "approval message says. If you performed each of them yourself and checked "
-            "its result, show those results to the approver and call approve again with "
-            "acknowledge_not_executed=True; do not perform them again. If nobody "
-            "performed them, cancel_workflow this one and create a new workflow."
-        ),
-        "workflow_id": wf.id,
-        "state": wf.state.value,
-        "not_executed_before_gate": [
-            {"index": s.index, "skill": s.skill, "tool": s.tool} for s in unrun
-        ],
-    }
 
 
 def _now() -> str:
