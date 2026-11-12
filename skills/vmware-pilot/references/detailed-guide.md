@@ -294,8 +294,8 @@ Read-only self-test with your own model and agent host: [model-fit self-test](ht
 2.0 renames one MCP tool: `plan_workflow` → `create_workflow_from_template`. It always created and saved a
 workflow from a template (it is a write, not a dry run); the new name says so and sets it apart from
 `create_workflow`, which saves your own step list. Parameters and results are unchanged, and so are the CLI
-commands. The skill catalog also follows vmware-vks's renames (`get_supervisor_kubeconfig` →
-`issue_supervisor_kubeconfig`, `get_tkc_kubeconfig` → `issue_tkc_kubeconfig`). Workflows saved with the old
+commands. The skill catalog also follows vmware-vks's renames (`issue_supervisor_kubeconfig` →
+`issue_supervisor_kubeconfig`, `issue_tkc_kubeconfig` → `issue_tkc_kubeconfig`). Workflows saved with the old
 names are translated when loaded. If an agent prompt, script or `~/.vmware/rules.yaml` names `plan_workflow`,
 update it. Requires vmware-policy ≥ 1.19.0. Details: [RELEASE_NOTES.md](../../../RELEASE_NOTES.md#v200--create_workflow_from_template-and-vks-kubeconfig-tools-at-their-new-names).
 
