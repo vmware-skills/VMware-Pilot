@@ -1,0 +1,6 @@
+[project]
+name = "vmware-pilot-mcpb"
+version = "2.5.1"
+description = "Claude Desktop extension shim that runs the published vmware-pilot MCP server"
+requires-python = ">=3.10"
+dependencies = ["vmware-pilot==2.5.1"]
