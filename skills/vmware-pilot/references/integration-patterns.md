@@ -12,7 +12,7 @@ Pilot vs. calling a skill directly.
 
 ## The Dispatch Contract
 
-Pilot is a **Dispatcher**, not an **Executor**. This is a deliberate v2-style architecture (per the Enterprise Harness Engineering framework — see `docs/architecture-audit-2026-04-30.md`).
+Pilot is a **Dispatcher**, not an **Executor**. This is a deliberate v2-style architecture (per the Enterprise Harness Engineering framework).
 
 The contract:
 
