@@ -21,3 +21,7 @@ config.yaml
 .claude/
 .trae/
 skills-lock.json
+
+# Design and planning documents stay out of the public repo and the sdist.
+docs/plans/
+design/
