@@ -1388,7 +1388,8 @@
   },
   "get_case": {
    "properties": [
-    "case_id"
+    "case_id",
+    "report_view"
    ],
    "required": [
     "case_id"
